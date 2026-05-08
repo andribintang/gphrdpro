@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HRD Lite — Module 2: Attendance System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#06080f;--bg2:#0c0f1a;--bg3:#111525;--bg4:#181d2e;
+    --border:#1a1f35;--border2:#222840;
+    --text:#e8edff;--text2:#7b82a8;--text3:#3d4260;
+    --accent:#5e9bff;--a2:#a78bfa;--a3:#34d399;
+    --red:#f87171;--yellow:#fbbf24;--orange:#fb923c;
+  }
+  [data-theme="light"]{
+    --bg:#f0f2fa;--bg2:#fff;--bg3:#e8ebf5;--bg4:#dde1f0;
+    --border:#cdd2e8;--border2:#b8bedd;
+    --text:#0a0c1a;--text2:#454970;--text3:#8a8fb5;
+    --accent:#3b78f0;--a2:#7c3aed;--a3:#059669;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+  /* ── header ── */
+  .hdr{position:sticky;top:0;z-index:99;backdrop-filter:blur(20px);
+    background:color-mix(in srgb,var(--bg) 80%,transparent);
+    border-bottom:1px solid var(--border);padding:11px 20px}
+  .hdr-in{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:var(--text)}
+  .logo-dot{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--a2));
+    display:flex;align-items:center;justify-content:center;font-size:13px}
+  .m-badge{padding:3px 9px;border-radius:99px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.5px;
+    background:color-mix(in srgb,var(--a3) 12%,transparent);border:1px solid color-mix(in srgb,var(--a3) 25%,transparent);color:var(--a3)}
+  .thm-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:5px 11px;border-radius:7px;
+    cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;transition:.15s}
+  .thm-btn:hover{background:var(--bg4);color:var(--text)}
+
+  /* ── layout ── */
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px}
+
+  /* ── hero ── */
+  .hero{padding:48px 0 36px;border-bottom:1px solid var(--border);margin-bottom:40px}
+  .eyebrow{font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);letter-spacing:2px;text-transform:uppercase;
+    margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .eyebrow::before{content:'';display:block;width:20px;height:1px;background:var(--a3)}
+  .hero h1{font-family:'Syne',sans-serif;font-size:clamp(26px,5vw,40px);font-weight:800;line-height:1.15;margin-bottom:12px}
+  .hero h1 span{background:linear-gradient(120deg,var(--accent),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{font-size:14px;color:var(--text2);line-height:1.75;max-width:580px}
+  .pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:20px}
+  .pill{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:99px;background:var(--bg3);
+    border:1px solid var(--border);font-size:11px;color:var(--text2);font-weight:500}
+  .pill .d{width:5px;height:5px;border-radius:50%}
+
+  /* ── section ── */
+  .sec{margin-bottom:44px}
+  .sec-hdr{display:flex;align-items:center;gap:11px;margin-bottom:18px}
+  .sec-n{width:26px;height:26px;border-radius:7px;
+    background:linear-gradient(135deg,var(--accent),var(--a2));
+    display:flex;align-items:center;justify-content:center;
+    font-family:'DM Mono',monospace;font-size:11px;color:#fff;font-weight:700;flex-shrink:0}
+  .sec-t{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text)}
+  .divider{height:1px;background:var(--border);margin:40px 0}
+
+  /* ── code ── */
+  .cb{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden;margin-bottom:14px}
+  .cb-hdr{display:flex;align-items:center;justify-content:space-between;
+    padding:9px 14px;background:var(--bg3);border-bottom:1px solid var(--border)}
+  .cb-lbl{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);display:flex;align-items:center;gap:7px}
+  .ltag{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px}
+  .l-bash{background:color-mix(in srgb,var(--a3) 14%,transparent);color:var(--a3)}
+  .l-js  {background:color-mix(in srgb,var(--yellow) 14%,transparent);color:var(--yellow)}
+  .l-env {background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--orange)}
+  .cp-btn{background:none;border:1px solid var(--border);color:var(--text3);padding:3px 9px;
+    border-radius:5px;cursor:pointer;font-size:10px;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;gap:4px}
+  .cp-btn:hover{background:var(--bg4);color:var(--text);border-color:var(--border2)}
+  .cp-btn.ok{color:var(--a3);border-color:var(--a3)}
+  .cb-body{padding:14px 18px;overflow-x:auto}
+  .cb-body pre{font-family:'DM Mono',monospace;font-size:12px;line-height:1.9;color:var(--text);white-space:pre}
+  .k{color:var(--accent)} .v{color:var(--a3)} .s{color:var(--orange)}
+  .c{color:var(--text3);font-style:italic} .kw{color:var(--a2)} .n{color:var(--yellow)} .cmd{color:var(--a3)}
+
+  /* ── flow diagram ── */
+  .flow{display:flex;flex-direction:column;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+  .flow-step{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);position:relative}
+  .flow-step:last-child{border-bottom:none}
+  .flow-num{width:28px;height:28px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'DM Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+  .fn-green{background:color-mix(in srgb,var(--a3) 14%,transparent);color:var(--a3);border:1px solid color-mix(in srgb,var(--a3) 25%,transparent)}
+  .fn-blue {background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent)}
+  .fn-yell {background:color-mix(in srgb,var(--yellow) 14%,transparent);color:var(--yellow);border:1px solid color-mix(in srgb,var(--yellow) 25%,transparent)}
+  .fn-red  {background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 25%,transparent)}
+  .fn-purp {background:color-mix(in srgb,var(--a2) 14%,transparent);color:var(--a2);border:1px solid color-mix(in srgb,var(--a2) 25%,transparent)}
+  .flow-body{}
+  .flow-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px}
+  .flow-desc{font-size:12px;color:var(--text2);line-height:1.6}
+  .flow-tag{display:inline-block;padding:2px 8px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;margin-top:5px}
+  .ft-ok   {background:color-mix(in srgb,var(--a3) 12%,transparent);color:var(--a3)}
+  .ft-warn {background:color-mix(in srgb,var(--yellow) 12%,transparent);color:var(--yellow)}
+  .ft-err  {background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
+  .ft-info {background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+
+  /* ── endpoint table ── */
+  .ep-tbl{border:1px solid var(--border);border-radius:13px;overflow:hidden}
+  .ep-row{display:grid;grid-template-columns:72px 1fr 90px 1fr;border-bottom:1px solid var(--border);align-items:center}
+  .ep-row:last-child{border-bottom:none}
+  .ep-row.head{background:var(--bg3);font-family:'DM Mono',monospace;font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px}
+  .ep-c{padding:10px 13px;font-size:12px;border-right:1px solid var(--border)}
+  .ep-c:last-child{border-right:none}
+  .mth{font-family:'DM Mono',monospace;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;display:inline-block}
+  .GET  {background:color-mix(in srgb,var(--a3) 14%,transparent);color:var(--a3)}
+  .POST {background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+  .PUT  {background:color-mix(in srgb,var(--yellow) 14%,transparent);color:var(--yellow)}
+  .DELETE{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red)}
+  .auth-p{display:inline-block;padding:2px 7px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700}
+  .pub{background:color-mix(in srgb,var(--a3) 12%,transparent);color:var(--a3)}
+  .bearer{background:color-mix(in srgb,var(--a2) 12%,transparent);color:var(--a2)}
+  .admin{background:color-mix(in srgb,var(--orange) 12%,transparent);color:var(--orange)}
+  .ep-path{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg3);padding:2px 7px;border-radius:4px}
+
+  /* ── ui preview cards ── */
+  .ui-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  .ui-card{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+  .ui-card-hdr{background:var(--bg3);padding:10px 14px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text)}
+  .ui-card-body{padding:14px}
+
+  /* ── mock phone ── */
+  .phone-wrap{display:flex;justify-content:center;margin:20px 0}
+  .phone{width:220px;background:var(--bg2);border:2px solid var(--border2);border-radius:28px;
+    padding:16px 14px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .phone-notch{width:60px;height:5px;background:var(--border2);border-radius:99px;margin:0 auto 14px}
+  .phone-screen{background:var(--bg3);border-radius:16px;padding:14px;min-height:280px}
+
+  /* ── status cards ── */
+  .status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .sc{padding:10px;border-radius:10px;text-align:center;border:1px solid var(--border)}
+  .sc-v{font-size:16px;font-weight:800;margin-bottom:3px}
+  .sc-l{font-size:9px;color:var(--text3);font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+
+  /* ── rule boxes ── */
+  .rules{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .rule-card{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:14px}
+  .rule-icon{font-size:20px;margin-bottom:8px}
+  .rule-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px}
+  .rule-desc{font-size:11.5px;color:var(--text2);line-height:1.6}
+  .rule-tag{display:inline-block;margin-top:7px;padding:2px 8px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600}
+
+  /* alert */
+  .alert{padding:12px 15px;border-radius:9px;border-left:3px solid;font-size:12.5px;display:flex;gap:9px;margin-bottom:14px;line-height:1.6}
+  .alert.info{background:color-mix(in srgb,var(--accent) 7%,transparent);border-color:var(--accent);color:var(--text2)}
+  .alert.ok  {background:color-mix(in srgb,var(--a3) 7%,transparent);border-color:var(--a3);color:var(--text2)}
+  .alert.warn{background:color-mix(in srgb,var(--yellow) 7%,transparent);border-color:var(--yellow);color:var(--text2)}
+
+  /* footer */
+  .footer{margin-top:56px;padding:24px 20px;border-top:1px solid var(--border);text-align:center}
+  .footer p{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)}
+
+  @media(max-width:600px){
+    .ep-row{grid-template-columns:60px 1fr}
+    .ep-row .ep-c:nth-child(3),.ep-row .ep-c:nth-child(4){display:none}
+    .rules{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo"><div class="logo-dot">🕐</div>HRD Lite</div>
+    <div style="display:flex;align-items:center;gap:9px">
+      <span class="m-badge">MODULE 2</span>
+      <button class="thm-btn" onclick="tog()" id="tb">☀ Light</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="eyebrow">Attendance System Complete</div>
+  <h1>Module 2 — <span>Absensi GPS & Waktu</span></h1>
+  <p>Check-in/out mobile dengan GPS capture, deteksi keterlambatan otomatis (batas 08:05 WIB),
+    riwayat bulanan, dan panel rekap harian untuk admin/HR. Semua berjalan real-time di server WIB.</p>
+  <div class="pills">
+    <span class="pill"><span class="d" style="background:var(--a3)"></span> Check-in 1x/hari</span>
+    <span class="pill"><span class="d" style="background:var(--yellow)"></span> Auto-late >08:05</span>
+    <span class="pill"><span class="d" style="background:var(--accent)"></span> GPS Optional</span>
+    <span class="pill"><span class="d" style="background:var(--a2)"></span> Work Hours Calc</span>
+    <span class="pill"><span class="d" style="background:var(--orange)"></span> Admin Daily Recap</span>
+  </div>
+</div>
+
+<!-- 01 — FILES ADDED -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">01</div><div class="sec-t">File yang Dibuat / Diubah</div></div>
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-bash">TREE</span>Module 2 files</div></div>
+    <div class="cb-body"><pre>
+<span class="k">NEW</span>  backend/controllers/<span class="v">attendanceController.js</span>  <span class="c">← logic check-in/out/history/admin</span>
+<span class="k">NEW</span>  backend/routes/<span class="v">attendance.js</span>                 <span class="c">← 6 endpoints dengan validasi</span>
+<span class="k">MOD</span>  backend/<span class="v">server.js</span>                            <span class="c">← register /api/attendance routes</span>
+
+<span class="k">NEW</span>  frontend/src/utils/<span class="v">attendanceService.js</span>        <span class="c">← API calls + GPS helper + formatters</span>
+<span class="k">NEW</span>  frontend/src/hooks/<span class="v">useLiveClock.js</span>             <span class="c">← live WIB clock, update tiap detik</span>
+<span class="k">NEW</span>  frontend/src/pages/<span class="v">AttendancePage.jsx</span>          <span class="c">← full UI: clock tab + history tab</span>
+<span class="k">MOD</span>  frontend/src/<span class="v">App.jsx</span>                          <span class="c">← import AttendancePage (replace placeholder)</span>
+<span class="k">MOD</span>  frontend/src/pages/<span class="v">DashboardPage.jsx</span>          <span class="c">← quick action card live attendance status</span>
+    </pre></div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 02 — BUSINESS RULES -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">02</div><div class="sec-t">Business Rules & Logic</div></div>
+  <div class="rules">
+    <div class="rule-card">
+      <div class="rule-icon">🔒</div>
+      <div class="rule-title">1x Check-in per Hari</div>
+      <div class="rule-desc">Database constraint <code style="font-family:'DM Mono',monospace;font-size:10px;background:var(--bg3);padding:1px 5px;border-radius:3px">UNIQUE(user_id, date)</code>.
+        Jika sudah check-in dan coba lagi, API return <strong>409 Conflict</strong> dengan pesan yang jelas.</div>
+      <span class="rule-tag" style="background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)">HTTP 409</span>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">⏰</div>
+      <div class="rule-title">Auto-Status Terlambat</div>
+      <div class="rule-desc">Server WIB (UTC+7) menentukan status.
+        Check-in sebelum <strong>08:05</strong> → <em>present</em>.
+        Check-in setelah 08:05 → <em>late</em>. Toleransi 5 menit dari jam masuk 08:00.</div>
+      <span class="rule-tag" style="background:color-mix(in srgb,var(--yellow) 12%,transparent);color:var(--yellow)">LATE_GRACE = 5 mnt</span>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">📍</div>
+      <div class="rule-title">GPS Optional</div>
+      <div class="rule-desc">Koordinat GPS <em>tidak wajib</em> — jika user menolak izin lokasi,
+        absensi tetap berhasil dengan <code style="font-family:'DM Mono',monospace;font-size:10px;background:var(--bg3);padding:1px 5px;border-radius:3px">lat/lng = NULL</code>.
+        Jika ada, disimpan ke <em>check_in_lat</em> & <em>check_in_lng</em>.</div>
+      <span class="rule-tag" style="background:color-mix(in srgb,var(--a3) 12%,transparent);color:var(--a3)">Non-blocking</span>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">🧮</div>
+      <div class="rule-title">Auto Hitung Jam Kerja</div>
+      <div class="rule-desc">Saat check-out, sistem otomatis menghitung selisih waktu
+        <em>check_in → check_out</em> dalam jam (2 desimal) dan menyimpan ke kolom
+        <code style="font-family:'DM Mono',monospace;font-size:10px;background:var(--bg3);padding:1px 5px;border-radius:3px">work_hours</code>.</div>
+      <span class="rule-tag" style="background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)">work_hours = out − in</span>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">🕐</div>
+      <div class="rule-title">Waktu Server WIB</div>
+      <div class="rule-desc">Semua waktu dihitung di sisi server menggunakan <strong>WIB (UTC+7)</strong>,
+        bukan waktu client. Ini mencegah manipulasi waktu dari device user.</div>
+      <span class="rule-tag" style="background:color-mix(in srgb,var(--a2) 12%,transparent);color:var(--a2)">Server-side time</span>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">🔄</div>
+      <div class="rule-title">Urutan Wajib</div>
+      <div class="rule-desc">Check-out hanya bisa dilakukan setelah check-in di hari yang sama.
+        Tidak bisa check-out tanpa check-in. Tidak bisa check-out 2x di hari yang sama.</div>
+      <span class="rule-tag" style="background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)">HTTP 400 / 409</span>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 03 — CHECK-IN FLOW -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">03</div><div class="sec-t">Check-in Logic Flow</div></div>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num fn-blue">1</div>
+      <div class="flow-body">
+        <div class="flow-title">User klik tombol CHECK IN</div>
+        <div class="flow-desc">Frontend mengambil GPS (non-blocking, timeout 10 detik). Jika GPS gagal/ditolak, lanjut tanpa koordinat.</div>
+        <span class="flow-tag ft-info">GPS optional</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num fn-blue">2</div>
+      <div class="flow-body">
+        <div class="flow-title">POST /api/attendance/check-in</div>
+        <div class="flow-desc">Kirim payload <code style="font-family:'DM Mono',monospace;font-size:11px;background:var(--bg3);padding:1px 5px;border-radius:3px">{ lat, lng }</code> ke backend. JWT diperlukan di header Authorization.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num fn-blue">3</div>
+      <div class="flow-body">
+        <div class="flow-title">Backend cek duplikat</div>
+        <div class="flow-desc">Query <code style="font-family:'DM Mono',monospace;font-size:11px;background:var(--bg3);padding:1px 5px;border-radius:3px">WHERE user_id = ? AND date = today_WIB</code>. Jika sudah ada record → return 409.</div>
+        <span class="flow-tag ft-err">ALREADY_CHECKED_IN → 409</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num fn-yell">4</div>
+      <div class="flow-body">
+        <div class="flow-title">Hitung status berdasarkan jam server WIB</div>
+        <div class="flow-desc">Ambil waktu WIB server → konversi ke HH:MM → bandingkan dengan threshold 08:05.</div>
+        <span class="flow-tag ft-ok">≤ 08:05 → present</span>&nbsp;
+        <span class="flow-tag ft-warn">> 08:05 → late</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num fn-green">5</div>
+      <div class="flow-body">
+        <div class="flow-title">INSERT ke tabel attendance</div>
+        <div class="flow-desc">Simpan: <em>user_id, date, check_in (HH:MM:SS), check_in_lat, check_in_lng, status</em>.</div>
+        <span class="flow-tag ft-ok">201 Created</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num fn-green">6</div>
+      <div class="flow-body">
+        <div class="flow-title">Response ke frontend</div>
+        <div class="flow-desc">Return data attendance baru + pesan sesuai status (tepat waktu / terlambat). Frontend refresh tampilan dan update tombol ke CHECK OUT.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 04 — API ENDPOINTS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">04</div><div class="sec-t">API Endpoints — Module 2</div></div>
+  <div class="ep-tbl">
+    <div class="ep-row head">
+      <div class="ep-c">METHOD</div><div class="ep-c">ENDPOINT</div>
+      <div class="ep-c">AUTH</div><div class="ep-c">DESKRIPSI</div>
+    </div>
+    <div class="ep-row">
+      <div class="ep-c"><span class="mth GET">GET</span></div>
+      <div class="ep-c"><span class="ep-path">/api/attendance/today</span></div>
+      <div class="ep-c"><span class="auth-p bearer">Bearer</span></div>
+      <div class="ep-c" style="font-size:12px;color:var(--text2)">Status absensi hari ini + waktu server WIB</div>
+    </div>
+    <div class="ep-row">
+      <div class="ep-c"><span class="mth POST">POST</span></div>
+      <div class="ep-c"><span class="ep-path">/api/attendance/check-in</span></div>
+      <div class="ep-c"><span class="auth-p bearer">Bearer</span></div>
+      <div class="ep-c" style="font-size:12px;color:var(--text2)">Check-in + GPS optional, 1x/hari, auto status</div>
+    </div>
+    <div class="ep-row">
+      <div class="ep-c"><span class="mth POST">POST</span></div>
+      <div class="ep-c"><span class="ep-path">/api/attendance/check-out</span></div>
+      <div class="ep-c"><span class="auth-p bearer">Bearer</span></div>
+      <div class="ep-c" style="font-size:12px;color:var(--text2)">Check-out + hitung jam kerja otomatis</div>
+    </div>
+    <div class="ep-row">
+      <div class="ep-c"><span class="mth GET">GET</span></div>
+      <div class="ep-c"><span class="ep-path">/api/attendance/history</span></div>
+      <div class="ep-c"><span class="auth-p bearer">Bearer</span></div>
+      <div class="ep-c" style="font-size:12px;color:var(--text2)">Riwayat pribadi, filter ?month=YYYY-MM</div>
+    </div>
+    <div class="ep-row">
+      <div class="ep-c"><span class="mth GET">GET</span></div>
+      <div class="ep-c"><span class="ep-path">/api/attendance/admin/daily</span></div>
+      <div class="ep-c"><span class="auth-p admin">Admin/HR</span></div>
+      <div class="ep-c" style="font-size:12px;color:var(--text2)">Rekap semua karyawan ?date=YYYY-MM-DD</div>
+    </div>
+    <div class="ep-row">
+      <div class="ep-c"><span class="mth GET">GET</span></div>
+      <div class="ep-c"><span class="ep-path">/api/attendance/admin/monthly</span></div>
+      <div class="ep-c"><span class="auth-p admin">Admin/HR</span></div>
+      <div class="ep-c" style="font-size:12px;color:var(--text2)">Rekap 1 karyawan ?userId=&amp;month=YYYY-MM</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 05 — TEST COMMANDS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">05</div><div class="sec-t">Cara Test Module 2</div></div>
+
+  <div class="alert info">
+    <span>ℹ️</span>
+    <div>Ganti <code style="font-family:'DM Mono',monospace;background:var(--bg3);padding:1px 5px;border-radius:3px">TOKEN</code> dengan accessToken yang didapat dari login endpoint <code style="font-family:'DM Mono',monospace;background:var(--bg3);padding:1px 5px;border-radius:3px">POST /api/auth/login</code></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-bash">BASH</span>1. Cek status hari ini</div>
+      <button class="cp-btn" onclick="cp(this,'t1')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="t1"><span class="cmd">curl</span> http://localhost:5000/api/attendance/today \
+  -H <span class="s">"Authorization: Bearer TOKEN"</span></pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-bash">BASH</span>2. Check-in (dengan GPS)</div>
+      <button class="cp-btn" onclick="cp(this,'t2')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="t2"><span class="cmd">curl</span> -X POST http://localhost:5000/api/attendance/check-in \
+  -H <span class="s">"Authorization: Bearer TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"lat":-6.2088,"lng":106.8456}'</span></pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-bash">BASH</span>3. Check-out</div>
+      <button class="cp-btn" onclick="cp(this,'t3')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="t3"><span class="cmd">curl</span> -X POST http://localhost:5000/api/attendance/check-out \
+  -H <span class="s">"Authorization: Bearer TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{}'</span></pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-bash">BASH</span>4. Riwayat bulan ini</div>
+      <button class="cp-btn" onclick="cp(this,'t4')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="t4"><span class="cmd">curl</span> "http://localhost:5000/api/attendance/history?month=2024-01" \
+  -H <span class="s">"Authorization: Bearer TOKEN"</span></pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-bash">BASH</span>5. Admin — rekap harian semua karyawan</div>
+      <button class="cp-btn" onclick="cp(this,'t5')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="t5"><span class="cmd">curl</span> "http://localhost:5000/api/attendance/admin/daily?date=2024-01-15" \
+  -H <span class="s">"Authorization: Bearer ADMIN_TOKEN"</span></pre></div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 06 — UI COMPONENTS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">06</div><div class="sec-t">UI Components Dibangun</div></div>
+  <div class="ui-grid">
+    <div class="ui-card">
+      <div class="ui-card-hdr">⭕ Big Action Button</div>
+      <div class="ui-card-body" style="font-size:12px;color:var(--text2);line-height:1.7">
+        Tombol bulat 160×160px dengan <strong>pulse ring animation</strong>.
+        3 state: <em>Check-in</em> (hijau/amber), <em>Check-out</em> (biru), <em>Selesai</em> (grey).
+        Warna berubah jika sudah melewati jam 08:05.
+      </div>
+    </div>
+    <div class="ui-card">
+      <div class="ui-card-hdr">🕐 Live Clock</div>
+      <div class="ui-card-body" style="font-size:12px;color:var(--text2);line-height:1.7">
+        Digital clock WIB update tiap detik via <code style="font-family:'DM Mono',monospace;font-size:10px;background:var(--bg3);padding:1px 5px;border-radius:3px">useLiveClock</code> hook.
+        Tampil jam:menit:detik + hari + tanggal Indonesia. Banner peringatan muncul jika sudah melewati 08:05.
+      </div>
+    </div>
+    <div class="ui-card">
+      <div class="ui-card-hdr">📍 GPS Indicator</div>
+      <div class="ui-card-body" style="font-size:12px;color:var(--text2);line-height:1.7">
+        Auto-request GPS saat halaman dibuka. Tampil koordinat + akurasi jika berhasil,
+        atau "Tanpa GPS" jika ditolak. Tombol Refresh GPS tersedia.
+        Absensi tetap jalan tanpa GPS.
+      </div>
+    </div>
+    <div class="ui-card">
+      <div class="ui-card-hdr">📊 Today Summary Card</div>
+      <div class="ui-card-body" style="font-size:12px;color:var(--text2);line-height:1.7">
+        Card ringkasan berisi: jam masuk, jam keluar, total jam kerja.
+        Status badge berwarna (Hadir/Terlambat). Koordinat GPS tampil jika tersedia.
+      </div>
+    </div>
+    <div class="ui-card">
+      <div class="ui-card-hdr">📅 History Tab</div>
+      <div class="ui-card-body" style="font-size:12px;color:var(--text2);line-height:1.7">
+        Filter per bulan dengan navigasi prev/next. Stats 4 kolom (hari, hadir, telat, jam).
+        List per record dengan tanggal, waktu in/out, duration, GPS indicator, dan status badge.
+      </div>
+    </div>
+    <div class="ui-card">
+      <div class="ui-card-hdr">📈 Dashboard Quick Card</div>
+      <div class="ui-card-body" style="font-size:12px;color:var(--text2);line-height:1.7">
+        Dashboard card absensi sekarang <strong>live</strong> — menampilkan status hari ini
+        (Belum Absen / Sudah Masuk / Lengkap) dengan warna dinamis dan jam check-in/out.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 07 — RESPONSE EXAMPLES -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">07</div><div class="sec-t">Contoh Response API</div></div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-js">JSON</span>Check-in berhasil (tepat waktu)</div>
+      <button class="cp-btn" onclick="cp(this,'r1')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="r1">{
+  <span class="k">"success"</span>: <span class="n">true</span>,
+  <span class="k">"message"</span>: <span class="s">"Check-in berhasil! Tepat waktu pukul 07:58"</span>,
+  <span class="k">"data"</span>: {
+    <span class="k">"attendance"</span>: {
+      <span class="k">"id"</span>: <span class="n">42</span>,
+      <span class="k">"user_id"</span>: <span class="n">3</span>,
+      <span class="k">"date"</span>: <span class="s">"2024-01-15"</span>,
+      <span class="k">"check_in"</span>: <span class="s">"07:58:23"</span>,
+      <span class="k">"check_out"</span>: <span class="n">null</span>,
+      <span class="k">"check_in_lat"</span>: <span class="s">"-6.2088"</span>,
+      <span class="k">"check_in_lng"</span>: <span class="s">"106.8456"</span>,
+      <span class="k">"status"</span>: <span class="s">"present"</span>,
+      <span class="k">"work_hours"</span>: <span class="n">null</span>
+    }
+  }
+}</pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-js">JSON</span>Check-in terlambat (setelah 08:05)</div>
+      <button class="cp-btn" onclick="cp(this,'r2')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="r2">{
+  <span class="k">"success"</span>: <span class="n">true</span>,
+  <span class="k">"message"</span>: <span class="s">"Check-in berhasil. Anda terlambat 08:23 (batas 08:05)"</span>,
+  <span class="k">"data"</span>: {
+    <span class="k">"attendance"</span>: { <span class="c">... "status": "late" ...</span> }
+  }
+}</pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-js">JSON</span>Check-out berhasil</div>
+      <button class="cp-btn" onclick="cp(this,'r3')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="r3">{
+  <span class="k">"success"</span>: <span class="n">true</span>,
+  <span class="k">"message"</span>: <span class="s">"Check-out berhasil pukul 17:02. Total kerja: 9.07 jam"</span>,
+  <span class="k">"data"</span>: {
+    <span class="k">"attendance"</span>: {
+      <span class="k">"check_out"</span>: <span class="s">"17:02:15"</span>,
+      <span class="k">"work_hours"</span>: <span class="s">"9.07"</span>,
+      <span class="k">"status"</span>: <span class="s">"present"</span>
+    }
+  }
+}</pre></div>
+  </div>
+
+  <div class="cb">
+    <div class="cb-hdr"><div class="cb-lbl"><span class="ltag l-js">JSON</span>Error — sudah check-in hari ini</div>
+      <button class="cp-btn" onclick="cp(this,'r4')">⎘ Copy</button></div>
+    <div class="cb-body"><pre id="r4">{
+  <span class="k">"success"</span>: <span class="n">false</span>,
+  <span class="k">"message"</span>: <span class="s">"Anda sudah check-in hari ini"</span>,
+  <span class="k">"code"</span>: <span class="s">"ALREADY_CHECKED_IN"</span>,
+  <span class="k">"data"</span>: { <span class="c">... existing attendance record ...</span> }
+}</pre></div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 08 — MODULE PROGRESS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-n">08</div><div class="sec-t">Status Module Progress</div></div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border)">
+      <div style="padding:9px 13px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);font-weight:700;letter-spacing:1px;background:var(--bg3);border-right:1px solid var(--border)">MODULE</div>
+      <div style="padding:9px 13px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);font-weight:700;letter-spacing:1px;background:var(--bg3);border-right:1px solid var(--border)">FITUR</div>
+      <div style="padding:9px 13px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);font-weight:700;letter-spacing:1px;background:var(--bg3)">STATUS</div>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border)">
+      <div style="padding:10px 13px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);border-right:1px solid var(--border)">M1</div>
+      <div style="padding:10px 13px;font-size:12px;color:var(--text2);border-right:1px solid var(--border)">Auth, DB Schema, JWT, React Layout</div>
+      <div style="padding:10px 13px"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">✓ DONE</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--a3) 4%,transparent)">
+      <div style="padding:10px 13px;font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);font-weight:700;border-right:1px solid var(--border)">M2</div>
+      <div style="padding:10px 13px;font-size:12px;color:var(--text);font-weight:600;border-right:1px solid var(--border)">GPS Check-in/out, Auto-late, History, Admin Recap</div>
+      <div style="padding:10px 13px"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">✓ DONE</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border)">
+      <div style="padding:10px 13px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;border-right:1px solid var(--border)">M3</div>
+      <div style="padding:10px 13px;font-size:12px;color:var(--text2);border-right:1px solid var(--border)">Leave Management — Pengajuan & Approval Cuti</div>
+      <div style="padding:10px 13px"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--accent)">→ NEXT</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border)">
+      <div style="padding:10px 13px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);border-right:1px solid var(--border)">M4</div>
+      <div style="padding:10px 13px;font-size:12px;color:var(--text3);border-right:1px solid var(--border)">Payroll Processing & Slip Gaji</div>
+      <div style="padding:10px 13px"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">pending</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border)">
+      <div style="padding:10px 13px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);border-right:1px solid var(--border)">M5</div>
+      <div style="padding:10px 13px;font-size:12px;color:var(--text3);border-right:1px solid var(--border)">Employee Management CRUD</div>
+      <div style="padding:10px 13px"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">pending</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:80px 1fr 100px">
+      <div style="padding:10px 13px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);border-right:1px solid var(--border)">M6</div>
+      <div style="padding:10px 13px;font-size:12px;color:var(--text3);border-right:1px solid var(--border)">Reports & Analytics Dashboard</div>
+      <div style="padding:10px 13px"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">pending</span></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<footer class="footer"><p>HRD Lite Professional System · Module 2 — Attendance System · v2.0.0</p></footer>
+
+<script>
+function tog(){
+  const h=document.documentElement,b=document.getElementById('tb');
+  if(h.getAttribute('data-theme')==='dark'){h.setAttribute('data-theme','light');b.textContent='🌙 Dark'}
+  else{h.setAttribute('data-theme','dark');b.textContent='☀ Light'}
+}
+function cp(btn,id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{
+    btn.textContent='✓ Copied!';btn.classList.add('ok');
+    setTimeout(()=>{btn.textContent='⎘ Copy';btn.classList.remove('ok')},2000);
+  });
+}
+</script>
+</body>
+</html>
