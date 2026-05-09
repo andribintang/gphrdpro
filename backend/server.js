@@ -11,9 +11,9 @@ const authRoutes       = require('./routes/auth');
 const attendanceRoutes = require('./routes/attendance');
 const leaveRoutes      = require('./routes/leaves');
 const payrollRoutes    = require('./routes/payroll');
+const employeeRoutes   = require('./routes/employees');
+const reportsRoutes    = require('./routes/reports');
 
-// const payrollRoutes = require('./routes/payroll');
-// const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -70,7 +70,8 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves',     leaveRoutes);
 app.use('/api/payroll',    payrollRoutes);
-// app.use('/api/employees', employeeRoutes);
+app.use('/api/employees',  employeeRoutes);
+app.use('/api/reports',    reportsRoutes);
 
 // 404 & Error handlers
 app.use(notFound);

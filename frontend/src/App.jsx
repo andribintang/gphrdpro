@@ -9,10 +9,9 @@ import DashboardPage from './pages/DashboardPage';
 import AttendancePage from './pages/AttendancePage';
 import LeavesPage from './pages/LeavesPage';
 import PayrollPage from './pages/PayrollPage';
-import {
-  EmployeesPage,
-  SettingsPage,
-} from './pages/PlaceholderPages';
+import EmployeesPage from './pages/EmployeesPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -49,6 +48,14 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={['admin', 'hr', 'supervisor']}>
                     <EmployeesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="reports"
+                element={
+                  <ProtectedRoute roles={['admin', 'hr', 'supervisor']}>
+                    <ReportsPage />
                   </ProtectedRoute>
                 }
               />

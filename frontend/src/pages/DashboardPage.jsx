@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { attendanceService, formatTime } from '../utils/attendanceService';
 import { leaveService } from '../utils/leaveService';
 import { payrollService, toRupiahShort, currentMonth } from '../utils/payrollService';
+import { employeeService } from '../utils/employeeService';
 
 // Stat cards are now dynamic — see DashboardPage component
 
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const [todayAtt, setTodayAtt] = useState(null);
   const [leaveQuota, setLeaveQuota] = useState(null);
   const [payrollSummary, setPayrollSummary] = useState(null);
+  const [empStats, setEmpStats] = useState(null);
 
   useEffect(() => {
     attendanceService.getToday()
@@ -37,6 +39,12 @@ export default function DashboardPage() {
     leaveService.getMyQuota(new Date().getFullYear())
       .then(r => setLeaveQuota(r.data.data))
       .catch(() => {});
+    // HR/admin: employee stats
+    if (user?.role === 'admin' || user?.role === 'hr' || user?.role === 'supervisor') {
+      employeeService.getStats()
+        .then(r => setEmpStats(r.data.data.stats))
+        .catch(() => {});
+    }
     // HR/admin: load payroll summary for current month
     if (user?.role === 'admin' || user?.role === 'hr') {
       payrollService.getAll({ month: currentMonth() })
@@ -142,8 +150,9 @@ export default function DashboardPage() {
           </div>
         </button>
 
-        {/* Stat 4 - Users (admin/HR) or work hours (employee) */}
-        <div className="card p-4 space-y-3">
+        {/* Stat 4 - Total karyawan (admin/HR/supervisor) or own work hours (employee) */}
+        <button onClick={() => navigate(isAdmin || isHR ? '/employees' : '/attendance')}
+          className="card p-4 space-y-3 hover:border-brand-300 dark:hover:border-brand-700 transition-colors text-left">
           <div className="flex items-center justify-between">
             <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
               <Users className="w-4.5 h-4.5 text-blue-500" size={18} />
@@ -152,14 +161,19 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="text-xl font-bold text-[var(--text-primary)]">
-              {att?.work_hours ? `${att.work_hours}j` : '—'}
+              {empStats ? empStats.active : att?.work_hours ? `${att.work_hours}j` : '—'}
             </p>
-            <p className="text-xs text-[var(--text-secondary)] font-medium">Jam Kerja Hari Ini</p>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">
+              {empStats ? 'Karyawan Aktif' : 'Jam Kerja Hari Ini'}
+            </p>
             <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-              {hasOut ? 'Sudah selesai' : hasIn ? 'Sedang berjalan' : 'Belum mulai'}
+              {empStats
+                ? `Total ${empStats.total} · ${empStats.new_this_month} baru bulan ini`
+                : hasOut ? 'Sudah selesai' : hasIn ? 'Sedang berjalan' : 'Belum mulai'
+              }
             </p>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Quick actions */}

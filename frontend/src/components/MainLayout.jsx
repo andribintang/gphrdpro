@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
   LayoutDashboard, Users, Clock, CalendarOff,
-  DollarSign, Menu, X, Sun, Moon, LogOut,
+  DollarSign, BarChart3, Menu, X, Sun, Moon, LogOut,
   Shield, Bell, ChevronRight, Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
