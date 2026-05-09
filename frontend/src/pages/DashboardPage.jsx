@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { useEffect, useState } from 'react';
 import { attendanceService, STATUS_CONFIG, formatTime } from '../utils/attendanceService';
+import { leaveService } from '../utils/leaveService';
 
 const STAT_CARDS = [
   { label: 'Total Karyawan', value: '20', icon: Users, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-950', trend: '+2 bulan ini' },
@@ -30,10 +31,14 @@ export default function DashboardPage() {
   const today = format(new Date(), "EEEE, d MMMM yyyy", { locale: localeID });
 
   const [todayAtt, setTodayAtt] = useState(null);
+  const [leaveQuota, setLeaveQuota] = useState(null);
 
   useEffect(() => {
     attendanceService.getToday()
       .then(r => setTodayAtt(r.data.data))
+      .catch(() => {});
+    leaveService.getMyQuota(new Date().getFullYear())
+      .then(r => setLeaveQuota(r.data.data))
       .catch(() => {});
   }, []);
 
@@ -127,8 +132,12 @@ export default function DashboardPage() {
               <ChevronRight className="w-3.5 h-3.5 text-[var(--text-muted)]" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Ajukan Cuti</p>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">Buat request</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Cuti</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                {leaveQuota
+                  ? `Sisa ${leaveQuota.annual_remaining} hari`
+                  : 'Ajukan request'}
+              </p>
             </div>
           </button>
         </div>

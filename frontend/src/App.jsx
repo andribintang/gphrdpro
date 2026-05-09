@@ -7,8 +7,8 @@ import MainLayout from './components/MainLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AttendancePage from './pages/AttendancePage';
+import LeavesPage from './pages/LeavesPage';
 import {
-  LeavesPage,
   PayrollPage,
   EmployeesPage,
   SettingsPage,

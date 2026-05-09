@@ -2,6 +2,7 @@ const User = require('./User');
 const Employee = require('./Employee');
 const Attendance = require('./Attendance');
 const LeaveRequest = require('./LeaveRequest');
+const LeaveQuota = require('./LeaveQuota');
 const Payroll = require('./Payroll');
 
 // User <-> Employee (1:1)
@@ -17,8 +18,12 @@ User.hasMany(LeaveRequest, { foreignKey: 'user_id', as: 'leaveRequests' });
 LeaveRequest.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 LeaveRequest.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
 
+// User <-> LeaveQuota (1:Many by year)
+User.hasMany(LeaveQuota, { foreignKey: 'user_id', as: 'leaveQuotas' });
+LeaveQuota.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 // User <-> Payroll (1:Many)
 User.hasMany(Payroll, { foreignKey: 'user_id', as: 'payrolls' });
 Payroll.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
-module.exports = { User, Employee, Attendance, LeaveRequest, Payroll };
+module.exports = { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll };

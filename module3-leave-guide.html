@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>HRD Lite — Module 3: Leave Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b12;--bg2:#0d1220;--bg3:#111929;--bg4:#172035;--border:#1a2540;--b2:#1f2e4a;--text:#ddeeff;--t2:#6b80a8;--t3:#2e3d5c;--a:#4f9eff;--a2:#c084fc;--a3:#34d399;--red:#f87171;--ylw:#fbbf24;--org:#fb923c}
+[data-theme=light]{--bg:#f0f4fc;--bg2:#fff;--bg3:#e6ecf8;--bg4:#dce4f4;--border:#c8d4eb;--b2:#b8c7e0;--text:#070b18;--t2:#3d5080;--t3:#8a9dc0;--a:#2563eb;--a2:#7c3aed;--a3:#059669}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.hdr{position:sticky;top:0;z-index:99;backdrop-filter:blur(18px);background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom:1px solid var(--border);padding:11px 20px}
+.hdr-in{max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:var(--text)}
+.logo-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--a2),var(--a));display:flex;align-items:center;justify-content:center;font-size:13px}
+.mbadge{padding:3px 9px;border-radius:99px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.5px;background:color-mix(in srgb,var(--a2) 14%,transparent);border:1px solid color-mix(in srgb,var(--a2) 28%,transparent);color:var(--a2)}
+.thm{background:var(--bg3);border:1px solid var(--border);color:var(--t2);padding:5px 11px;border-radius:7px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif;transition:.15s}
+.thm:hover{background:var(--bg4);color:var(--text)}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+.hero{padding:50px 0 38px;border-bottom:1px solid var(--border);margin-bottom:42px}
+.eye{font-family:'DM Mono',monospace;font-size:11px;color:var(--a2);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.eye::before{content:'';display:block;width:20px;height:1px;background:var(--a2)}
+h1{font-family:'Syne',sans-serif;font-size:clamp(26px,5vw,42px);font-weight:800;line-height:1.12;margin-bottom:13px}
+h1 em{font-style:normal;background:linear-gradient(120deg,var(--a2),var(--a));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:14px;color:var(--t2);line-height:1.78;max-width:600px}
+.pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:22px}
+.pill{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:99px;background:var(--bg3);border:1px solid var(--border);font-size:11px;color:var(--t2);font-weight:500}
+.pill .d{width:5px;height:5px;border-radius:50%}
+.sec{margin-bottom:48px}
+.sh{display:flex;align-items:center;gap:11px;margin-bottom:20px}
+.sn{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--a2),var(--a));display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;color:#fff;font-weight:700;flex-shrink:0}
+.st{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text)}
+.div{height:1px;background:var(--border);margin:42px 0}
+.cb{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden;margin-bottom:14px}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.cl{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);display:flex;align-items:center;gap:7px}
+.lt{padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px}
+.bash{background:color-mix(in srgb,var(--a3) 13%,transparent);color:var(--a3)}
+.js{background:color-mix(in srgb,var(--ylw) 13%,transparent);color:var(--ylw)}
+.tree{background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--a)}
+.cpb{background:none;border:1px solid var(--border);color:var(--t3);padding:3px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;gap:4px}
+.cpb:hover{background:var(--bg4);color:var(--text);border-color:var(--b2)}
+.cpb.ok{color:var(--a3);border-color:var(--a3)}
+.cb-body{padding:14px 18px;overflow-x:auto}
+.cb-body pre{font-family:'DM Mono',monospace;font-size:12px;line-height:1.9;color:var(--text);white-space:pre}
+.k{color:var(--a)}.v{color:var(--a3)}.s{color:var(--org)}.c{color:var(--t3);font-style:italic}.kw{color:var(--a2)}.n{color:var(--ylw)}.cmd{color:var(--a3)}
+.wf{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.ws{display:flex;align-items:flex-start;gap:14px;padding:15px 18px;border-bottom:1px solid var(--border)}
+.ws:last-child{border-bottom:none}
+.wn{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+.wn.b{background:color-mix(in srgb,var(--a) 14%,transparent);color:var(--a);border:1px solid color-mix(in srgb,var(--a) 28%,transparent)}
+.wn.g{background:color-mix(in srgb,var(--a3) 14%,transparent);color:var(--a3);border:1px solid color-mix(in srgb,var(--a3) 28%,transparent)}
+.wn.y{background:color-mix(in srgb,var(--ylw) 14%,transparent);color:var(--ylw);border:1px solid color-mix(in srgb,var(--ylw) 28%,transparent)}
+.wn.r{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 28%,transparent)}
+.wn.a{background:color-mix(in srgb,var(--a2) 14%,transparent);color:var(--a2);border:1px solid color-mix(in srgb,var(--a2) 28%,transparent)}
+.wt{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px}
+.wd{font-size:12px;color:var(--t2);line-height:1.65}
+.wtag{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:5px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;margin-right:4px}
+.tok{background:color-mix(in srgb,var(--a3) 11%,transparent);color:var(--a3)}
+.twrn{background:color-mix(in srgb,var(--ylw) 11%,transparent);color:var(--ylw)}
+.terr{background:color-mix(in srgb,var(--red) 11%,transparent);color:var(--red)}
+.tinf{background:color-mix(in srgb,var(--a) 11%,transparent);color:var(--a)}
+.ep{border:1px solid var(--border);border-radius:13px;overflow:hidden;width:100%}
+.er{display:grid;grid-template-columns:72px 1fr 96px 1fr;border-bottom:1px solid var(--border);align-items:center}
+.er:last-child{border-bottom:none}
+.er.hd{background:var(--bg3);font-family:'DM Mono',monospace;font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px}
+.ec{padding:10px 13px;font-size:12px;border-right:1px solid var(--border)}
+.ec:last-child{border-right:none}
+.m{font-family:'DM Mono',monospace;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;display:inline-block}
+.GET{background:color-mix(in srgb,var(--a3) 13%,transparent);color:var(--a3)}
+.POST{background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--a)}
+.PATCH{background:color-mix(in srgb,var(--ylw) 13%,transparent);color:var(--ylw)}
+.DELETE{background:color-mix(in srgb,var(--red) 13%,transparent);color:var(--red)}
+.ap{display:inline-block;padding:2px 7px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700}
+.jwt{background:color-mix(in srgb,var(--a2) 11%,transparent);color:var(--a2)}
+.adm{background:color-mix(in srgb,var(--org) 11%,transparent);color:var(--org)}
+.epath{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg3);padding:2px 7px;border-radius:4px}
+.g2{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.fc{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.fch{background:var(--bg3);padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text)}
+.fcb{padding:14px;font-size:12px;color:var(--t2);line-height:1.7}
+.prog{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.pr{display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--border);align-items:center}
+.pr:last-child{border-bottom:none}
+.pr.hd{background:var(--bg3);font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:1px}
+.prc{padding:11px 14px;font-size:12px;border-right:1px solid var(--border)}
+.prc:last-child{border-right:none}
+.alert{padding:12px 15px;border-radius:9px;border-left:3px solid;font-size:12.5px;display:flex;gap:9px;margin-bottom:14px;line-height:1.6}
+.alert.info{background:color-mix(in srgb,var(--a) 7%,transparent);border-color:var(--a);color:var(--t2)}
+.footer{margin-top:56px;padding:24px 20px;border-top:1px solid var(--border);text-align:center}
+.footer p{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)}
+@media(max-width:600px){.er{grid-template-columns:62px 1fr}.er .ec:nth-child(3),.er .ec:nth-child(4){display:none}.pr{grid-template-columns:70px 1fr}.pr .prc:nth-child(3){display:none}}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo"><div class="logo-ico">📅</div>HRD Lite</div>
+    <div style="display:flex;align-items:center;gap:9px">
+      <span class="mbadge">MODULE 3</span>
+      <button class="thm" onclick="tog()" id="tb">&#9728; Light</button>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+<div class="hero">
+  <div class="eye">Leave Management Complete</div>
+  <h1>Module 3 &mdash; <em>Cuti &amp; Approval Workflow</em></h1>
+  <p>Sistem cuti lengkap: 7 tipe cuti, validasi kuota otomatis, pengecekan overlap tanggal, approval/reject dengan modal alasan, tracking sisa hari per tahun + carry-over support.</p>
+  <div class="pills">
+    <span class="pill"><span class="d" style="background:var(--a2)"></span>7 Tipe Cuti</span>
+    <span class="pill"><span class="d" style="background:var(--a3)"></span>Quota Tracking</span>
+    <span class="pill"><span class="d" style="background:var(--a)"></span>Anti-overlap Check</span>
+    <span class="pill"><span class="d" style="background:var(--ylw)"></span>Hari Kerja Calc</span>
+    <span class="pill"><span class="d" style="background:var(--org)"></span>Approval Workflow</span>
+    <span class="pill"><span class="d" style="background:var(--red)"></span>Reject Modal</span>
+    <span class="pill"><span class="d" style="background:var(--a3)"></span>Carry-Over</span>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">01</div><div class="st">File yang Dibuat / Diubah</div></div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt tree">TREE</span>Module 3 delta</div></div>
+    <div class="cb-body"><pre>
+<span class="v">NEW</span>  backend/models/<span class="k">LeaveQuota.js</span>            <span class="c">-- kuota per user per tahun, carry-over</span>
+<span class="v">NEW</span>  backend/controllers/<span class="k">leaveController.js</span>   <span class="c">-- 9 handler: create, list, quota, approve, reject...</span>
+<span class="v">NEW</span>  backend/routes/<span class="k">leaves.js</span>                <span class="c">-- route definitions + validasi express-validator</span>
+<span class="v">NEW</span>  frontend/src/utils/<span class="k">leaveService.js</span>       <span class="c">-- API wrapper + LEAVE_TYPES + formatters</span>
+<span class="v">NEW</span>  frontend/src/pages/<span class="k">LeavesPage.jsx</span>        <span class="c">-- 727 baris: QuotaCard, ApplyForm, LeaveCard, RejectModal, 2 tabs</span>
+<span class="kw">MOD</span>  backend/models/<span class="k">index.js</span>                 <span class="c">-- LeaveQuota + associations User hasMany</span>
+<span class="kw">MOD</span>  backend/scripts/<span class="k">migrate.js</span>              <span class="c">-- seed leave_quotas + sample approved+pending leaves</span>
+<span class="kw">MOD</span>  backend/<span class="k">server.js</span>                       <span class="c">-- cleaned comments, /api/leaves aktif</span>
+<span class="kw">MOD</span>  frontend/src/pages/<span class="k">DashboardPage.jsx</span>     <span class="c">-- cuti quick-card shows live sisa quota</span>
+<span class="kw">MOD</span>  frontend/src/<span class="k">App.jsx</span>                    <span class="c">-- LeavesPage replace placeholder</span>
+    </pre></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">02</div><div class="st">Approval Workflow Flow</div></div>
+  <div class="wf">
+    <div class="ws"><div class="wn b">1</div><div><div class="wt">Karyawan ajukan cuti via bottom-sheet form</div><div class="wd">Pilih tipe, tanggal, alasan (min 10 karakter). Preview hari kerja dihitung real-time di frontend (exclude Sabtu/Minggu). Warning jika melebihi kuota.</div><span class="wtag tinf">Client-side preview</span></div></div>
+    <div class="ws"><div class="wn a">2</div><div><div class="wt">POST /api/leaves &mdash; validasi 3 lapis di backend</div><div class="wd">Server cek: (a) tanggal tidak di masa lalu, (b) tidak overlap dengan cuti pending/approved lain, (c) untuk annual: kuota mencukupi. Hari kerja dihitung ulang di server.</div><span class="wtag terr">Past date &rarr; 400</span><span class="wtag terr">Overlap &rarr; 409</span><span class="wtag terr">Quota habis &rarr; 400</span></div></div>
+    <div class="ws"><div class="wn g">3</div><div><div class="wt">Record tersimpan status "pending"</div><div class="wd">LeaveRequest dibuat. Karyawan lihat badge amber "Menunggu" di tab "Cuti Saya". Tombol Batalkan tersedia selama masih pending.</div><span class="wtag tok">201 Created</span></div></div>
+    <div class="ws"><div class="wn y">4</div><div><div class="wt">HR/Supervisor buka tab "Persetujuan"</div><div class="wd">Kartu menampilkan nama, departemen, tipe cuti, tanggal, jumlah hari, alasan. Dua tombol: Setujui dan Tolak.</div><span class="wtag tinf">Role: admin / hr / supervisor</span></div></div>
+    <div class="ws"><div class="wn g">5A</div><div><div class="wt">Setujui &rarr; PATCH /:id/approve</div><div class="wd">Status &rarr; approved. Annual: annual_used += total_days. Sick: sick_used += total_days. Semua dalam DB transaction agar atomic.</div><span class="wtag tok">Quota dikurangi otomatis &middot; Transaction safe</span></div></div>
+    <div class="ws"><div class="wn r">5B</div><div><div class="wt">Tolak &rarr; RejectModal muncul (bukan browser prompt)</div><div class="wd">Bottom-sheet modal meminta alasan penolakan (opsional). Klik "Tolak Cuti" &rarr; PATCH /:id/reject. Status &rarr; rejected, alasan tersimpan. Quota TIDAK berubah.</div><span class="wtag terr">Quota tidak dikurangi</span></div></div>
+    <div class="ws"><div class="wn b">6</div><div><div class="wt">Karyawan lihat hasil di "Cuti Saya"</div><div class="wd">Badge berubah: hijau "Disetujui" atau merah "Ditolak". Alasan penolakan tampil dalam card. QuotaCard progress bar ter-update.</div><span class="wtag tok">Real-time refresh setelah aksi</span></div></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">03</div><div class="st">API Endpoints &mdash; Module 3</div></div>
+  <div class="ep">
+    <div class="er hd"><div class="ec">METHOD</div><div class="ec">ENDPOINT</div><div class="ec">AUTH</div><div class="ec">DESKRIPSI</div></div>
+    <div class="er"><div class="ec"><span class="m POST">POST</span></div><div class="ec"><span class="epath">/api/leaves</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Ajukan cuti. Validasi kuota + overlap + tanggal</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/leaves</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Daftar cuti saya. Filter ?status= ?year=</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/leaves/quota</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Sisa kuota tahunan ?year=YYYY</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/leaves/:id</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Detail satu pengajuan</div></div>
+    <div class="er"><div class="ec"><span class="m DELETE">DEL</span></div><div class="ec"><span class="epath">/api/leaves/:id</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Batalkan cuti (hanya status pending)</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/leaves/admin/pending</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Semua pending, filter ?department=</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/leaves/admin/all</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Semua cuti + filter ?status= ?month= ?userId=</div></div>
+    <div class="er"><div class="ec"><span class="m PATCH">PATCH</span></div><div class="ec"><span class="epath">/api/leaves/:id/approve</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Setujui + update quota dalam transaction</div></div>
+    <div class="er"><div class="ec"><span class="m PATCH">PATCH</span></div><div class="ec"><span class="epath">/api/leaves/:id/reject</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Tolak + simpan alasan. Body: {rejection_reason?}</div></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">04</div><div class="st">Test Commands</div></div>
+  <div class="alert info"><span>&#9432;</span><div>Ganti TOKEN dengan accessToken dari POST /api/auth/login. Jalankan <code style="font-family:'DM Mono',monospace;background:var(--bg3);padding:1px 5px;border-radius:3px">node scripts/migrate.js</code> untuk tabel leave_quotas + seed data.</div></div>
+
+  <div class="cb"><div class="ch"><div class="cl"><span class="lt bash">BASH</span>Cek kuota cuti</div><button class="cpb" onclick="cp(this,'t1')">&#x2398; Copy</button></div>
+  <div class="cb-body"><pre id="t1"><span class="cmd">curl</span> "http://localhost:5000/api/leaves/quota?year=2024" \
+  -H <span class="s">"Authorization: Bearer EMP_TOKEN"</span></pre></div></div>
+
+  <div class="cb"><div class="ch"><div class="cl"><span class="lt bash">BASH</span>Ajukan cuti tahunan</div><button class="cpb" onclick="cp(this,'t2')">&#x2398; Copy</button></div>
+  <div class="cb-body"><pre id="t2"><span class="cmd">curl</span> -X POST http://localhost:5000/api/leaves \
+  -H <span class="s">"Authorization: Bearer EMP_TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"type":"annual","start_date":"2024-02-05","end_date":"2024-02-07","reason":"Liburan keluarga ke Yogyakarta"}'</span></pre></div></div>
+
+  <div class="cb"><div class="ch"><div class="cl"><span class="lt bash">BASH</span>HR: setujui cuti ID=1</div><button class="cpb" onclick="cp(this,'t3')">&#x2398; Copy</button></div>
+  <div class="cb-body"><pre id="t3"><span class="cmd">curl</span> -X PATCH http://localhost:5000/api/leaves/1/approve \
+  -H <span class="s">"Authorization: Bearer HR_TOKEN"</span></pre></div></div>
+
+  <div class="cb"><div class="ch"><div class="cl"><span class="lt bash">BASH</span>HR: tolak dengan alasan</div><button class="cpb" onclick="cp(this,'t4')">&#x2398; Copy</button></div>
+  <div class="cb-body"><pre id="t4"><span class="cmd">curl</span> -X PATCH http://localhost:5000/api/leaves/2/reject \
+  -H <span class="s">"Authorization: Bearer HR_TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"rejection_reason":"Jadwal bentrok dengan project deadline"}'</span></pre></div></div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">05</div><div class="st">UI Components</div></div>
+  <div class="g2">
+    <div class="fc"><div class="fch">&#x1F4CA; QuotaCard</div><div class="fcb">Progress bar visual berubah warna: hijau &rarr; amber (50%+) &rarr; merah (80%+). Stats: Sisa Tahunan, Carry Over, Sakit Dipakai.</div></div>
+    <div class="fc"><div class="fch">&#x1F4DD; ApplyForm (Bottom Sheet)</div><div class="fcb">Slide-up modal. Grid 2-kolom 7 tipe cuti. Date picker. Live preview hari kerja. Warning quota real-time. Textarea + counter karakter.</div></div>
+    <div class="fc"><div class="fch">&#x1F0CF; LeaveCard</div><div class="fcb">Color stripe sesuai status. Icon tipe. Date range. Alasan. Rejection reason. Tombol Batalkan atau Setujui+Tolak sesuai role.</div></div>
+    <div class="fc"><div class="fch">&#x274C; RejectModal</div><div class="fcb">Menggantikan browser prompt(). Bottom-sheet mobile-friendly dengan textarea alasan dan tombol konfirmasi merah.</div></div>
+    <div class="fc"><div class="fch">&#x1F464; Tab: Cuti Saya</div><div class="fcb">Filter pills (Semua/Menunggu/Disetujui/Ditolak). Refresh button. Skeleton loader. QuotaCard + tombol Ajukan Cuti.</div></div>
+    <div class="fc"><div class="fch">&#x1F465; Tab: Persetujuan</div><div class="fcb">Hanya muncul untuk admin/hr/supervisor. Stats pending count. Toggle pending/semua. Tiap card punya aksi approve+reject.</div></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">06</div><div class="st">Module Progress</div></div>
+  <div class="prog">
+    <div class="pr hd"><div class="prc">MODULE</div><div class="prc">FITUR</div><div class="prc">STATUS</div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);font-weight:700">M1</div><div class="prc" style="font-size:12px;color:var(--t2)">Auth, DB Schema, JWT, React Layout, Dark Mode</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">&#x2713; DONE</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);font-weight:700">M2</div><div class="prc" style="font-size:12px;color:var(--t2)">GPS Check-in/out, Auto-late, History, Admin Recap</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">&#x2713; DONE</span></div></div>
+    <div class="pr" style="background:color-mix(in srgb,var(--a2) 4%,transparent)"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a2);font-weight:700">M3</div><div class="prc" style="font-size:12px;color:var(--text);font-weight:600">7 Tipe Cuti, Quota, Overlap, Approval + RejectModal</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a2)">&#x2713; DONE</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a);font-weight:700">M4</div><div class="prc" style="font-size:12px;color:var(--t2)">Payroll &mdash; Hitung gaji, tunjangan, potongan, slip gaji</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--a)">&rarr; NEXT</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)">M5</div><div class="prc" style="font-size:12px;color:var(--t3)">Employee CRUD + Struktur Organisasi</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)">pending</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)">M6</div><div class="prc" style="font-size:12px;color:var(--t3)">Reports &amp; Analytics &mdash; Export Excel/PDF, Charts</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)">pending</span></div></div>
+  </div>
+</div>
+</div>
+<footer class="footer"><p>HRD Lite Professional System &middot; Module 3 &mdash; Leave Management &middot; v3.0.0</p></footer>
+<script>
+function tog(){const h=document.documentElement,b=document.getElementById('tb');h.getAttribute('data-theme')==='dark'?(h.setAttribute('data-theme','light'),b.textContent='\u{1F319} Dark'):(h.setAttribute('data-theme','dark'),b.textContent='\u2600 Light');}
+function cp(btn,id){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{btn.textContent='Copied!';btn.classList.add('ok');setTimeout(()=>{btn.textContent='\u2398 Copy';btn.classList.remove('ok')},2000);});}
+</script>
+</body>
+</html>

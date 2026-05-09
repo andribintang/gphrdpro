@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { sequelize } = require('../config/database');
-const { User, Employee, Attendance, LeaveRequest, Payroll } = require('../models');
+const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll } = require('../models');
 const bcrypt = require('bcryptjs');
 
 const migrate = async () => {
@@ -91,6 +91,50 @@ const migrate = async () => {
         salary_base: 5000000,
         join_date: '2022-01-10',
         status: 'active',
+      });
+
+      // Seed leave quotas for current year
+      const currentYear = new Date().getFullYear();
+      const usersWithQuota = [hr, supervisor, emp1, emp2];
+      for (const u of usersWithQuota) {
+        await LeaveQuota.create({
+          user_id: u.id,
+          year: currentYear,
+          annual_quota: 12,
+          annual_used: 0,
+          sick_used: 0,
+          carry_over: 0,
+        });
+      }
+
+      // Seed a sample approved leave for demo
+      await LeaveRequest.create({
+        user_id: emp1.id,
+        type: 'annual',
+        start_date: new Date(currentYear, new Date().getMonth(), 20).toISOString().split('T')[0],
+        end_date: new Date(currentYear, new Date().getMonth(), 22).toISOString().split('T')[0],
+        total_days: 3,
+        reason: 'Liburan keluarga ke Bali',
+        status: 'approved',
+        approved_by: hr.id,
+        approved_at: new Date(),
+      });
+
+      // Update quota usage for the approved leave
+      await LeaveQuota.update(
+        { annual_used: 3 },
+        { where: { user_id: emp1.id, year: currentYear } }
+      );
+
+      // Seed a pending leave request for demo
+      await LeaveRequest.create({
+        user_id: emp2.id,
+        type: 'sick',
+        start_date: new Date(currentYear, new Date().getMonth() + 1, 5).toISOString().split('T')[0],
+        end_date: new Date(currentYear, new Date().getMonth() + 1, 6).toISOString().split('T')[0],
+        total_days: 2,
+        reason: 'Sakit demam dan perlu istirahat total',
+        status: 'pending',
       });
 
       console.log('✅ Initial seed data created');

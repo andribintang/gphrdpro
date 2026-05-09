@@ -9,9 +9,8 @@ const { errorHandler, notFound } = require('./middleware/errorHandler');
 // Import routes
 const authRoutes       = require('./routes/auth');
 const attendanceRoutes = require('./routes/attendance');
-// Future modules (uncomment as built):
-// const employeeRoutes = require('./routes/employees');
-// const leaveRoutes = require('./routes/leaves');
+const leaveRoutes      = require('./routes/leaves');
+
 // const payrollRoutes = require('./routes/payroll');
 // const dashboardRoutes = require('./routes/dashboard');
 
@@ -68,12 +67,8 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth',       authRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/leaves',     leaveRoutes);
 // app.use('/api/employees', employeeRoutes);
-// app.use('/api/leaves',    leaveRoutes);
-// app.use('/api/payroll',   payrollRoutes);
-// app.use('/api/leaves', leaveRoutes);
-// app.use('/api/payroll', payrollRoutes);
-// app.use('/api/dashboard', dashboardRoutes);
 
 // 404 & Error handlers
 app.use(notFound);
