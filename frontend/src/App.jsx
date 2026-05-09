@@ -8,8 +8,8 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AttendancePage from './pages/AttendancePage';
 import LeavesPage from './pages/LeavesPage';
+import PayrollPage from './pages/PayrollPage';
 import {
-  PayrollPage,
   EmployeesPage,
   SettingsPage,
 } from './pages/PlaceholderPages';

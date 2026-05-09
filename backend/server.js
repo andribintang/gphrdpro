@@ -10,6 +10,7 @@ const { errorHandler, notFound } = require('./middleware/errorHandler');
 const authRoutes       = require('./routes/auth');
 const attendanceRoutes = require('./routes/attendance');
 const leaveRoutes      = require('./routes/leaves');
+const payrollRoutes    = require('./routes/payroll');
 
 // const payrollRoutes = require('./routes/payroll');
 // const dashboardRoutes = require('./routes/dashboard');
@@ -68,6 +69,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth',       authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves',     leaveRoutes);
+app.use('/api/payroll',    payrollRoutes);
 // app.use('/api/employees', employeeRoutes);
 
 // 404 & Error handlers

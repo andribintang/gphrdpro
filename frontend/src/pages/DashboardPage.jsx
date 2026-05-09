@@ -8,15 +8,11 @@ import {
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
 import { useEffect, useState } from 'react';
-import { attendanceService, STATUS_CONFIG, formatTime } from '../utils/attendanceService';
+import { attendanceService, formatTime } from '../utils/attendanceService';
 import { leaveService } from '../utils/leaveService';
+import { payrollService, toRupiahShort, currentMonth } from '../utils/payrollService';
 
-const STAT_CARDS = [
-  { label: 'Total Karyawan', value: '20', icon: Users, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-950', trend: '+2 bulan ini' },
-  { label: 'Hadir Hari Ini', value: '17', icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-950', trend: '85% kehadiran' },
-  { label: 'Cuti Pending', value: '3', icon: CalendarOff, color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-950', trend: 'Perlu persetujuan' },
-  { label: 'Payroll Bulan Ini', value: 'Rp 86jt', icon: DollarSign, color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-950', trend: 'Draft' },
-];
+// Stat cards are now dynamic — see DashboardPage component
 
 const RECENT_ACTIVITY = [
   { name: 'Ahmad Fauzi', action: 'Check-in', time: '08:03', status: 'Tepat Waktu', type: 'success' },
@@ -32,6 +28,7 @@ export default function DashboardPage() {
 
   const [todayAtt, setTodayAtt] = useState(null);
   const [leaveQuota, setLeaveQuota] = useState(null);
+  const [payrollSummary, setPayrollSummary] = useState(null);
 
   useEffect(() => {
     attendanceService.getToday()
@@ -40,7 +37,13 @@ export default function DashboardPage() {
     leaveService.getMyQuota(new Date().getFullYear())
       .then(r => setLeaveQuota(r.data.data))
       .catch(() => {});
-  }, []);
+    // HR/admin: load payroll summary for current month
+    if (user?.role === 'admin' || user?.role === 'hr') {
+      payrollService.getAll({ month: currentMonth() })
+        .then(r => setPayrollSummary(r.data.data.summary))
+        .catch(() => {});
+    }
+  }, [user?.role]);
 
   const att = todayAtt?.attendance;
   const hasIn  = !!att?.check_in;
@@ -76,21 +79,87 @@ export default function DashboardPage() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3">
-        {STAT_CARDS.map((stat, i) => (
-          <div key={i} className="card p-4 space-y-3 hover:border-brand-300 dark:hover:border-brand-700 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className={`w-9 h-9 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                <stat.icon className={`w-4.5 h-4.5 ${stat.color}`} size={18} />
-              </div>
-              <TrendingUp className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+        {/* Stat 1 - Attendance today */}
+        <button onClick={() => navigate('/attendance')}
+          className="card p-4 space-y-3 hover:border-brand-300 dark:hover:border-brand-700 transition-colors text-left">
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center">
+              <Clock className="w-4.5 h-4.5 text-emerald-500" size={18} />
             </div>
-            <div>
-              <p className="text-xl font-bold text-[var(--text-primary)]">{stat.value}</p>
-              <p className="text-xs text-[var(--text-secondary)] font-medium">{stat.label}</p>
-              <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{stat.trend}</p>
-            </div>
+            <TrendingUp className="w-3.5 h-3.5 text-[var(--text-muted)]" />
           </div>
-        ))}
+          <div>
+            <p className="text-xl font-bold text-[var(--text-primary)]">
+              {hasIn ? (hasOut ? '✓' : 'Aktif') : '—'}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">Absensi Hari Ini</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              {hasIn ? `Masuk ${formatTime(att?.check_in)}` : 'Belum check-in'}
+            </p>
+          </div>
+        </button>
+
+        {/* Stat 2 - Leave quota */}
+        <button onClick={() => navigate('/leaves')}
+          className="card p-4 space-y-3 hover:border-brand-300 dark:hover:border-brand-700 transition-colors text-left">
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
+              <CalendarOff className="w-4.5 h-4.5 text-amber-500" size={18} />
+            </div>
+            <TrendingUp className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-[var(--text-primary)]">
+              {leaveQuota != null ? `${leaveQuota.annual_remaining}` : '—'}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">Sisa Cuti Tahunan</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              {leaveQuota ? `Terpakai ${leaveQuota.annual_used} hari` : 'Memuat...'}
+            </p>
+          </div>
+        </button>
+
+        {/* Stat 3 - Payroll (HR/Admin shows total, employee shows own) */}
+        <button onClick={() => navigate('/payroll')}
+          className="card p-4 space-y-3 hover:border-brand-300 dark:hover:border-brand-700 transition-colors text-left">
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center">
+              <DollarSign className="w-4.5 h-4.5 text-purple-500" size={18} />
+            </div>
+            <TrendingUp className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-[var(--text-primary)]">
+              {payrollSummary ? toRupiahShort(payrollSummary.total_gaji) : '—'}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">Total Gaji Bulan Ini</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              {payrollSummary
+                ? `${payrollSummary.status_counts?.paid || 0} sudah dibayar`
+                : (isHR ? 'Memuat...' : 'Lihat slip gaji')
+              }
+            </p>
+          </div>
+        </button>
+
+        {/* Stat 4 - Users (admin/HR) or work hours (employee) */}
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
+              <Users className="w-4.5 h-4.5 text-blue-500" size={18} />
+            </div>
+            <TrendingUp className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-[var(--text-primary)]">
+              {att?.work_hours ? `${att.work_hours}j` : '—'}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] font-medium">Jam Kerja Hari Ini</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+              {hasOut ? 'Sudah selesai' : hasIn ? 'Sedang berjalan' : 'Belum mulai'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Quick actions */}

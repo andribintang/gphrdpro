@@ -137,6 +137,82 @@ const migrate = async () => {
         status: 'pending',
       });
 
+      // Seed payroll records for last 2 months
+      const prevMonthDate = new Date(currentYear, new Date().getMonth() - 1, 1);
+      const prevMonthStr  = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      const curMonthStr   = `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+      const payrollUsers = [
+        { user: hr,         base: 8000000 },
+        { user: supervisor, base: 7500000 },
+        { user: emp1,       base: 5500000 },
+        { user: emp2,       base: 5000000 },
+      ];
+
+      for (const { user: u, base } of payrollUsers) {
+        const allowances  = 750000;
+        const deductions  = Math.round((base * 0.01) + (base * 0.02) + Math.max(0, base + allowances - 4500000) * 0.05);
+        const totalSalary = base + allowances - deductions;
+
+        // Previous month - paid
+        await Payroll.create({
+          user_id: u.id,
+          month: prevMonthStr,
+          salary_base:  base,
+          allowances:   allowances,
+          deductions:   deductions,
+          overtime_pay: 0,
+          total_salary: totalSalary,
+          status: 'paid',
+          paid_at: new Date(),
+          processed_by: hr.id,
+          details_json: {
+            employee: { name: u.name, nip: '', position: '', department: '' },
+            attendance_summary: { present: 20, late: 1, absent: 0, leave: 1, total_hours: 168 },
+            allowance_items: [
+              { name: 'Tunjangan Transport', amount: 300000 },
+              { name: 'Tunjangan Makan',     amount: 450000 },
+            ],
+            deduction_items: [
+              { name: 'BPJS Kesehatan (1%)', amount: Math.round(base * 0.01) },
+              { name: 'BPJS TK / JHT (2%)', amount: Math.round(base * 0.02) },
+              { name: 'PPH 21 (5%)',         amount: Math.round(Math.max(0, base + allowances - 4500000) * 0.05) },
+            ],
+            gross_salary: base + allowances,
+            calculated_at: new Date().toISOString(),
+          },
+        });
+
+        // Current month - processed
+        await Payroll.create({
+          user_id: u.id,
+          month: curMonthStr,
+          salary_base:  base,
+          allowances:   allowances,
+          deductions:   deductions,
+          overtime_pay: 0,
+          total_salary: totalSalary,
+          status: 'processed',
+          processed_by: hr.id,
+          details_json: {
+            employee: { name: u.name, nip: '', position: '', department: '' },
+            attendance_summary: { present: 18, late: 2, absent: 0, leave: 0, total_hours: 152 },
+            allowance_items: [
+              { name: 'Tunjangan Transport', amount: 300000 },
+              { name: 'Tunjangan Makan',     amount: 450000 },
+              { name: 'Potongan Terlambat (2x)', amount: -50000 },
+            ],
+            deduction_items: [
+              { name: 'BPJS Kesehatan (1%)', amount: Math.round(base * 0.01) },
+              { name: 'BPJS TK / JHT (2%)', amount: Math.round(base * 0.02) },
+              { name: 'PPH 21 (5%)',         amount: Math.round(Math.max(0, base + allowances - 4500000) * 0.05) },
+            ],
+            gross_salary: base + allowances,
+            calculated_at: new Date().toISOString(),
+          },
+        });
+      }
+
       console.log('✅ Initial seed data created');
       console.log('\n📋 Login Credentials:');
       console.log('  Admin:      admin@hrd.com / Admin@123');

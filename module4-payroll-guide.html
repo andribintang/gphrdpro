@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>HRD Lite — Module 4: Payroll</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#05080e;--bg2:#0a0f1c;--bg3:#0f1628;--bg4:#152035;--bdr:#162040;--b2:#1d2d50;--text:#e0eaff;--t2:#5a7aaa;--t3:#273555;--a:#38bdf8;--a2:#818cf8;--a3:#34d399;--red:#f87171;--ylw:#fbbf24;--org:#fb923c;--pur:#c084fc}
+[data-theme=light]{--bg:#f0f5ff;--bg2:#fff;--bg3:#e8eff8;--bg4:#dde6f5;--bdr:#c5d4ec;--b2:#b0c4e0;--text:#06091a;--t2:#3a5080;--t3:#8099c0;--a:#0284c7;--a2:#4f46e5;--a3:#059669}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.hdr{position:sticky;top:0;z-index:99;backdrop-filter:blur(18px);background:color-mix(in srgb,var(--bg) 80%,transparent);border-bottom:1px solid var(--bdr);padding:11px 20px}
+.hdr-in{max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:var(--text)}
+.logo-i{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--pur),var(--a));display:flex;align-items:center;justify-content:center;font-size:13px}
+.mb{padding:3px 9px;border-radius:99px;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.5px;background:color-mix(in srgb,var(--pur) 14%,transparent);border:1px solid color-mix(in srgb,var(--pur) 28%,transparent);color:var(--pur)}
+.thm{background:var(--bg3);border:1px solid var(--bdr);color:var(--t2);padding:5px 11px;border-radius:7px;cursor:pointer;font-size:11px;font-family:'DM Sans',sans-serif}
+.thm:hover{background:var(--bg4);color:var(--text)}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+.hero{padding:50px 0 38px;border-bottom:1px solid var(--bdr);margin-bottom:42px}
+.eye{font-family:'DM Mono',monospace;font-size:11px;color:var(--pur);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.eye::before{content:'';display:block;width:20px;height:1px;background:var(--pur)}
+h1{font-family:'Syne',sans-serif;font-size:clamp(26px,5vw,42px);font-weight:800;line-height:1.12;margin-bottom:12px}
+h1 em{font-style:normal;background:linear-gradient(120deg,var(--pur),var(--a));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:14px;color:var(--t2);line-height:1.78;max-width:600px}
+.pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:20px}
+.pill{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:99px;background:var(--bg3);border:1px solid var(--bdr);font-size:11px;color:var(--t2);font-weight:500}
+.pill .d{width:5px;height:5px;border-radius:50%}
+.sec{margin-bottom:46px}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.sn{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--pur),var(--a));display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:11px;color:#fff;font-weight:700;flex-shrink:0}
+.st{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text)}
+.div{height:1px;background:var(--bdr);margin:40px 0}
+.cb{background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;overflow:hidden;margin-bottom:14px}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg3);border-bottom:1px solid var(--bdr)}
+.cl{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);display:flex;align-items:center;gap:7px}
+.lt{padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px}
+.bash{background:color-mix(in srgb,var(--a3) 13%,transparent);color:var(--a3)}
+.js{background:color-mix(in srgb,var(--ylw) 13%,transparent);color:var(--ylw)}
+.tree{background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--a)}
+.cpb{background:none;border:1px solid var(--bdr);color:var(--t3);padding:3px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;gap:4px}
+.cpb:hover{background:var(--bg4);color:var(--text)}.cpb.ok{color:var(--a3);border-color:var(--a3)}
+.cb-body{padding:14px 18px;overflow-x:auto}
+.cb-body pre{font-family:'DM Mono',monospace;font-size:12px;line-height:1.9;color:var(--text);white-space:pre}
+.k{color:var(--a)}.v{color:var(--a3)}.s{color:var(--org)}.c{color:var(--t3);font-style:italic}.kw{color:var(--a2)}.n{color:var(--ylw)}.cmd{color:var(--a3)}
+.ep{border:1px solid var(--bdr);border-radius:13px;overflow:hidden;width:100%}
+.er{display:grid;grid-template-columns:72px 1fr 96px 1fr;border-bottom:1px solid var(--bdr);align-items:center}
+.er:last-child{border-bottom:none}
+.er.hd{background:var(--bg3);font-family:'DM Mono',monospace;font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px}
+.ec{padding:10px 13px;font-size:12px;border-right:1px solid var(--bdr)}.ec:last-child{border-right:none}
+.m{font-family:'DM Mono',monospace;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;display:inline-block}
+.GET{background:color-mix(in srgb,var(--a3) 13%,transparent);color:var(--a3)}
+.POST{background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--a)}
+.PATCH{background:color-mix(in srgb,var(--ylw) 13%,transparent);color:var(--ylw)}
+.DELETE{background:color-mix(in srgb,var(--red) 13%,transparent);color:var(--red)}
+.ap{display:inline-block;padding:2px 7px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700}
+.jwt{background:color-mix(in srgb,var(--a2) 11%,transparent);color:var(--a2)}
+.adm{background:color-mix(in srgb,var(--org) 11%,transparent);color:var(--org)}
+.epath{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);background:var(--bg3);padding:2px 7px;border-radius:4px}
+.g2{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.fc{background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;overflow:hidden}
+.fch{background:var(--bg3);padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:12px;font-weight:600;color:var(--text)}
+.fcb{padding:14px;font-size:12px;color:var(--t2);line-height:1.7}
+/* calc table */
+.calc-tbl{border:1px solid var(--bdr);border-radius:13px;overflow:hidden}
+.calc-row{display:grid;grid-template-columns:1fr 140px;border-bottom:1px solid var(--bdr);align-items:center}
+.calc-row:last-child{border-bottom:none}
+.calc-row.head{background:var(--bg3);font-family:'DM Mono',monospace;font-size:9px;font-weight:700;color:var(--t3);letter-spacing:1px}
+.calc-row.subtotal{background:var(--bg3)}
+.calc-row.total{background:color-mix(in srgb,var(--a3) 6%,transparent)}
+.cc{padding:10px 14px;font-size:12px;border-right:1px solid var(--bdr)}.cc:last-child{border-right:none}
+/* progress */
+.prog{background:var(--bg2);border:1px solid var(--bdr);border-radius:13px;overflow:hidden}
+.pr{display:grid;grid-template-columns:80px 1fr 100px;border-bottom:1px solid var(--bdr);align-items:center}
+.pr:last-child{border-bottom:none}
+.pr.hd{background:var(--bg3);font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:1px}
+.prc{padding:11px 14px;font-size:12px;border-right:1px solid var(--bdr)}.prc:last-child{border-right:none}
+.footer{margin-top:56px;padding:24px 20px;border-top:1px solid var(--bdr);text-align:center}
+.footer p{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)}
+@media(max-width:600px){.er{grid-template-columns:62px 1fr}.er .ec:nth-child(3),.er .ec:nth-child(4){display:none}.pr{grid-template-columns:70px 1fr}.pr .prc:nth-child(3){display:none}}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo"><div class="logo-i">&#x1F4B0;</div>HRD Lite</div>
+    <div style="display:flex;align-items:center;gap:9px">
+      <span class="mb">MODULE 4</span>
+      <button class="thm" onclick="tog()" id="tb">&#9728; Light</button>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+
+<div class="hero">
+  <div class="eye">Payroll System Complete</div>
+  <h1>Module 4 &mdash; <em>Penggajian Otomatis</em></h1>
+  <p>Sistem payroll lengkap: kalkulasi gaji otomatis dari data absensi + cuti, tunjangan transport &amp; makan, potongan BPJS + PPH21, overtime pay, slip gaji visual per karyawan, dan bulk payment marking.</p>
+  <div class="pills">
+    <span class="pill"><span class="d" style="background:var(--pur)"></span>Auto-calculate dari absensi</span>
+    <span class="pill"><span class="d" style="background:var(--a3)"></span>BPJS + PPH21 otomatis</span>
+    <span class="pill"><span class="d" style="background:var(--a)"></span>Overtime pay 1.5x</span>
+    <span class="pill"><span class="d" style="background:var(--ylw)"></span>Slip gaji visual</span>
+    <span class="pill"><span class="d" style="background:var(--org)"></span>Bulk pay marking</span>
+    <span class="pill"><span class="d" style="background:var(--a3)"></span>Monthly bar chart</span>
+    <span class="pill"><span class="d" style="background:var(--red)"></span>Transaction-safe upsert</span>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">01</div><div class="st">File yang Dibuat / Diubah</div></div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt tree">TREE</span>Module 4 delta</div></div>
+    <div class="cb-body"><pre>
+<span class="v">NEW</span>  backend/controllers/<span class="k">payrollController.js</span>   <span class="c">-- 419 baris: generate, getAll, getMy, getOne, markPaid, bulkPay, summary</span>
+<span class="v">NEW</span>  backend/routes/<span class="k">payroll.js</span>                 <span class="c">-- 8 endpoints dengan RBAC admin/hr</span>
+<span class="v">NEW</span>  frontend/src/utils/<span class="k">payrollService.js</span>       <span class="c">-- API wrapper + toRupiah + monthLabel + PAYROLL_STATUS</span>
+<span class="v">NEW</span>  frontend/src/pages/<span class="k">PayrollPage.jsx</span>         <span class="c">-- 623 baris: SlipModal, AdminTab, MyPayrollTab</span>
+<span class="kw">MOD</span>  backend/<span class="k">server.js</span>                        <span class="c">-- register /api/payroll routes</span>
+<span class="kw">MOD</span>  backend/scripts/<span class="k">migrate.js</span>               <span class="c">-- seed payroll 2 bulan per karyawan (paid + processed)</span>
+<span class="kw">MOD</span>  frontend/src/<span class="k">App.jsx</span>                     <span class="c">-- import PayrollPage (replace placeholder)</span>
+<span class="kw">MOD</span>  frontend/src/pages/<span class="k">DashboardPage.jsx</span>      <span class="c">-- 4 stat cards sekarang semua live data</span>
+    </pre></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">02</div><div class="st">Formula Kalkulasi Gaji</div></div>
+  <div class="calc-tbl">
+    <div class="calc-row head"><div class="cc">KOMPONEN</div><div class="cc">FORMULA / NILAI</div></div>
+    <div class="calc-row"><div class="cc"><strong>Gaji Pokok</strong></div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px">employee.salary_base</div></div>
+    <div class="calc-row"><div class="cc">Tunjangan Transport</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px">+Rp 300.000</div></div>
+    <div class="calc-row"><div class="cc">Tunjangan Makan</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px">+Rp 450.000</div></div>
+    <div class="calc-row"><div class="cc">Lembur (jika ada)</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px">+(jam &times; gaji/jam &times; 1.5)</div></div>
+    <div class="calc-row"><div class="cc">Koreksi Absen Tidak Sah</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px">-(hari &times; gaji/hari)</div></div>
+    <div class="calc-row subtotal"><div class="cc"><strong>= Gaji Kotor</strong></div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a)">SUM pokok + tunjangan</div></div>
+    <div class="calc-row"><div class="cc" style="color:var(--red)">BPJS Kesehatan</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--red)">-1% dari gaji pokok</div></div>
+    <div class="calc-row"><div class="cc" style="color:var(--red)">BPJS TK / JHT</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--red)">-2% dari gaji pokok</div></div>
+    <div class="calc-row"><div class="cc" style="color:var(--red)">PPH 21</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--red)">-5% dari (kotor - PTKP 4.5jt)</div></div>
+    <div class="calc-row"><div class="cc" style="color:var(--red)">Potongan Terlambat</div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--red)">-Rp 25.000 &times; jumlah terlambat</div></div>
+    <div class="calc-row total"><div class="cc"><strong>= Take Home Pay</strong></div><div class="cc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a3)">Kotor &minus; Total Potongan</div></div>
+  </div>
+  <p style="font-size:11px;color:var(--t2);margin-top:10px;line-height:1.7">
+    &#9432; Semua angka dapat dikustomisasi di konstanta <code style="font-family:'DM Mono',monospace;background:var(--bg3);padding:1px 5px;border-radius:3px">payrollController.js</code> bagian atas (BPJS_KESEHATAN_PCT, BPJS_TK_PCT, PPH21_RATE, LATE_DEDUCTION, dll).
+  </p>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">03</div><div class="st">API Endpoints &mdash; Module 4</div></div>
+  <div class="ep">
+    <div class="er hd"><div class="ec">METHOD</div><div class="ec">ENDPOINT</div><div class="ec">AUTH</div><div class="ec">DESKRIPSI</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/payroll/my</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Slip gaji saya. Filter ?month= ?limit=</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/payroll/:id</span></div><div class="ec"><span class="ap jwt">Bearer</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Detail slip gaji tertentu</div></div>
+    <div class="er"><div class="ec"><span class="m POST">POST</span></div><div class="ec"><span class="epath">/api/payroll/generate</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Generate / recalc payroll. Body: {month, user_ids?}</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/payroll</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">List semua payroll. ?month= ?status=</div></div>
+    <div class="er"><div class="ec"><span class="m GET">GET</span></div><div class="ec"><span class="epath">/api/payroll/summary</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Rekap tahunan per bulan ?year=YYYY</div></div>
+    <div class="er"><div class="ec"><span class="m PATCH">PATCH</span></div><div class="ec"><span class="epath">/api/payroll/:id/pay</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Tandai 1 slip sudah dibayar</div></div>
+    <div class="er"><div class="ec"><span class="m POST">POST</span></div><div class="ec"><span class="epath">/api/payroll/bulk-pay</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Tandai SEMUA processed &rarr; paid. Body: {month}</div></div>
+    <div class="er"><div class="ec"><span class="m DELETE">DEL</span></div><div class="ec"><span class="epath">/api/payroll/:id</span></div><div class="ec"><span class="ap adm">Admin/HR</span></div><div class="ec" style="font-size:12px;color:var(--t2)">Hapus payroll berstatus processed saja</div></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">04</div><div class="st">UI Components &mdash; PayrollPage.jsx</div></div>
+  <div class="g2">
+    <div class="fc"><div class="fch">&#x1F9FE; SlipModal (Bottom Sheet)</div><div class="fcb">Slide-up modal fullscreen pada mobile. Header gradient purple/biru dengan nama, NIP, jabatan. Take Home Pay besar. Breakdown lengkap: rekap kehadiran, tabel komponen gaji dengan ikon +/&minus;, tabel potongan merah, dan total akhir hijau.</div></div>
+    <div class="fc"><div class="fch">&#x1F4CA; AdminTab &mdash; Kelola Gaji</div><div class="fcb">Month navigator. Summary cards (total gaji + status count). Tombol Generate (kalkulasi otomatis) + Bayar Semua (bulk pay). List karyawan dengan gaji, status badge, tombol lihat slip + mark paid.</div></div>
+    <div class="fc"><div class="fch">&#x1F4C4; MyPayrollTab &mdash; Slip Saya</div><div class="fcb">Year selector + total take-home tahunan. Bar chart 12 bulan dengan warna: hijau (paid), amber (processed), abu (kosong). List slip per bulan, klik buka SlipModal detail lengkap.</div></div>
+    <div class="fc"><div class="fch">&#x1F4C8; Dashboard Stats Live</div><div class="fcb">Keempat stat card di dashboard sekarang menampilkan data live: absensi hari ini, sisa cuti tahunan, total gaji bulan ini (HR/admin), dan jam kerja hari ini.</div></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">05</div><div class="st">Test Commands</div></div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt bash">BASH</span>Generate payroll bulan ini (semua karyawan)</div><button class="cpb" onclick="cp(this,'t1')">&#x2398; Copy</button></div>
+    <div class="cb-body"><pre id="t1"><span class="cmd">curl</span> -X POST http://localhost:5000/api/payroll/generate \
+  -H <span class="s">"Authorization: Bearer HR_TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"month":"2024-01"}'</span></pre></div>
+  </div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt bash">BASH</span>Generate untuk karyawan tertentu saja</div><button class="cpb" onclick="cp(this,'t2')">&#x2398; Copy</button></div>
+    <div class="cb-body"><pre id="t2"><span class="cmd">curl</span> -X POST http://localhost:5000/api/payroll/generate \
+  -H <span class="s">"Authorization: Bearer HR_TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"month":"2024-01","user_ids":[3,4]}'</span></pre></div>
+  </div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt bash">BASH</span>List payroll bulan ini (HR)</div><button class="cpb" onclick="cp(this,'t3')">&#x2398; Copy</button></div>
+    <div class="cb-body"><pre id="t3"><span class="cmd">curl</span> "http://localhost:5000/api/payroll?month=2024-01" \
+  -H <span class="s">"Authorization: Bearer HR_TOKEN"</span></pre></div>
+  </div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt bash">BASH</span>Bulk pay &mdash; tandai semua sebagai dibayar</div><button class="cpb" onclick="cp(this,'t4')">&#x2398; Copy</button></div>
+    <div class="cb-body"><pre id="t4"><span class="cmd">curl</span> -X POST http://localhost:5000/api/payroll/bulk-pay \
+  -H <span class="s">"Authorization: Bearer HR_TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"month":"2024-01"}'</span></pre></div>
+  </div>
+  <div class="cb">
+    <div class="ch"><div class="cl"><span class="lt bash">BASH</span>Slip gaji saya (karyawan)</div><button class="cpb" onclick="cp(this,'t5')">&#x2398; Copy</button></div>
+    <div class="cb-body"><pre id="t5"><span class="cmd">curl</span> http://localhost:5000/api/payroll/my \
+  -H <span class="s">"Authorization: Bearer EMP_TOKEN"</span></pre></div>
+  </div>
+</div>
+<div class="div"></div>
+
+<div class="sec">
+  <div class="sh"><div class="sn">06</div><div class="st">Module Progress</div></div>
+  <div class="prog">
+    <div class="pr hd"><div class="prc">MODULE</div><div class="prc">FITUR</div><div class="prc">STATUS</div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);font-weight:700">M1</div><div class="prc" style="font-size:12px;color:var(--t2)">Auth, DB Schema, JWT, React Layout, Dark Mode</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">&#x2713; DONE</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);font-weight:700">M2</div><div class="prc" style="font-size:12px;color:var(--t2)">GPS Check-in/out, Auto-late, History, Admin Recap</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">&#x2713; DONE</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a3);font-weight:700">M3</div><div class="prc" style="font-size:12px;color:var(--t2)">7 Tipe Cuti, Quota, Overlap, Approval + RejectModal</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--a3)">&#x2713; DONE</span></div></div>
+    <div class="pr" style="background:color-mix(in srgb,var(--pur) 4%,transparent)"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--pur);font-weight:700">M4</div><div class="prc" style="font-size:12px;color:var(--text);font-weight:600">Auto-calc gaji, BPJS+PPH21, Slip Visual, Bulk Pay, Bar Chart</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:var(--pur)">&#x2713; DONE</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--a);font-weight:700">M5</div><div class="prc" style="font-size:12px;color:var(--t2)">Employee Management &mdash; CRUD, profil lengkap, struktur org</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--a)">&rarr; NEXT</span></div></div>
+    <div class="pr"><div class="prc" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)">M6</div><div class="prc" style="font-size:12px;color:var(--t3)">Reports &amp; Analytics &mdash; Export Excel/PDF, Charts</div><div class="prc"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)">pending</span></div></div>
+  </div>
+</div>
+</div>
+<footer class="footer"><p>HRD Lite Professional System &middot; Module 4 &mdash; Payroll System &middot; v4.0.0</p></footer>
+<script>
+function tog(){const h=document.documentElement,b=document.getElementById('tb');h.getAttribute('data-theme')==='dark'?(h.setAttribute('data-theme','light'),b.textContent='\u{1F319} Dark'):(h.setAttribute('data-theme','dark'),b.textContent='\u2600 Light');}
+function cp(btn,id){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{btn.textContent='Copied!';btn.classList.add('ok');setTimeout(()=>{btn.textContent='\u2398 Copy';btn.classList.remove('ok')},2000);});}
+</script>
+</body>
+</html>
