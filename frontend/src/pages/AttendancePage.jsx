@@ -13,8 +13,9 @@ import {
   STATUS_CONFIG, formatTime, formatDate,
 } from '../utils/attendanceService';
 
-const FACE_API_CDN = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist';
-const FACE_MODELS_URL = `${FACE_API_CDN}/models`;
+// face-api.js v0.22.2 — script + weights dari jsDelivr (reliable CDN)
+const FACE_API_SCRIPT = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+const FACE_MODELS_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
 const FACE_MATCH_THRESHOLD = 0.55;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
 const CLOUDINARY_CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
@@ -28,14 +29,15 @@ const loadFaceApi = () => new Promise((resolve, reject) => {
   if (faceApiLoading) { const t = setInterval(() => { if (faceApiLoaded) { clearInterval(t); resolve(window.faceapi); } }, 200); return; }
   faceApiLoading = true;
   const script = document.createElement('script');
-  script.src = `${FACE_API_CDN}/face-api.js`;
+  script.src = FACE_API_SCRIPT;
   script.onload = async () => {
     try {
       const fa = window.faceapi;
+      // Load models — script + weights versi sama (0.22.2) dari jsDelivr
       await Promise.all([
-        fa.nets.tinyFaceDetector.loadFromUri(`${FACE_MODELS_URL}`),
-        fa.nets.faceLandmark68TinyNet.loadFromUri(`${FACE_MODELS_URL}`),
-        fa.nets.faceRecognitionNet.loadFromUri(`${FACE_MODELS_URL}`),
+        fa.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL),
+        fa.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL),
+        fa.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL),
       ]);
       faceApiLoaded = true;
       faceApiLoading = false;
