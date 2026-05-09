@@ -1,38 +1,43 @@
 const express = require('express');
 const router  = express.Router();
-const { body, query } = require('express-validator');
+const { body, query, param } = require('express-validator');
 const {
-  checkIn, checkOut, getToday,
-  getHistory, getAdminDaily, getAdminMonthly,
+  checkIn, checkOut, breakStart, breakEnd,
+  getToday, getHistory,
+  getRealtimeMonitoring, getAdminMonthly,
+  getOfficeSettingsApi, updateOfficeSettings,
+  registerFace, getFaceStatus,
 } = require('../controllers/attendanceController');
 const { authenticate, authorize } = require('../middleware/auth');
 
-// Semua routes butuh auth
 router.use(authenticate);
 
 // ── Employee routes ──────────────────────────────────────────
-router.get('/today',   getToday);
-
-router.post('/check-in', [
-  body('lat').optional().isFloat({ min: -90,  max: 90  }).withMessage('Latitude tidak valid'),
-  body('lng').optional().isFloat({ min: -180, max: 180 }).withMessage('Longitude tidak valid'),
-  body('notes').optional().isString().isLength({ max: 500 }),
-], checkIn);
-
-router.post('/check-out', [
-  body('lat').optional().isFloat({ min: -90,  max: 90  }),
-  body('lng').optional().isFloat({ min: -180, max: 180 }),
-  body('notes').optional().isString().isLength({ max: 500 }),
-], checkOut);
+router.get('/today',       getToday);
+router.post('/check-in',   checkIn);
+router.post('/check-out',  checkOut);
+router.post('/break-start', breakStart);
+router.post('/break-end',   breakEnd);
 
 router.get('/history', [
-  query('month').optional().matches(/^\d{4}-\d{2}$/).withMessage('Format bulan: YYYY-MM'),
+  query('month').optional().matches(/^\d{4}-\d{2}$/).withMessage('Format: YYYY-MM'),
   query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 100 }),
 ], getHistory);
 
-// ── Admin / HR routes ────────────────────────────────────────
-router.get('/admin/daily',   authorize('admin', 'hr', 'supervisor'), getAdminDaily);
-router.get('/admin/monthly', authorize('admin', 'hr'),               getAdminMonthly);
+// ── Face registration ────────────────────────────────────────
+router.post('/register-face', registerFace);
+router.get('/face-status/:userId?', getFaceStatus);
+
+// ── Office settings ──────────────────────────────────────────
+router.get('/office/settings',  getOfficeSettingsApi);
+router.put('/office/settings',  authorize('admin', 'hr'), [
+  body('lat').isFloat({ min: -90, max: 90 }),
+  body('lng').isFloat({ min: -180, max: 180 }),
+  body('radius').isInt({ min: 10, max: 5000 }),
+], updateOfficeSettings);
+
+// ── Admin / HR ───────────────────────────────────────────────
+router.get('/admin/realtime', authorize('admin', 'hr', 'supervisor'), getRealtimeMonitoring);
+router.get('/admin/monthly',  authorize('admin', 'hr'),               getAdminMonthly);
 
 module.exports = router;

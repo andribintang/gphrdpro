@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { sequelize } = require('../config/database');
-const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll } = require('../models');
+const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll, OfficeSetting, EmployeeFace } = require('../models');
 const bcrypt = require('bcryptjs');
 
 const migrate = async () => {
@@ -221,6 +221,25 @@ const migrate = async () => {
       console.log('  Employee:   ahmad@hrd.com / Emp@123456');
     } else {
       console.log('ℹ️  Seed data already exists, skipping...');
+    }
+
+    // Seed office settings if not exists
+    const officeExists = await OfficeSetting.findOne();
+    if (!officeExists) {
+      await OfficeSetting.create({
+        name: 'Kantor HRD Lite',
+        address: 'Jl. Kantor No. 1, Jakarta',
+        lat: -6.2088,
+        lng: 106.8456,
+        radius: 100,
+        check_in_start: '06:00',
+        check_in_deadline: '08:05',
+        check_out_start: '15:00',
+        work_hours_required: 8.0,
+        is_active: true,
+      });
+      console.log('✅ Office settings created (lat:-6.2088, lng:106.8456, radius:100m)');
+      console.log('   → Ubah koordinat kantor di menu Settings > Pengaturan Kantor');
     }
 
     console.log('\n🎉 Migration complete!');
