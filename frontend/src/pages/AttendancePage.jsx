@@ -13,9 +13,9 @@ import {
   STATUS_CONFIG, formatTime, formatDate,
 } from '../utils/attendanceService';
 
-// face-api.js v0.22.2 — script + weights dari jsDelivr (reliable CDN)
-const FACE_API_SCRIPT = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-const FACE_MODELS_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+// @vladmandic/face-api — script & model dari package yang SAMA (konsisten)
+const FACE_API_SCRIPT = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
+const FACE_MODELS_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const FACE_MATCH_THRESHOLD = 0.55;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
 const CLOUDINARY_CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
