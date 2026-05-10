@@ -31,8 +31,8 @@ const calculatePeriod = async (periodId) => {
   const employees = await IncEmployee.findAll({
     where: { is_active: true },
     include: [
-      { model: require('./Branch'), as: 'branch' },
-      { model: require('./Position'), as: 'position', required: false },
+      { model: require('../models/incentive/Branch'), as: 'branch' },
+      { model: require('../models/incentive/Position'), as: 'position', required: false },
     ],
   });
   const activeCount = employees.length;
@@ -78,7 +78,7 @@ const calculatePeriod = async (periodId) => {
   // ── 4. Activities per employee ────────────────────────────
   const activities = await EmployeeActivity.findAll({
     where: { period_id: periodId },
-    include: [{ model: require('./ActivityType'), as: 'activityType' }],
+    include: [{ model: require('../models/incentive/ActivityType'), as: 'activityType' }],
   });
   const actByEmp = {};
   activities.forEach(a => {
