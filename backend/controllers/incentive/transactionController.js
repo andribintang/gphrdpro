@@ -1,0 +1,466 @@
+const { Op } = require('sequelize');
+const { sequelize } = require('../../config/database');
+const {
+  IncentivePeriod, IncEmployee, SalesChannel, BonusTarget,
+  WaSale, MarketplaceSale, MarketplaceShare,
+  WebSale, WebShare, EmployeeActivity,
+  IncentiveResult, Branch, AuditLog,
+} = require('../../models/incentive');
+const engine = require('../../services/incentiveEngine');
+
+const MONTHS_ID = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const audit = async (req, action, module, id, desc) => {
+  try { await AuditLog.create({ user_id: req.user?.id, user_name: req.user?.name, action, module, record_id: id, description: desc, ip_address: req.ip }); } catch {}
+};
+
+// ─────────────────────────────────────────────────────────────
+// PERIODS
+// ─────────────────────────────────────────────────────────────
+const getPeriods = async (req, res, next) => {
+  try {
+    const { year, status, page = 1, limit = 20 } = req.query;
+    const where = {};
+    if (year)   where.year   = parseInt(year);
+    if (status) where.status = status;
+
+    const { count, rows } = await IncentivePeriod.findAndCountAll({
+      where,
+      order: [['year', 'DESC'], ['month', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit),
+    });
+    return res.json({ success: true, data: { periods: rows, pagination: { total: count, page: parseInt(page), totalPages: Math.ceil(count / parseInt(limit)) } } });
+  } catch (err) { next(err); }
+};
+
+const getPeriod = async (req, res, next) => {
+  try {
+    const period = await IncentivePeriod.findByPk(req.params.id);
+    if (!period) return res.status(404).json({ success: false, message: 'Periode tidak ditemukan' });
+    return res.json({ success: true, data: { period } });
+  } catch (err) { next(err); }
+};
+
+const createPeriod = async (req, res, next) => {
+  try {
+    const { month, year } = req.body;
+    const exists = await IncentivePeriod.findOne({ where: { month: parseInt(month), year: parseInt(year) } });
+    if (exists) return res.status(409).json({ success: false, message: `Periode ${MONTHS_ID[month]} ${year} sudah ada` });
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay   = new Date(year, month, 0).getDate();
+    const endDate   = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+    const name      = req.body.name || `Insentif ${MONTHS_ID[parseInt(month)]} ${year}`;
+
+    const period = await IncentivePeriod.create({
+      name, month: parseInt(month), year: parseInt(year),
+      start_date: startDate, end_date: endDate,
+      status: 'draft', created_by: req.user?.id,
+    });
+    await audit(req, 'CREATE', 'periods', period.id, `Periode ${name} dibuat`);
+    return res.status(201).json({ success: true, message: `Periode ${name} berhasil dibuat`, data: { period } });
+  } catch (err) { next(err); }
+};
+
+const approvePeriod = async (req, res, next) => {
+  try {
+    const period = await IncentivePeriod.findByPk(req.params.id);
+    if (!period) return res.status(404).json({ success: false, message: 'Periode tidak ditemukan' });
+    if (period.status !== 'calculated') return res.status(400).json({ success: false, message: 'Hanya periode berstatus "calculated" yang bisa di-approve' });
+
+    await period.update({
+      status:         'approved',
+      approved_by:    req.user?.id,
+      approved_at:    new Date(),
+      approved_notes: req.body.notes || null,
+    });
+    await IncentiveResult.update({ status: 'approved' }, { where: { period_id: period.id } });
+    await audit(req, 'APPROVE', 'periods', period.id, `Periode ${period.name} di-approve`);
+    return res.json({ success: true, message: `${period.name} berhasil di-approve`, data: { period } });
+  } catch (err) { next(err); }
+};
+
+const lockPeriod = async (req, res, next) => {
+  try {
+    const period = await IncentivePeriod.findByPk(req.params.id);
+    if (!period) return res.status(404).json({ success: false, message: 'Periode tidak ditemukan' });
+    if (period.status !== 'approved') return res.status(400).json({ success: false, message: 'Hanya periode approved yang bisa dikunci' });
+    await period.update({ status: 'locked' });
+    await IncentiveResult.update({ status: 'locked' }, { where: { period_id: period.id } });
+    await audit(req, 'LOCK', 'periods', period.id, `Periode ${period.name} dikunci`);
+    return res.json({ success: true, message: `${period.name} berhasil dikunci`, data: { period } });
+  } catch (err) { next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// CALCULATE ENGINE
+// ─────────────────────────────────────────────────────────────
+const calculatePeriod = async (req, res, next) => {
+  try {
+    const period = await IncentivePeriod.findByPk(req.params.id);
+    if (!period) return res.status(404).json({ success: false, message: 'Periode tidak ditemukan' });
+    if (period.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+
+    const result = await engine.calculatePeriod(parseInt(req.params.id));
+    await audit(req, 'CALCULATE', 'periods', period.id, `Periode ${period.name} dikalkulasi`);
+    return res.json({ success: true, message: `Kalkulasi ${period.name} selesai!`, data: result });
+  } catch (err) { next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// WA SALES
+// ─────────────────────────────────────────────────────────────
+const getWaSales = async (req, res, next) => {
+  try {
+    const { period_id, branch_id, employee_id } = req.query;
+    const where = {};
+    if (period_id)   where.period_id   = period_id;
+    if (branch_id)   where.branch_id   = branch_id;
+    if (employee_id) where.employee_id = employee_id;
+
+    const rows = await WaSale.findAll({
+      where,
+      include: [
+        { model: IncEmployee, as: 'employee', attributes: ['id','name'] },
+        { model: Branch,      as: 'branch',   attributes: ['id','name','code'] },
+      ],
+      order: [['date', 'DESC'], ['created_at', 'DESC']],
+    });
+
+    const totals = rows.reduce((s, r) => ({
+      sale_amount:    s.sale_amount    + parseFloat(r.sale_amount),
+      incentive_amount: s.incentive_amount + parseFloat(r.incentive_amount),
+    }), { sale_amount: 0, incentive_amount: 0 });
+
+    return res.json({ success: true, data: { sales: rows, totals } });
+  } catch (err) { next(err); }
+};
+
+const createWaSale = async (req, res, next) => {
+  try {
+    const period = await IncentivePeriod.findByPk(req.body.period_id);
+    if (!period) return res.status(404).json({ success: false, message: 'Periode tidak ditemukan' });
+    if (period.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+
+    const channel = await SalesChannel.findOne({ where: { code: 'WA', is_active: true } });
+    if (!channel) return res.status(400).json({ success: false, message: 'Channel WA belum dikonfigurasi' });
+
+    const incentive = engine.calcWaIncentive(req.body.sale_amount, channel.percentage);
+    const sale = await WaSale.create({
+      ...req.body,
+      channel_pct:      channel.percentage,
+      incentive_amount: incentive,
+      created_by:       req.user?.id,
+    });
+    return res.status(201).json({ success: true, message: 'Penjualan WA berhasil ditambahkan', data: { sale, incentive } });
+  } catch (err) { next(err); }
+};
+
+const updateWaSale = async (req, res, next) => {
+  try {
+    const sale = await WaSale.findByPk(req.params.id);
+    if (!sale) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+    const period = await IncentivePeriod.findByPk(sale.period_id);
+    if (period?.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+
+    const channel  = await SalesChannel.findOne({ where: { code: 'WA', is_active: true } });
+    const incentive = engine.calcWaIncentive(req.body.sale_amount || sale.sale_amount, channel.percentage);
+    await sale.update({ ...req.body, channel_pct: channel.percentage, incentive_amount: incentive });
+    return res.json({ success: true, message: 'Data diperbarui', data: { sale } });
+  } catch (err) { next(err); }
+};
+
+const deleteWaSale = async (req, res, next) => {
+  try {
+    const sale = await WaSale.findByPk(req.params.id);
+    if (!sale) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+    const period = await IncentivePeriod.findByPk(sale.period_id);
+    if (period?.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+    await sale.destroy();
+    return res.json({ success: true, message: 'Data penjualan WA dihapus' });
+  } catch (err) { next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// MARKETPLACE SALES
+// ─────────────────────────────────────────────────────────────
+const getMarketplaceSales = async (req, res, next) => {
+  try {
+    const { period_id, branch_id } = req.query;
+    const where = {};
+    if (period_id) where.period_id = period_id;
+    if (branch_id) where.branch_id = branch_id;
+    const rows = await MarketplaceSale.findAll({
+      where,
+      include: [
+        { model: Branch, as: 'branch', attributes: ['id','name','code'] },
+        { model: MarketplaceShare, as: 'shares',
+          include: [{ model: IncEmployee, as: 'employee', attributes: ['id','name'] }] },
+      ],
+      order: [['created_at', 'DESC']],
+    });
+    return res.json({ success: true, data: { sales: rows } });
+  } catch (err) { next(err); }
+};
+
+const upsertMarketplaceSale = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { period_id, branch_id, total_amount, shares, notes } = req.body;
+    const period = await IncentivePeriod.findByPk(period_id, { transaction: t });
+    if (period?.status === 'locked') { await t.rollback(); return res.status(400).json({ success: false, message: 'Periode sudah terkunci' }); }
+
+    // Validate shares total = 100%
+    if (shares?.length) {
+      const totalPct = shares.reduce((s, sh) => s + parseFloat(sh.share_percentage || 0), 0);
+      if (Math.abs(totalPct - 100) > 0.01) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: `Total pembagian harus 100%! Sekarang: ${totalPct.toFixed(2)}%`, code: 'SHARE_NOT_100' });
+      }
+    }
+
+    const channel = await SalesChannel.findOne({ where: { code: 'MARKETPLACE', is_active: true } });
+    if (!channel) { await t.rollback(); return res.status(400).json({ success: false, message: 'Channel Marketplace belum dikonfigurasi' }); }
+
+    // Upsert sale header
+    let [sale] = await MarketplaceSale.findOrCreate({ where: { period_id, branch_id }, transaction: t, defaults: { total_amount, channel_pct: channel.percentage, notes, created_by: req.user?.id } });
+    if (sale) await sale.update({ total_amount, channel_pct: channel.percentage, notes }, { transaction: t });
+
+    // Recalculate and upsert shares
+    if (shares?.length) {
+      await MarketplaceShare.destroy({ where: { marketplace_sale_id: sale.id }, transaction: t });
+      const calculated = engine.calcShares(total_amount, shares, channel.percentage);
+      for (const sh of calculated) {
+        await MarketplaceShare.create({
+          marketplace_sale_id: sale.id,
+          employee_id:         sh.user_id || sh.employee_id,
+          share_percentage:    sh.share_percentage,
+          performance_amount:  sh.performance_amount,
+          incentive_amount:    sh.incentive_amount,
+        }, { transaction: t });
+      }
+    }
+
+    await t.commit();
+    return res.json({ success: true, message: 'Data Marketplace berhasil disimpan', data: { sale } });
+  } catch (err) { await t.rollback(); next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// WEB SALES
+// ─────────────────────────────────────────────────────────────
+const getWebSales = async (req, res, next) => {
+  try {
+    const { period_id, branch_id } = req.query;
+    const where = {};
+    if (period_id) where.period_id = period_id;
+    if (branch_id) where.branch_id = branch_id;
+    const rows = await WebSale.findAll({
+      where,
+      include: [
+        { model: Branch, as: 'branch', attributes: ['id','name','code'] },
+        { model: WebShare, as: 'shares',
+          include: [{ model: IncEmployee, as: 'employee', attributes: ['id','name'] }] },
+      ],
+      order: [['created_at', 'DESC']],
+    });
+    return res.json({ success: true, data: { sales: rows } });
+  } catch (err) { next(err); }
+};
+
+const upsertWebSale = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { period_id, branch_id, total_amount, shares, notes } = req.body;
+    const period = await IncentivePeriod.findByPk(period_id, { transaction: t });
+    if (period?.status === 'locked') { await t.rollback(); return res.status(400).json({ success: false, message: 'Periode sudah terkunci' }); }
+
+    if (shares?.length) {
+      const totalPct = shares.reduce((s, sh) => s + parseFloat(sh.share_percentage || 0), 0);
+      if (Math.abs(totalPct - 100) > 0.01) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: `Total pembagian harus 100%! Sekarang: ${totalPct.toFixed(2)}%`, code: 'SHARE_NOT_100' });
+      }
+    }
+
+    const channel = await SalesChannel.findOne({ where: { code: 'WEB', is_active: true } });
+    if (!channel) { await t.rollback(); return res.status(400).json({ success: false, message: 'Channel Web belum dikonfigurasi' }); }
+
+    let [sale] = await WebSale.findOrCreate({ where: { period_id, branch_id }, transaction: t, defaults: { total_amount, channel_pct: channel.percentage, notes, created_by: req.user?.id } });
+    if (sale) await sale.update({ total_amount, channel_pct: channel.percentage, notes }, { transaction: t });
+
+    if (shares?.length) {
+      await WebShare.destroy({ where: { web_sale_id: sale.id }, transaction: t });
+      const calculated = engine.calcShares(total_amount, shares, channel.percentage);
+      for (const sh of calculated) {
+        await WebShare.create({
+          web_sale_id:         sale.id,
+          employee_id:         sh.user_id || sh.employee_id,
+          share_percentage:    sh.share_percentage,
+          performance_amount:  sh.performance_amount,
+          incentive_amount:    sh.incentive_amount,
+        }, { transaction: t });
+      }
+    }
+
+    await t.commit();
+    return res.json({ success: true, message: 'Data Web berhasil disimpan', data: { sale } });
+  } catch (err) { await t.rollback(); next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// ACTIVITIES
+// ─────────────────────────────────────────────────────────────
+const getActivities = async (req, res, next) => {
+  try {
+    const { period_id, branch_id, employee_id } = req.query;
+    const where = {};
+    if (period_id)   where.period_id   = period_id;
+    if (branch_id)   where.branch_id   = branch_id;
+    if (employee_id) where.employee_id = employee_id;
+    const rows = await EmployeeActivity.findAll({
+      where,
+      include: [
+        { model: IncEmployee,  as: 'employee',     attributes: ['id','name'] },
+        { model: require('../../models/incentive/ActivityType'), as: 'activityType', attributes: ['id','name','calc_type','unit_label'] },
+      ],
+      order: [['date', 'DESC']],
+    });
+    const total = rows.reduce((s, r) => s + parseFloat(r.incentive_amount), 0);
+    return res.json({ success: true, data: { activities: rows, total_incentive: total } });
+  } catch (err) { next(err); }
+};
+
+const createActivity = async (req, res, next) => {
+  try {
+    const { period_id, employee_id, branch_id, activity_type_id, date, qty, notes } = req.body;
+    const period = await IncentivePeriod.findByPk(period_id);
+    if (period?.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+
+    const actType = await require('../../models/incentive/ActivityType').findByPk(activity_type_id);
+    if (!actType) return res.status(404).json({ success: false, message: 'Jenis aktivitas tidak ditemukan' });
+
+    const incentive = engine.calcActivityIncentive(qty, actType.nominal);
+    const act = await EmployeeActivity.create({
+      period_id, employee_id, branch_id, activity_type_id, date, qty,
+      nominal_snapshot: actType.nominal,
+      incentive_amount: incentive,
+      notes, created_by: req.user?.id,
+    });
+    return res.status(201).json({ success: true, message: 'Aktivitas berhasil ditambahkan', data: { activity: act, incentive } });
+  } catch (err) { next(err); }
+};
+
+const deleteActivity = async (req, res, next) => {
+  try {
+    const act = await EmployeeActivity.findByPk(req.params.id);
+    if (!act) return res.status(404).json({ success: false, message: 'Tidak ditemukan' });
+    const period = await IncentivePeriod.findByPk(act.period_id);
+    if (period?.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+    await act.destroy();
+    return res.json({ success: true, message: 'Aktivitas dihapus' });
+  } catch (err) { next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// RESULTS
+// ─────────────────────────────────────────────────────────────
+const getResults = async (req, res, next) => {
+  try {
+    const { period_id, branch_id } = req.query;
+    const where = { period_id };
+    if (branch_id) where.branch_id = branch_id;
+    const rows = await IncentiveResult.findAll({
+      where,
+      include: [
+        { model: IncEmployee, as: 'employee', include: [{ model: Branch, as: 'branch', attributes: ['id','name','code'] }] },
+      ],
+      order: [['total_incentive', 'DESC']],
+    });
+    const summary = {
+      total_employees: rows.length,
+      total_incentive: rows.reduce((s, r) => s + parseFloat(r.total_incentive), 0),
+      total_wa:        rows.reduce((s, r) => s + parseFloat(r.wa_incentive), 0),
+      total_mp:        rows.reduce((s, r) => s + parseFloat(r.marketplace_incentive), 0),
+      total_web:       rows.reduce((s, r) => s + parseFloat(r.web_incentive), 0),
+      total_activity:  rows.reduce((s, r) => s + parseFloat(r.activity_incentive), 0),
+      total_bonus:     rows.reduce((s, r) => s + parseFloat(r.bonus_target), 0),
+    };
+    return res.json({ success: true, data: { results: rows, summary } });
+  } catch (err) { next(err); }
+};
+
+const getResultDetail = async (req, res, next) => {
+  try {
+    const result = await IncentiveResult.findByPk(req.params.id, {
+      include: [
+        { model: IncEmployee,    as: 'employee' },
+        { model: IncentivePeriod,as: 'period' },
+      ],
+    });
+    if (!result) return res.status(404).json({ success: false, message: 'Slip tidak ditemukan' });
+    return res.json({ success: true, data: { result } });
+  } catch (err) { next(err); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// DASHBOARD STATS
+// ─────────────────────────────────────────────────────────────
+const getDashboardStats = async (req, res, next) => {
+  try {
+    const currentYear  = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+
+    const [branches, employees, latestPeriod, allPeriods] = await Promise.all([
+      Branch.findAll({ where: { is_active: true } }),
+      IncEmployee.findAll({ where: { is_active: true } }),
+      IncentivePeriod.findOne({ order: [['year','DESC'],['month','DESC']] }),
+      IncentivePeriod.findAll({ where: { year: currentYear }, order: [['month','ASC']] }),
+    ]);
+
+    let latestResults = [];
+    if (latestPeriod) {
+      latestResults = await IncentiveResult.findAll({
+        where: { period_id: latestPeriod.id },
+        order: [['total_incentive','DESC']],
+        limit: 5,
+        include: [{ model: IncEmployee, as: 'employee', attributes: ['id','name'] }],
+      });
+    }
+
+    const monthlyTrend = allPeriods.map(p => ({
+      month: MONTHS_ID[p.month], month_num: p.month,
+      total_sales: parseFloat(p.total_all_sales),
+      total_incentive: parseFloat(p.total_incentive_paid),
+      status: p.status,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        summary: {
+          total_branches:  branches.length,
+          total_employees: employees.length,
+          latest_period:   latestPeriod?.name,
+          latest_status:   latestPeriod?.status,
+          latest_sales:    latestPeriod ? parseFloat(latestPeriod.total_all_sales) : 0,
+          latest_incentive:latestPeriod ? parseFloat(latestPeriod.total_incentive_paid) : 0,
+        },
+        top_performers: latestResults,
+        monthly_trend:  monthlyTrend,
+        branches:        branches,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+module.exports = {
+  getPeriods, getPeriod, createPeriod, approvePeriod, lockPeriod,
+  calculatePeriod,
+  getWaSales, createWaSale, updateWaSale, deleteWaSale,
+  getMarketplaceSales, upsertMarketplaceSale,
+  getWebSales, upsertWebSale,
+  getActivities, createActivity, deleteActivity,
+  getResults, getResultDetail,
+  getDashboardStats,
+};

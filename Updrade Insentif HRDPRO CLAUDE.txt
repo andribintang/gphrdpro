@@ -1,0 +1,458 @@
+UPGRADE INSENTIVE SYSTEM
+Menghitung insentif karyawan secara otomatis untuk 2 cabang online store:
+
+1. GPRACING
+   - Bidang: Online Store Spare Part Racing
+   - Jumlah karyawan: 4
+
+2. GPDISTRO
+   - Bidang: Online Store Fashion
+   - Jumlah karyawan: 4
+
+====================================================
+MASTER DATA
+====================================================
+
+Buat Modul Master Data berikut:
+
+1. Perusahaan
+2. Cabang
+3. Jabatan
+4. Karyawan
+5. Jalur Penjualan
+6. Aktivitas
+7. Bonus Target
+
+====================================================
+MODUL DATA KARYAWAN
+====================================================
+
+Field:
+- ID Karyawan
+- Nama
+- Email
+- No HP
+- Cabang
+- Jabatan
+- Status Aktif
+- Tanggal Bergabung
+- Foto Profile
+
+Fitur:
+- tambah
+- edit
+- hapus
+- pencarian
+- filter cabang
+- import excel
+- export excel
+
+====================================================
+MODUL JALUR PENJUALAN
+====================================================
+
+Default Jalur:
+
+1. WA
+2. Marketplace
+3. Web
+
+Field:
+- Nama Jalur
+- Persentase Insentif
+- Status Aktif
+
+Contoh:
+- WA = 3%
+- Marketplace = 0.5%
+- Web = 2%
+
+Persentase bisa diubah oleh HRD kapan saja.
+
+====================================================
+MODUL INSENTIF SALES
+====================================================
+
+Konsep:
+Insentif dihitung berdasarkan performance penjualan.
+
+Rumus:
+Insentif = Nominal Penjualan x Persentase Jalur
+
+====================================================
+JALUR WA
+====================================================
+
+HRD input manual transaksi penjualan WA.
+
+Field:
+- Tanggal
+- Karyawan
+- Customer
+- Nominal Penjualan
+- Keterangan
+
+Sistem otomatis menghitung insentif berdasarkan persentase jalur WA.
+
+====================================================
+JALUR MARKETPLACE
+====================================================
+
+HRD input total penjualan marketplace per periode.
+
+Field:
+- Periode
+- Cabang
+- Total Penjualan Marketplace
+
+Lalu HRD membagi porsi performance ke masing-masing karyawan.
+
+Contoh:
+Total Marketplace = 100.000.000
+
+Pembagian:
+- Karyawan A = 50%
+- Karyawan B = 30%
+- Karyawan C = 20%
+
+VALIDATION:
+- total pembagian wajib 100%
+- tampilkan warning jika tidak 100%
+
+Sistem otomatis menghitung:
+Performance Karyawan =
+Total Marketplace x Persentase Pembagian
+
+Lalu hitung insentif:
+Performance x Persentase Jalur Marketplace
+
+====================================================
+JALUR WEB
+====================================================
+
+Konsep sama seperti marketplace.
+
+HRD input:
+- periode
+- total penjualan web
+- pembagian %
+
+VALIDATION:
+- total pembagian wajib 100%
+
+====================================================
+MODUL INSENTIF AKTIVITAS
+====================================================
+
+Buat master aktivitas fleksibel.
+
+Contoh:
+1. Live Stream
+2. Konten
+
+Field:
+- Nama Aktivitas
+- Tipe Perhitungan
+- Nominal Insentif
+- Status Aktif
+
+Tipe Perhitungan:
+- per jam
+- per qty
+
+====================================================
+INPUT AKTIVITAS KARYAWAN
+====================================================
+
+HRD dapat input aktivitas karyawan.
+
+Contoh:
+Live Stream:
+- 10.000/jam
+
+Karyawan A:
+- 4 jam
+
+Maka:
+4 x 10.000 = 40.000
+
+Konten:
+- 15.000/konten
+
+Karyawan:
+- 10 konten
+
+Maka:
+10 x 15.000 = 150.000
+
+Field:
+- tanggal
+- karyawan
+- aktivitas
+- qty/jam
+- auto calculate subtotal
+
+====================================================
+MODUL BONUS TARGET
+====================================================
+
+Bonus target dihitung dari TOTAL PENJUALAN GABUNGAN semua cabang.
+
+Contoh:
+WA = 50.000.000
+Marketplace = 300.000.000
+Web = 10.000.000
+
+Total = 360.000.000
+
+====================================================
+MASTER BONUS TARGET
+====================================================
+
+HRD dapat membuat multiple target.
+
+Contoh:
+- >100JT = 200.000
+- >200JT = 300.000
+- >300JT = 400.000
+
+RULE:
+- sistem mengambil target tertinggi yang tercapai
+- bukan akumulasi
+
+====================================================
+PEMBAGIAN BONUS TARGET
+====================================================
+
+Bonus target dibagi rata ke semua karyawan aktif.
+
+Contoh:
+Bonus = 400.000
+Jumlah Karyawan Aktif = 8
+
+Maka:
+400.000 / 8 = 50.000 per karyawan
+
+====================================================
+MODUL PERIODE INSENTIF
+====================================================
+
+WAJIB ADA.
+
+Field:
+- Nama Periode
+- Tanggal Mulai
+- Tanggal Selesai
+- Status:
+  - Draft
+  - Calculated
+  - Approved
+  - Locked
+
+====================================================
+ENGINE PERHITUNGAN OTOMATIS
+====================================================
+
+Buat engine perhitungan otomatis:
+
+Hitung:
+1. Performance Sales
+2. Insentif Sales
+3. Insentif Aktivitas
+4. Bonus Target
+5. Total Insentif
+
+Pastikan:
+- realtime calculation
+- accurate calculation
+- no duplicate calculation
+
+====================================================
+APPROVAL SYSTEM
+====================================================
+
+Flow:
+1. Draft
+2. HRD Approval
+3. Manager Approval
+4. Locked
+
+Jika status LOCKED:
+- data tidak dapat diubah
+
+====================================================
+SLIP INSENTIF
+====================================================
+
+Buat desain slip insentif modern premium.
+
+Isi:
+1. Header perusahaan
+2. Data karyawan
+3. Performance
+4. Detail insentif
+5. Total insentif
+6. Status approval
+7. QR verification
+8. Tanggal cetak
+
+====================================================
+DETAIL SLIP
+====================================================
+
+Performance:
+- Penjualan Marketplace
+- Penjualan WA
+- Penjualan Web
+- Aktivitas
+
+Insentif:
+- Insentif Marketplace
+- Insentif WA
+- Insentif Web
+- Bonus Target
+- Insentif Aktivitas
+- Total Insentif
+
+====================================================
+FITUR EXPORT
+====================================================
+
+Buat fitur:
+- Export PDF
+- Export Excel
+- Print Slip
+- Bulk Print
+
+====================================================
+DASHBOARD
+====================================================
+
+Buat dashboard modern SaaS.
+
+Tampilkan:
+- Total Penjualan
+- Total Insentif
+- Target Progress
+- Ranking Karyawan
+- Grafik Penjualan
+- Grafik Insentif
+- Aktivitas Terbanyak
+
+====================================================
+UI/UX
+====================================================
+
+Gunakan desain:
+- modern ERP SaaS premium
+- rounded card
+- glassmorphism ringan
+- sidebar modern
+- statistik card
+- dark mode
+- clean typography
+- animation smooth
+- responsive
+
+====================================================
+DATABASE
+====================================================
+
+Buat struktur database relational MySQL lengkap.
+
+Buat:
+- ERD
+- table schema
+- foreign key
+- indexing
+- optimized query
+
+====================================================
+TABLE YANG HARUS DIBUAT
+====================================================
+
+MASTER:
+- companies
+- branches
+- positions
+- employees
+- users
+- roles
+- sales_channels
+- activity_types
+- bonus_targets
+
+TRANSACTION:
+- sales_wa
+- marketplace_sales
+- marketplace_sales_shares
+- web_sales
+- web_sales_shares
+- employee_activities
+- incentive_periods
+- incentive_calculations
+- incentive_details
+- incentive_slips
+- approvals
+
+====================================================
+FITUR TAMBAHAN
+====================================================
+
+Tambahkan:
+- Audit Log
+- Activity History
+- Notification System
+- Search Global
+- Multi Filter
+- Upload Profile Photo
+- Import Excel
+- Export Excel
+- Empty State UI
+- Error State UI
+- Skeleton Loading
+- Confirmation Dialog
+
+====================================================
+OUTPUT YANG SAYA INGINKAN
+====================================================
+
+Generate:
+1. Struktur folder project
+2. Database schema MySQL
+3. ERD relational
+4. React frontend pages
+5. Backend service architecture
+6. API structure
+7. Full CRUD
+8. Modern UI
+9. Reusable components
+10. Auto calculation logic
+11. Approval logic
+12. Slip PDF design
+13. Dashboard analytics
+14. Routing structure
+15. Authentication system
+
+====================================================
+IMPORTANT DEVELOPMENT RULES
+====================================================
+
+- gunakan best practice production
+- clean code
+- modular architecture
+- scalable architecture
+- reusable components
+- no duplicated code
+- use environment variables
+- optimized performance
+- secure authentication
+- protected API
+- validation all forms
+- responsive all devices
+
+====================================================
+FINAL RESULT
+====================================================
+
+Hasil akhir harus berupa aplikasi ERP HR Insentif modern yang siap dikembangkan lebih lanjut menjadi production system profesional.

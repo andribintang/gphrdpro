@@ -13,6 +13,8 @@ import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
 import PayrollEnginePage from './pages/PayrollEnginePage';
 import SettingsPage from './pages/SettingsPage';
+import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
+import MasterDataPage from './pages/incentive/MasterDataPage';
 
 export default function App() {
   return (
@@ -68,6 +70,10 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* Incentive System */}
+              <Route path="incentive" element={<ProtectedRoute roles={['admin','hr']}><IncentiveDashboard /></ProtectedRoute>} />
+              <Route path="incentive/master" element={<ProtectedRoute roles={['admin','hr']}><MasterDataPage /></ProtectedRoute>} />
+              <Route path="incentive/master/:section" element={<ProtectedRoute roles={['admin','hr']}><MasterDataPage /></ProtectedRoute>} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 

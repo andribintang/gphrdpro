@@ -1,0 +1,555 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Building2, Users, Briefcase, Percent, Star,
+  Target, Plus, Edit3, Trash2, X, Loader2,
+  CheckCircle2, ToggleLeft, ToggleRight, RefreshCw
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import { incentiveService, toRp, MONTHS_ID } from '../../utils/incentive/incentiveService';
+
+// ── Shared Modal ──────────────────────────────────────────────
+const Modal = ({ title, onClose, children, footer }) => (
+  <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+    <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[90vh] flex flex-col"
+      onClick={e => e.stopPropagation()}>
+      <div className="flex justify-center pt-3 sm:hidden flex-shrink-0"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">{title}</h3>
+        <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">{children}</div>
+      {footer && <div className="px-5 py-4 border-t border-[var(--border)] flex gap-2 flex-shrink-0">{footer}</div>}
+    </div>
+  </div>
+);
+
+const Field = ({ label, required, children }) => (
+  <div>
+    <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+      {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+    {children}
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════════
+// BRANCHES TAB
+// ════════════════════════════════════════════════════════════════
+const BranchesTab = () => {
+  const [branches, setBranches] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [modal, setModal]       = useState(null); // null | 'add' | {branch}
+  const [form, setForm]         = useState({ code:'', name:'', business_type:'', address:'', phone:'', email:'' });
+  const [saving, setSaving]     = useState(false);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try { const r = await incentiveService.getBranches(); setBranches(r.data.data.branches); }
+    catch { toast.error('Gagal memuat cabang'); } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const openAdd  = () => { setForm({ code:'', name:'', business_type:'', address:'', phone:'', email:'' }); setModal('add'); };
+  const openEdit = (b) => { setForm(b); setModal(b); };
+
+  const handleSave = async () => {
+    if (!form.code || !form.name) { toast.error('Kode dan nama wajib diisi'); return; }
+    setSaving(true);
+    try {
+      if (modal === 'add') { await incentiveService.createBranch(form); toast.success(`Cabang ${form.name} dibuat`); }
+      else { await incentiveService.updateBranch(modal.id, form); toast.success('Cabang diperbarui'); }
+      setModal(null); fetch();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (b) => {
+    if (!confirm(`Hapus cabang ${b.name}?`)) return;
+    try { await incentiveService.deleteBranch(b.id); toast.success('Cabang dihapus'); fetch(); }
+    catch (e) { toast.error(e.response?.data?.message || 'Gagal hapus'); }
+  };
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <p className="text-xs text-[var(--text-muted)]">{branches.length} cabang terdaftar</p>
+        <button onClick={openAdd} className="btn-primary h-8 px-3 text-xs"><Plus className="w-3.5 h-3.5" /> Tambah</button>
+      </div>
+      {loading ? <div className="space-y-2">{[...Array(2)].map((_,i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
+      : branches.map(b => (
+        <div key={b.id} className="card p-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-black">{b.code[0]}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-[var(--text-primary)]">{b.name}</p>
+            <p className="text-xs text-[var(--text-muted)]">{b.business_type}</p>
+            <p className="text-xs text-[var(--text-muted)]">{b.employee_count || 0} karyawan aktif</p>
+          </div>
+          <div className="flex gap-1.5">
+            <button onClick={() => openEdit(b)} className="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><Edit3 className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleDelete(b)} className="w-8 h-8 rounded-lg border border-red-200 dark:border-red-900 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>
+        </div>
+      ))}
+
+      {modal !== null && (
+        <Modal title={modal === 'add' ? 'Tambah Cabang' : 'Edit Cabang'} onClose={() => setModal(null)}
+          footer={<><button onClick={() => setModal(null)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Simpan
+            </button></>}>
+          <Field label="Kode" required><input value={form.code} onChange={e => sf('code', e.target.value.toUpperCase())} placeholder="GPRACING" className="input-base text-sm font-mono" /></Field>
+          <Field label="Nama Cabang" required><input value={form.name} onChange={e => sf('name', e.target.value)} placeholder="GP Racing" className="input-base text-sm" /></Field>
+          <Field label="Bidang Usaha"><input value={form.business_type} onChange={e => sf('business_type', e.target.value)} placeholder="Online Store Spare Part Racing" className="input-base text-sm" /></Field>
+          <Field label="Alamat"><textarea value={form.address} onChange={e => sf('address', e.target.value)} rows={2} className="input-base text-sm" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Telepon"><input value={form.phone} onChange={e => sf('phone', e.target.value)} placeholder="08xx" className="input-base text-sm" /></Field>
+            <Field label="Email"><input value={form.email} onChange={e => sf('email', e.target.value)} placeholder="email@" className="input-base text-sm" /></Field>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// EMPLOYEES TAB
+// ════════════════════════════════════════════════════════════════
+const EmployeesTab = () => {
+  const [employees, setEmps]   = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [loading, setLoading]  = useState(true);
+  const [modal, setModal]      = useState(null);
+  const [filterBranch, setFB]  = useState('');
+  const [form, setForm]        = useState({ name:'', email:'', phone:'', branch_id:'', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'' });
+  const [saving, setSaving]    = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [eRes, bRes, pRes] = await Promise.all([
+        incentiveService.getEmployees({ branch_id: filterBranch || undefined }),
+        incentiveService.getBranches(),
+        incentiveService.getPositions({ branch_id: filterBranch || undefined }),
+      ]);
+      setEmps(eRes.data.data.employees);
+      setBranches(bRes.data.data.branches);
+      setPositions(pRes.data.data.positions);
+    } catch { toast.error('Gagal memuat data'); } finally { setLoading(false); }
+  }, [filterBranch]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const openAdd  = () => { setForm({ name:'', email:'', phone:'', branch_id: branches[0]?.id || '', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'' }); setModal('add'); };
+  const openEdit = (e) => { setForm({ ...e, branch_id: e.branch_id, position_id: e.position_id || '' }); setModal(e); };
+
+  const handleSave = async () => {
+    if (!form.name || !form.branch_id) { toast.error('Nama dan cabang wajib diisi'); return; }
+    setSaving(true);
+    try {
+      if (modal === 'add') { await incentiveService.createEmployee(form); toast.success(`${form.name} ditambahkan`); }
+      else { await incentiveService.updateEmployee(modal.id, form); toast.success('Data diperbarui'); }
+      setModal(null); fetchAll();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (e) => {
+    try {
+      await incentiveService.updateEmployee(e.id, { is_active: !e.is_active });
+      toast.success(`${e.name} ${e.is_active ? 'dinonaktifkan' : 'diaktifkan'}`);
+      fetchAll();
+    } catch { toast.error('Gagal'); }
+  };
+
+  const filteredPositions = positions.filter(p => !form.branch_id || p.branch_id == form.branch_id);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <select value={filterBranch} onChange={e => setFB(e.target.value)} className="input-base text-sm flex-1">
+          <option value="">Semua Cabang</option>
+          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <button onClick={openAdd} className="btn-primary h-10 px-3 text-xs flex-shrink-0"><Plus className="w-3.5 h-3.5" /></button>
+      </div>
+      <p className="text-xs text-[var(--text-muted)]">{employees.length} karyawan</p>
+
+      {loading ? <div className="space-y-2">{[...Array(4)].map((_,i)=><div key={i} className="skeleton h-16 rounded-xl"/>)}</div>
+      : employees.length === 0 ? <div className="text-center py-10 text-sm text-[var(--text-muted)]">Belum ada karyawan</div>
+      : (
+        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+          {employees.map(e => (
+            <div key={e.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {e.name[0]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold truncate ${e.is_active ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] line-through'}`}>{e.name}</p>
+                <p className="text-xs text-[var(--text-muted)] truncate">{e.branch?.name} · {e.position?.name || 'No Position'}</p>
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={() => openEdit(e)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><Edit3 className="w-3 h-3" /></button>
+                <button onClick={() => handleToggle(e)}>
+                  {e.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-[var(--text-muted)]" />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modal !== null && (
+        <Modal title={modal === 'add' ? 'Tambah Karyawan' : 'Edit Karyawan'} onClose={() => setModal(null)}
+          footer={<><button onClick={() => setModal(null)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Simpan
+            </button></>}>
+          <Field label="Nama" required><input value={form.name} onChange={e => sf('name', e.target.value)} placeholder="Ahmad Fauzi" className="input-base text-sm" /></Field>
+          <Field label="Cabang" required>
+            <select value={form.branch_id} onChange={e => { sf('branch_id', e.target.value); sf('position_id', ''); }} className="input-base text-sm">
+              <option value="">Pilih cabang...</option>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Jabatan">
+            <select value={form.position_id} onChange={e => sf('position_id', e.target.value)} className="input-base text-sm">
+              <option value="">Pilih jabatan...</option>
+              {filteredPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Kode Karyawan"><input value={form.employee_code} onChange={e => sf('employee_code', e.target.value)} placeholder="EMP-001" className="input-base text-sm" /></Field>
+          <Field label="Email"><input type="email" value={form.email} onChange={e => sf('email', e.target.value)} placeholder="email@company.com" className="input-base text-sm" /></Field>
+          <Field label="No HP"><input value={form.phone} onChange={e => sf('phone', e.target.value)} placeholder="08xx" className="input-base text-sm" /></Field>
+          <Field label="Tanggal Bergabung"><input type="date" value={form.join_date} onChange={e => sf('join_date', e.target.value)} className="input-base text-sm" /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// CHANNELS TAB — Sales Channels dengan %
+// ════════════════════════════════════════════════════════════════
+const ChannelsTab = () => {
+  const [channels, setChannels] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [editing, setEditing]   = useState(null);
+  const [pct, setPct]           = useState('');
+  const [saving, setSaving]     = useState(false);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try { const r = await incentiveService.getChannels(); setChannels(r.data.data.channels); }
+    catch { toast.error('Gagal'); } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const handleSave = async (ch) => {
+    if (!pct || isNaN(parseFloat(pct))) { toast.error('Masukkan persentase yang valid'); return; }
+    setSaving(true);
+    try {
+      await incentiveService.updateChannel(ch.id, { percentage: parseFloat(pct) });
+      toast.success(`${ch.name} diperbarui ke ${pct}%`);
+      setEditing(null); fetch();
+    } catch { toast.error('Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const ICONS = { WA: '💬', MARKETPLACE: '🛒', WEB: '🌐' };
+
+  return (
+    <div className="space-y-3">
+      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-xs text-amber-700 dark:text-amber-300">
+        ⚠️ Perubahan persentase akan berpengaruh ke kalkulasi insentif periode berikutnya.
+      </div>
+      {loading ? <div className="space-y-2">{[...Array(3)].map((_,i)=><div key={i} className="skeleton h-16 rounded-xl"/>)}</div>
+      : channels.map(ch => (
+        <div key={ch.id} className="card p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl">{ICONS[ch.code] || '📊'}</span>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-[var(--text-primary)]">{ch.name}</p>
+              <p className="text-xs text-[var(--text-muted)]">{ch.input_type === 'per_transaction' ? 'Input per transaksi' : 'Input per periode'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-black text-brand-600 dark:text-brand-400">{parseFloat(ch.percentage)}%</p>
+              <p className="text-[10px] text-[var(--text-muted)]">persentase</p>
+            </div>
+          </div>
+
+          {editing === ch.id ? (
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input type="number" step="0.001" value={pct} onChange={e => setPct(e.target.value)}
+                  placeholder="0.000" className="input-base text-sm pr-8" autoFocus />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-bold">%</span>
+              </div>
+              <button onClick={() => handleSave(ch)} disabled={saving}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Simpan'}
+              </button>
+              <button onClick={() => setEditing(null)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)]">Batal</button>
+            </div>
+          ) : (
+            <button onClick={() => { setEditing(ch.id); setPct(ch.percentage); }}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+              <Edit3 className="w-3 h-3" /> Ubah Persentase
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// ACTIVITY TYPES TAB
+// ════════════════════════════════════════════════════════════════
+const ActivityTypesTab = () => {
+  const [types, setTypes]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal]   = useState(null);
+  const [form, setForm]     = useState({ name:'', calc_type:'per_qty', nominal:'', unit_label:'qty', notes:'' });
+  const [saving, setSaving] = useState(false);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try { const r = await incentiveService.getActivityTypes(); setTypes(r.data.data.activity_types); }
+    catch { toast.error('Gagal'); } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name || !form.nominal) { toast.error('Nama dan nominal wajib diisi'); return; }
+    setSaving(true);
+    try {
+      if (modal === 'add') { await incentiveService.createActivityType(form); toast.success('Aktivitas ditambahkan'); }
+      else { await incentiveService.updateActivityType(modal.id, form); toast.success('Aktivitas diperbarui'); }
+      setModal(null); fetch();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (t) => {
+    try { await incentiveService.updateActivityType(t.id, { is_active: !t.is_active }); fetch(); }
+    catch { toast.error('Gagal'); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <p className="text-xs text-[var(--text-muted)]">{types.length} jenis aktivitas</p>
+        <button onClick={() => { setForm({ name:'', calc_type:'per_qty', nominal:'', unit_label:'qty', notes:'' }); setModal('add'); }}
+          className="btn-primary h-8 px-3 text-xs"><Plus className="w-3.5 h-3.5" /> Tambah</button>
+      </div>
+
+      {loading ? <div className="space-y-2">{[...Array(2)].map((_,i)=><div key={i} className="skeleton h-14 rounded-xl"/>)}</div>
+      : types.map(t => (
+        <div key={t.id} className="card p-4 flex items-center gap-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className={`text-sm font-bold ${t.is_active ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] line-through'}`}>{t.name}</p>
+              <span className="text-[10px] bg-[var(--bg-secondary)] text-[var(--text-muted)] px-2 py-0.5 rounded font-semibold">
+                {t.calc_type === 'per_hour' ? '/jam' : '/qty'}
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{toRp(t.nominal)} per {t.unit_label}</p>
+          </div>
+          <div className="flex gap-1.5">
+            <button onClick={() => { setForm(t); setModal(t); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><Edit3 className="w-3 h-3" /></button>
+            <button onClick={() => handleToggle(t)}>
+              {t.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-[var(--text-muted)]" />}
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {modal !== null && (
+        <Modal title={modal === 'add' ? 'Tambah Aktivitas' : 'Edit Aktivitas'} onClose={() => setModal(null)}
+          footer={<><button onClick={() => setModal(null)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Simpan</button></>}>
+          <Field label="Nama Aktivitas" required><input value={form.name} onChange={e => sf('name', e.target.value)} placeholder="Live Stream" className="input-base text-sm" /></Field>
+          <Field label="Tipe Perhitungan">
+            <div className="grid grid-cols-2 gap-2">
+              {[{v:'per_qty',l:'Per Qty'},{v:'per_hour',l:'Per Jam'}].map(t => (
+                <button key={t.v} type="button" onClick={() => sf('calc_type', t.v)}
+                  className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${form.calc_type===t.v ? 'bg-brand-500 text-white border-brand-500' : 'border-[var(--border)] text-[var(--text-secondary)]'}`}>
+                  {t.l}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Nominal" required>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">Rp</span>
+              <input type="number" value={form.nominal} onChange={e => sf('nominal', e.target.value)} placeholder="10000" className="input-base pl-10 text-sm" />
+            </div>
+          </Field>
+          <Field label="Satuan (label)"><input value={form.unit_label} onChange={e => sf('unit_label', e.target.value)} placeholder="jam / konten / video" className="input-base text-sm" /></Field>
+          <Field label="Catatan"><textarea value={form.notes} onChange={e => sf('notes', e.target.value)} rows={2} className="input-base text-sm" /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// BONUS TARGETS TAB
+// ════════════════════════════════════════════════════════════════
+const BonusTargetsTab = () => {
+  const [targets, setTargets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal]     = useState(null);
+  const [form, setForm]       = useState({ name:'', min_amount:'', bonus_amount:'', notes:'' });
+  const [saving, setSaving]   = useState(false);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try { const r = await incentiveService.getBonusTargets(); setTargets(r.data.data.bonus_targets); }
+    catch { toast.error('Gagal'); } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name || !form.min_amount || !form.bonus_amount) { toast.error('Semua field wajib diisi'); return; }
+    setSaving(true);
+    try {
+      if (modal === 'add') { await incentiveService.createBonusTarget(form); toast.success('Target bonus dibuat'); }
+      else { await incentiveService.updateBonusTarget(modal.id, form); toast.success('Target bonus diperbarui'); }
+      setModal(null); fetch();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (t) => {
+    if (!confirm(`Hapus target "${t.name}"?`)) return;
+    try { await incentiveService.deleteBonusTarget(t.id); toast.success('Dihapus'); fetch(); }
+    catch { toast.error('Gagal'); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-xs text-amber-700 dark:text-amber-300">
+        💡 Sistem mengambil target TERTINGGI yang tercapai (bukan akumulasi). Contoh: jika total penjualan Rp 350jt, maka tier &gt;300jt yang berlaku.
+      </div>
+      <div className="flex justify-between items-center">
+        <p className="text-xs text-[var(--text-muted)]">{targets.length} target terdaftar</p>
+        <button onClick={() => { setForm({ name:'', min_amount:'', bonus_amount:'', notes:'' }); setModal('add'); }}
+          className="btn-primary h-8 px-3 text-xs"><Plus className="w-3.5 h-3.5" /> Tambah Target</button>
+      </div>
+
+      {loading ? <div className="space-y-2">{[...Array(3)].map((_,i)=><div key={i} className="skeleton h-16 rounded-xl"/>)}</div>
+      : targets.length === 0 ? <div className="text-center py-10 text-sm text-[var(--text-muted)]">Belum ada target bonus</div>
+      : targets.map((t, i) => (
+        <div key={t.id} className="card p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{i === targets.length-1 ? '🏆' : '🎯'}</span>
+                <p className="text-sm font-bold text-[var(--text-primary)]">{t.name}</p>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Total penjualan &gt; {toRp(t.min_amount)}</p>
+            </div>
+            <div className="flex gap-1.5">
+              <button onClick={() => { setForm(t); setModal(t); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><Edit3 className="w-3 h-3" /></button>
+              <button onClick={() => handleDelete(t)} className="w-7 h-7 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950"><Trash2 className="w-3 h-3" /></button>
+            </div>
+          </div>
+          <div className="bg-[var(--bg-secondary)] rounded-xl px-3 py-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-[var(--text-muted)]">Total Bonus Dibagi Rata</span>
+              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{toRp(t.bonus_amount)}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {modal !== null && (
+        <Modal title={modal === 'add' ? 'Tambah Bonus Target' : 'Edit Bonus Target'} onClose={() => setModal(null)}
+          footer={<><button onClick={() => setModal(null)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Simpan</button></>}>
+          <Field label="Nama Target" required><input value={form.name} onChange={e => sf('name', e.target.value)} placeholder="> 300 Juta" className="input-base text-sm" /></Field>
+          <Field label="Minimum Total Penjualan (semua channel)" required>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">Rp</span>
+              <input type="number" value={form.min_amount} onChange={e => sf('min_amount', e.target.value)} placeholder="300000000" className="input-base pl-10 text-sm" />
+            </div>
+            {form.min_amount && <p className="text-xs text-[var(--text-muted)] mt-1">{toRp(form.min_amount)}</p>}
+          </Field>
+          <Field label="Total Bonus (dibagi rata ke semua karyawan aktif)" required>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">Rp</span>
+              <input type="number" value={form.bonus_amount} onChange={e => sf('bonus_amount', e.target.value)} placeholder="400000" className="input-base pl-10 text-sm" />
+            </div>
+            {form.bonus_amount && <p className="text-xs text-[var(--text-muted)] mt-1">{toRp(form.bonus_amount)}</p>}
+          </Field>
+          <Field label="Catatan"><input value={form.notes} onChange={e => sf('notes', e.target.value)} className="input-base text-sm" /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// MAIN MASTER DATA PAGE
+// ════════════════════════════════════════════════════════════════
+const TABS = [
+  { id:'branches',  label:'Cabang',    icon:Building2 },
+  { id:'employees', label:'Karyawan',  icon:Users },
+  { id:'channels',  label:'Jalur',     icon:Percent },
+  { id:'activities',label:'Aktivitas', icon:Star },
+  { id:'bonus',     label:'Target',    icon:Target },
+];
+
+export default function MasterDataPage() {
+  const [activeTab, setActiveTab] = useState('branches');
+
+  return (
+    <div className="max-w-lg mx-auto">
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Master Data</h1>
+        <p className="text-sm text-[var(--text-secondary)]">Cabang · Karyawan · Jalur Penjualan · Aktivitas · Target</p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin bg-[var(--bg-secondary)] p-1 rounded-2xl border border-[var(--border)] mb-5">
+        {TABS.map(tab => {
+          const Icon   = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap
+                ${active ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <Icon className="w-3.5 h-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'branches'   && <BranchesTab />}
+      {activeTab === 'employees'  && <EmployeesTab />}
+      {activeTab === 'channels'   && <ChannelsTab />}
+      {activeTab === 'activities' && <ActivityTypesTab />}
+      {activeTab === 'bonus'      && <BonusTargetsTab />}
+    </div>
+  );
+}

@@ -1,0 +1,164 @@
+Kamu adalah seorang Senior Software Architect dan Fullstack Developer profesional.
+
+upgrade aplikasi GPHRD PRO dengan MENAMBAHKAN modul baru bernama:
+# "INSENTIVE MANAGEMENT"
+
+==================================================
+TUJUAN
+==================================================
+
+Modul ini digunakan untuk:
+- menghitung insentif karyawan otomatis
+- menghitung performance sales
+- menghitung bonus target
+- menghitung insentif aktivitas
+- generate slip insentif
+
+==================================================
+IMPORTANT INTEGRATION RULES
+==================================================
+
+- Analisa struktur project existing terlebih dahulu
+- Gunakan style UI yang sudah ada
+- Gunakan routing existing
+- Gunakan authentication existing
+- Gunakan firestore existing
+- Jangan merusak modul lain
+- Jangan overwrite existing component
+- Gunakan reusable architecture
+- Semua fitur baru harus modular
+- Semua fitur baru harus scalable
+
+==================================================
+MODUL BARU YANG HARUS DITAMBAHKAN
+==================================================
+
+1. Master Data Insentif
+2. Insentif Sales
+3. Insentif Aktivitas
+4. Bonus Target
+5. Periode Insentif
+6. Engine Perhitungan
+7. Approval
+8. Slip Insentif
+9. Dashboard Insentif
+
+==================================================
+STRUKTUR PERUSAHAAN
+==================================================
+
+Perusahaan memiliki 2 cabang:
+
+1. GPRACING
+- Online Store Spare Part Racing
+- 4 Karyawan
+
+2. GPDISTRO
+- Online Store Fashion
+- 4 Karyawan
+
+==================================================
+KONSEP INSENTIF
+==================================================
+
+KOMPONEN:
+1. Insentif Sales
+2. Insentif Aktivitas
+3. Bonus Target
+
+==================================================
+INSENTIF SALES
+==================================================
+
+Jalur Sales:
+1. WA
+2. Marketplace
+3. Web
+
+Rumus:
+Insentif = Performance Penjualan x Persentase Jalur
+
+Contoh:
+- WA = 3%
+- Marketplace = 0.5%
+- Web = 2%
+
+==================================================
+MARKETPLACE & WEB SHARE SYSTEM
+==================================================
+
+HRD input:
+- total penjualan
+- pembagian % ke karyawan
+
+Contoh:
+Marketplace = 100.000.000
+
+Pembagian:
+- A = 50%
+- B = 30%
+- C = 20%
+
+VALIDATION:
+- total pembagian wajib 100%
+
+==================================================
+INSENTIF AKTIVITAS
+==================================================
+
+Contoh:
+- Live Stream
+- Konten
+
+Perhitungan:
+- per jam
+- per qty
+
+==================================================
+BONUS TARGET
+==================================================
+
+Bonus berdasarkan total gabungan semua cabang.
+
+Contoh:
+>100JT = 200.000
+>200JT = 300.000
+>300JT = 400.000
+
+RULE:
+- gunakan target tertinggi yang tercapai
+- bonus dibagi rata ke semua karyawan aktif
+
+==================================================
+TUGAS YANG HARUS DILAKUKAN
+==================================================
+
+1. Analisa struktur project existing
+2. Buat struktur folder modular baru
+3. Buat struktur Firestore collection
+4. Buat relational logic antar collection
+5. Buat routing integration
+6. Buat sidebar integration
+7. Buat role permission integration
+8. Buat architecture plan
+9. Buat state management plan
+10. Buat reusable component plan
+
+==================================================
+OUTPUT YANG SAYA INGINKAN
+==================================================
+
+1. Analisa integrasi project existing
+2. Struktur folder modul baru
+3. Struktur collection Firestore
+4. Struktur document Firestore
+5. Relasi antar data
+6. Routing baru
+7. Sidebar menu baru
+8. Permission access
+9. Flowchart sistem
+10. Development roadmap step-by-step
+
+IMPORTANT:
+JANGAN generate semua coding dulu.
+Fokus dulu membuat architecture & integration planning yang aman untuk project existing GP HRD PRO.

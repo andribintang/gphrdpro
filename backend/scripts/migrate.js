@@ -257,6 +257,33 @@ const migrate = async () => {
       console.log('✅ Default payroll components seeded (15 komponen)');
     }
 
+    // Sync incentive system models
+    const incModels = require('../models/incentive');
+    // Tables already synced via sequelize.sync above
+    // Seed default data if not exists
+
+    // Seed default branches
+    const { Branch, SalesChannel } = incModels;
+    const branchCount = await Branch.count();
+    if (branchCount === 0) {
+      await Branch.bulkCreate([
+        { code: 'GPRACING', name: 'GP Racing',  business_type: 'Online Store Spare Part Racing', sort_order: 1 },
+        { code: 'GPDISTRO', name: 'GP Distro',  business_type: 'Online Store Fashion',           sort_order: 2 },
+      ]);
+      console.log('✅ Default branches seeded (GP Racing, GP Distro)');
+    }
+
+    // Seed default sales channels
+    const channelCount = await SalesChannel.count();
+    if (channelCount === 0) {
+      await SalesChannel.bulkCreate([
+        { code: 'WA',          name: 'WhatsApp',    percentage: 3.000, input_type: 'per_transaction', sort_order: 1 },
+        { code: 'MARKETPLACE', name: 'Marketplace', percentage: 0.500, input_type: 'per_period',      sort_order: 2 },
+        { code: 'WEB',         name: 'Website',     percentage: 2.000, input_type: 'per_period',      sort_order: 3 },
+      ]);
+      console.log('✅ Default sales channels seeded (WA 3%, Marketplace 0.5%, Web 2%)');
+    }
+
     console.log('\n🎉 Migration complete!');
     process.exit(0);
   } catch (error) {

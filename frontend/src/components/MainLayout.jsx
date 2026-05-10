@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Users, Clock, CalendarOff,
   DollarSign, Menu, X, Sun, Moon, LogOut,
-  Shield, Bell, ChevronRight, Settings, BarChart3
+  Shield, Bell, ChevronRight, Settings, BarChart3, TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
