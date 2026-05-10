@@ -1,6 +1,22 @@
 require('dotenv').config();
 const { sequelize } = require('../config/database');
-const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll, OfficeSetting, EmployeeFace, PayrollSetting, PayrollComponent } = require('../models');
+
+// ── Import SEMUA models di awal — SEBELUM sequelize.sync() ────
+const {
+  User, Employee, Attendance, LeaveRequest, LeaveQuota,
+  Payroll, OfficeSetting, EmployeeFace,
+  PayrollSetting, PayrollComponent,
+} = require('../models');
+
+// Import incentive models di awal juga agar tabelnya ikut di-sync
+const {
+  Branch, Position, IncEmployee, SalesChannel,
+  ActivityType, BonusTarget, IncentivePeriod,
+  WaSale, MarketplaceSale, MarketplaceShare,
+  WebSale, WebShare, EmployeeActivity,
+  IncentiveResult, AuditLog,
+} = require('../models/incentive');
+
 const { seedDefaultComponents } = require('../controllers/payrollEngineController');
 const bcrypt = require('bcryptjs');
 
@@ -8,11 +24,12 @@ const migrate = async () => {
   try {
     console.log('🔄 Running database migration...');
 
+    // sync() sekarang akan include SEMUA model yang sudah di-import di atas
     await sequelize.sync({ force: false, alter: true });
 
-    console.log('✅ Database tables synced successfully');
+    console.log('✅ Database tables synced successfully (HRD + Incentive)');
 
-    // Seed initial admin user
+    // ── Seed admin user ──────────────────────────────────────
     const adminExists = await User.findOne({ where: { email: 'admin@hrd.com' } });
 
     if (!adminExists) {
@@ -53,165 +70,35 @@ const migrate = async () => {
         role: 'employee',
       });
 
-      // Create employee profiles
-      await Employee.create({
-        user_id: hr.id,
-        nip: 'NIP-001',
-        position: 'HR Manager',
-        department: 'Human Resources',
-        salary_base: 8000000,
-        join_date: '2020-01-15',
-        status: 'active',
-      });
+      // Employee profiles
+      await Employee.create({ user_id: hr.id,         nip: 'NIP-001', position: 'HR Manager',   department: 'Human Resources', salary_base: 8000000, join_date: '2020-01-15', status: 'active' });
+      await Employee.create({ user_id: supervisor.id, nip: 'NIP-002', position: 'Supervisor',    department: 'Operations',      salary_base: 7500000, join_date: '2020-03-01', status: 'active' });
+      await Employee.create({ user_id: emp1.id,       nip: 'NIP-003', position: 'Staff IT',      department: 'Technology',      salary_base: 5500000, join_date: '2021-06-01', status: 'active' });
+      await Employee.create({ user_id: emp2.id,       nip: 'NIP-004', position: 'Staff Finance', department: 'Finance',         salary_base: 5000000, join_date: '2022-01-10', status: 'active' });
 
-      await Employee.create({
-        user_id: supervisor.id,
-        nip: 'NIP-002',
-        position: 'Supervisor',
-        department: 'Operations',
-        salary_base: 7500000,
-        join_date: '2020-03-01',
-        status: 'active',
-      });
-
-      await Employee.create({
-        user_id: emp1.id,
-        nip: 'NIP-003',
-        position: 'Staff IT',
-        department: 'Technology',
-        salary_base: 5500000,
-        join_date: '2021-06-01',
-        status: 'active',
-      });
-
-      await Employee.create({
-        user_id: emp2.id,
-        nip: 'NIP-004',
-        position: 'Staff Finance',
-        department: 'Finance',
-        salary_base: 5000000,
-        join_date: '2022-01-10',
-        status: 'active',
-      });
-
-      // Seed leave quotas for current year
+      // Leave quotas
       const currentYear = new Date().getFullYear();
-      const usersWithQuota = [hr, supervisor, emp1, emp2];
-      for (const u of usersWithQuota) {
-        await LeaveQuota.create({
-          user_id: u.id,
-          year: currentYear,
-          annual_quota: 12,
-          annual_used: 0,
-          sick_used: 0,
-          carry_over: 0,
-        });
+      for (const u of [hr, supervisor, emp1, emp2]) {
+        await LeaveQuota.create({ user_id: u.id, year: currentYear, annual_quota: 12, annual_used: 0, sick_used: 0, carry_over: 0 });
       }
 
-      // Seed a sample approved leave for demo
-      await LeaveRequest.create({
-        user_id: emp1.id,
-        type: 'annual',
-        start_date: new Date(currentYear, new Date().getMonth(), 20).toISOString().split('T')[0],
-        end_date: new Date(currentYear, new Date().getMonth(), 22).toISOString().split('T')[0],
-        total_days: 3,
-        reason: 'Liburan keluarga ke Bali',
-        status: 'approved',
-        approved_by: hr.id,
-        approved_at: new Date(),
-      });
+      // Sample leave requests
+      await LeaveRequest.create({ user_id: emp1.id, type: 'annual', start_date: `${currentYear}-${String(new Date().getMonth()+1).padStart(2,'0')}-20`, end_date: `${currentYear}-${String(new Date().getMonth()+1).padStart(2,'0')}-22`, total_days: 3, reason: 'Liburan keluarga', status: 'approved', approved_by: hr.id, approved_at: new Date() });
+      await LeaveQuota.update({ annual_used: 3 }, { where: { user_id: emp1.id, year: currentYear } });
+      await LeaveRequest.create({ user_id: emp2.id, type: 'sick', start_date: `${currentYear}-${String(new Date().getMonth()+2).padStart(2,'0')}-05`, end_date: `${currentYear}-${String(new Date().getMonth()+2).padStart(2,'0')}-06`, total_days: 2, reason: 'Sakit demam', status: 'pending' });
 
-      // Update quota usage for the approved leave
-      await LeaveQuota.update(
-        { annual_used: 3 },
-        { where: { user_id: emp1.id, year: currentYear } }
-      );
+      // Sample payroll
+      const prevMonth = new Date(); prevMonth.setMonth(prevMonth.getMonth() - 1);
+      const prevMonthStr = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth()+1).padStart(2,'0')}`;
+      const curMonthStr  = `${currentYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
 
-      // Seed a pending leave request for demo
-      await LeaveRequest.create({
-        user_id: emp2.id,
-        type: 'sick',
-        start_date: new Date(currentYear, new Date().getMonth() + 1, 5).toISOString().split('T')[0],
-        end_date: new Date(currentYear, new Date().getMonth() + 1, 6).toISOString().split('T')[0],
-        total_days: 2,
-        reason: 'Sakit demam dan perlu istirahat total',
-        status: 'pending',
-      });
-
-      // Seed payroll records for last 2 months
-      const prevMonthDate = new Date(currentYear, new Date().getMonth() - 1, 1);
-      const prevMonthStr  = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
-      const curMonthStr   = `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-
-      const payrollUsers = [
-        { user: hr,         base: 8000000 },
-        { user: supervisor, base: 7500000 },
-        { user: emp1,       base: 5500000 },
-        { user: emp2,       base: 5000000 },
-      ];
-
-      for (const { user: u, base } of payrollUsers) {
-        const allowances  = 750000;
-        const deductions  = Math.round((base * 0.01) + (base * 0.02) + Math.max(0, base + allowances - 4500000) * 0.05);
+      for (const { user: u, base } of [{ user: hr, base: 8000000 }, { user: supervisor, base: 7500000 }, { user: emp1, base: 5500000 }, { user: emp2, base: 5000000 }]) {
+        const allowances = 750000;
+        const deductions = Math.round((base * 0.01) + (base * 0.02) + Math.max(0, base + allowances - 4500000) * 0.05);
         const totalSalary = base + allowances - deductions;
-
-        // Previous month - paid
-        await Payroll.create({
-          user_id: u.id,
-          month: prevMonthStr,
-          salary_base:  base,
-          allowances:   allowances,
-          deductions:   deductions,
-          overtime_pay: 0,
-          total_salary: totalSalary,
-          status: 'paid',
-          paid_at: new Date(),
-          processed_by: hr.id,
-          details_json: {
-            employee: { name: u.name, nip: '', position: '', department: '' },
-            attendance_summary: { present: 20, late: 1, absent: 0, leave: 1, total_hours: 168 },
-            allowance_items: [
-              { name: 'Tunjangan Transport', amount: 300000 },
-              { name: 'Tunjangan Makan',     amount: 450000 },
-            ],
-            deduction_items: [
-              { name: 'BPJS Kesehatan (1%)', amount: Math.round(base * 0.01) },
-              { name: 'BPJS TK / JHT (2%)', amount: Math.round(base * 0.02) },
-              { name: 'PPH 21 (5%)',         amount: Math.round(Math.max(0, base + allowances - 4500000) * 0.05) },
-            ],
-            gross_salary: base + allowances,
-            calculated_at: new Date().toISOString(),
-          },
-        });
-
-        // Current month - processed
-        await Payroll.create({
-          user_id: u.id,
-          month: curMonthStr,
-          salary_base:  base,
-          allowances:   allowances,
-          deductions:   deductions,
-          overtime_pay: 0,
-          total_salary: totalSalary,
-          status: 'processed',
-          processed_by: hr.id,
-          details_json: {
-            employee: { name: u.name, nip: '', position: '', department: '' },
-            attendance_summary: { present: 18, late: 2, absent: 0, leave: 0, total_hours: 152 },
-            allowance_items: [
-              { name: 'Tunjangan Transport', amount: 300000 },
-              { name: 'Tunjangan Makan',     amount: 450000 },
-              { name: 'Potongan Terlambat (2x)', amount: -50000 },
-            ],
-            deduction_items: [
-              { name: 'BPJS Kesehatan (1%)', amount: Math.round(base * 0.01) },
-              { name: 'BPJS TK / JHT (2%)', amount: Math.round(base * 0.02) },
-              { name: 'PPH 21 (5%)',         amount: Math.round(Math.max(0, base + allowances - 4500000) * 0.05) },
-            ],
-            gross_salary: base + allowances,
-            calculated_at: new Date().toISOString(),
-          },
-        });
+        const base_json = { employee: { name: u.name }, allowance_items: [], deduction_items: [], calculated_at: new Date().toISOString() };
+        await Payroll.create({ user_id: u.id, month: prevMonthStr, salary_base: base, allowances, deductions, overtime_pay: 0, total_salary: totalSalary, status: 'paid', paid_at: new Date(), processed_by: hr.id, details_json: base_json });
+        await Payroll.create({ user_id: u.id, month: curMonthStr,  salary_base: base, allowances, deductions, overtime_pay: 0, total_salary: totalSalary, status: 'processed', processed_by: hr.id, details_json: base_json });
       }
 
       console.log('✅ Initial seed data created');
@@ -224,56 +111,75 @@ const migrate = async () => {
       console.log('ℹ️  Seed data already exists, skipping...');
     }
 
-    // Seed office settings if not exists
+    // ── Office settings ──────────────────────────────────────
     const officeExists = await OfficeSetting.findOne();
     if (!officeExists) {
-      await OfficeSetting.create({
-        name: 'Kantor HRD Lite',
-        address: 'Jl. Kantor No. 1, Jakarta',
-        lat: -6.2088,
-        lng: 106.8456,
-        radius: 100,
-        check_in_start: '06:00',
-        check_in_deadline: '08:05',
-        check_out_start: '15:00',
-        work_hours_required: 8.0,
-        is_active: true,
-      });
-      console.log('✅ Office settings created (lat:-6.2088, lng:106.8456, radius:100m)');
-      console.log('   → Ubah koordinat kantor di menu Settings > Pengaturan Kantor');
+      await OfficeSetting.create({ name: 'Kantor HRD Lite', address: 'Jakarta', lat: -6.2088, lng: 106.8456, radius: 100, check_in_start: '06:00', check_in_deadline: '08:05', check_out_start: '15:00', work_hours_required: 8.0, is_active: true });
+      console.log('✅ Office settings created');
     }
 
-    // Seed payroll settings
+    // ── Payroll settings ──────────────────────────────────────
     const psExists = await PayrollSetting.findOne();
     if (!psExists) {
       await PayrollSetting.create({});
-      console.log('✅ Payroll settings created (default)');
+      console.log('✅ Payroll settings created');
     }
 
-    // Seed default payroll components
+    // ── Payroll components ────────────────────────────────────
     const compCount = await PayrollComponent.count();
     if (compCount === 0) {
       await seedDefaultComponents();
       console.log('✅ Default payroll components seeded (15 komponen)');
     }
 
-    // Sync incentive system models
-    const incModels = require('../models/incentive');
-    // Tables already synced via sequelize.sync above
-    // Seed default data if not exists
+    // ── Incentive: Positions ─────────────────────────────────────
+    // Seed jabatan SETELAH branches agar bisa link ke branch_id
+    // Dilakukan di bawah setelah branches di-seed
 
-    // Seed default branches
-    const { Branch, SalesChannel } = incModels;
+    // ── Incentive: Branches ───────────────────────────────────
+    // Branch model sudah di-import di atas, tabelnya sudah dibuat oleh sync()
     const branchCount = await Branch.count();
     if (branchCount === 0) {
       await Branch.bulkCreate([
-        { code: 'GPRACING', name: 'GP Racing',  business_type: 'Online Store Spare Part Racing', sort_order: 1 },
-        { code: 'GPDISTRO', name: 'GP Distro',  business_type: 'Online Store Fashion',           sort_order: 2 },
+        { code: 'GPRACING', name: 'GP Racing', business_type: 'Online Store Spare Part Racing', sort_order: 1 },
+        { code: 'GPDISTRO', name: 'GP Distro', business_type: 'Online Store Fashion',           sort_order: 2 },
       ]);
       console.log('✅ Default branches seeded (GP Racing, GP Distro)');
     }
 
-    // Seed default sales channels
+    // ── Incentive: Positions ─────────────────────────────────────
+    const positionCount = await Position.count();
+    if (positionCount === 0) {
+      // Get branch IDs
+      const branchRacing = await Branch.findOne({ where: { code: 'GPRACING' } });
+      const branchDistro = await Branch.findOne({ where: { code: 'GPDISTRO' } });
+
+      const jabatanList = [
+        'Admin',
+        'Customer Service',
+        'Sales',
+        'Marketing',
+        'Packing',
+        'Gudang',
+        'Driver',
+        'Supervisor',
+        'Manager',
+      ];
+
+      if (branchRacing) {
+        for (let i = 0; i < jabatanList.length; i++) {
+          await Position.create({ branch_id: branchRacing.id, name: jabatanList[i], level: i < 7 ? 1 : i === 7 ? 2 : 3 });
+        }
+      }
+      if (branchDistro) {
+        for (let i = 0; i < jabatanList.length; i++) {
+          await Position.create({ branch_id: branchDistro.id, name: jabatanList[i], level: i < 7 ? 1 : i === 7 ? 2 : 3 });
+        }
+      }
+      console.log('✅ Default positions seeded (' + jabatanList.length + ' jabatan per cabang)');
+    }
+
+    // ── Incentive: Sales Channels ─────────────────────────────
     const channelCount = await SalesChannel.count();
     if (channelCount === 0) {
       await SalesChannel.bulkCreate([
@@ -285,9 +191,12 @@ const migrate = async () => {
     }
 
     console.log('\n🎉 Migration complete!');
+    console.log('   HRD tables    : users, employees, attendance, leaves, payroll, ...');
+    console.log('   Incentive tables: inc_branches, inc_employees, inc_sales_channels, ...');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Migration failed:', error);
+    console.error('❌ Migration failed:', error.message);
+    console.error(error.stack);
     process.exit(1);
   }
 };

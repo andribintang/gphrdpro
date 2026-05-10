@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Users, Briefcase, Percent, Star,
   Target, Plus, Edit3, Trash2, X, Loader2,
-  CheckCircle2, ToggleLeft, ToggleRight, RefreshCw
+  CheckCircle2, ToggleLeft, ToggleRight, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { incentiveService, toRp, MONTHS_ID } from '../../utils/incentive/incentiveService';
@@ -117,6 +117,180 @@ const BranchesTab = () => {
   );
 };
 
+
+// ════════════════════════════════════════════════════════════════
+// POSITIONS TAB — Jabatan per cabang
+// ════════════════════════════════════════════════════════════════
+const PositionsTab = () => {
+  const [positions, setPositions]   = useState([]);
+  const [branches, setBranches]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [filterBranch, setFB]       = useState('');
+  const [modal, setModal]           = useState(null);
+  const [form, setForm]             = useState({ branch_id:'', name:'', level: 1 });
+  const [saving, setSaving]         = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [pRes, bRes] = await Promise.all([
+        incentiveService.getPositions({ branch_id: filterBranch || undefined }),
+        incentiveService.getBranches(),
+      ]);
+      setPositions(pRes.data.data.positions);
+      setBranches(bRes.data.data.branches);
+    } catch { toast.error('Gagal memuat jabatan'); }
+    finally { setLoading(false); }
+  }, [filterBranch]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.branch_id || !form.name.trim()) {
+      toast.error('Cabang dan nama jabatan wajib diisi'); return;
+    }
+    setSaving(true);
+    try {
+      if (modal === 'add') {
+        await incentiveService.createPosition(form);
+        toast.success(`Jabatan "${form.name}" ditambahkan`);
+      } else {
+        await incentiveService.updatePosition(modal.id, form);
+        toast.success('Jabatan diperbarui');
+      }
+      setModal(null); fetchAll();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (pos) => {
+    if (!confirm(`Hapus jabatan "${pos.name}"?`)) return;
+    try {
+      await incentiveService.deletePosition(pos.id);
+      toast.success('Jabatan dihapus');
+      fetchAll();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal menghapus'); }
+  };
+
+  // Group by branch
+  const grouped = {};
+  positions.forEach(p => {
+    const key = p.branch?.name || 'Unknown';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(p);
+  });
+
+  const LEVEL_LABELS = { 1:'Staff', 2:'Senior / Koordinator', 3:'Manager / Lead' };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <select value={filterBranch} onChange={e => setFB(e.target.value)} className="input-base text-sm flex-1">
+          <option value="">Semua Cabang</option>
+          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <button onClick={() => { setForm({ branch_id: filterBranch || branches[0]?.id || '', name:'', level:1 }); setModal('add'); }}
+          className="btn-primary h-10 px-3 text-xs flex-shrink-0">
+          <Plus className="w-3.5 h-3.5" /> Tambah
+        </button>
+      </div>
+
+      <p className="text-xs text-[var(--text-muted)]">{positions.length} jabatan terdaftar</p>
+
+      {loading ? (
+        <div className="space-y-2">{[...Array(3)].map((_,i) => <div key={i} className="skeleton h-12 rounded-xl" />)}</div>
+      ) : positions.length === 0 ? (
+        <div className="text-center py-10">
+          <Briefcase className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-2 opacity-30" />
+          <p className="text-sm text-[var(--text-muted)]">Belum ada jabatan</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Klik "Tambah" untuk menambahkan jabatan baru</p>
+        </div>
+      ) : (
+        Object.entries(grouped).map(([branchName, posts]) => (
+          <div key={branchName}>
+            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> {branchName} ({posts.length})
+            </p>
+            <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+              {posts.map(pos => (
+                <div key={pos.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
+                    <Briefcase className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{pos.name}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">{LEVEL_LABELS[pos.level] || 'Staff'}</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => { setForm({ branch_id: pos.branch_id, name: pos.name, level: pos.level }); setModal(pos); }}
+                      className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => handleDelete(pos)}
+                      className="w-7 h-7 rounded-lg border border-red-200 dark:border-red-900 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+
+      {modal !== null && (
+        <Modal
+          title={modal === 'add' ? 'Tambah Jabatan' : `Edit Jabatan: ${modal.name}`}
+          onClose={() => setModal(null)}
+          footer={
+            <>
+              <button onClick={() => setModal(null)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Simpan
+              </button>
+            </>
+          }>
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+              Cabang <span className="text-red-500">*</span>
+            </label>
+            <select value={form.branch_id} onChange={e => sf('branch_id', e.target.value)} className="input-base text-sm">
+              <option value="">Pilih cabang...</option>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+              Nama Jabatan <span className="text-red-500">*</span>
+            </label>
+            <input value={form.name} onChange={e => sf('name', e.target.value)}
+              placeholder="Contoh: Admin, Sales, CS, Packing..."
+              className="input-base text-sm"
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Level</label>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(LEVEL_LABELS).map(([v, l]) => (
+                <button key={v} type="button" onClick={() => sf('level', parseInt(v))}
+                  className={`py-2 rounded-xl text-xs font-semibold border transition-all text-center
+                    ${form.level === parseInt(v)
+                      ? 'bg-brand-500 text-white border-brand-500'
+                      : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
 // ════════════════════════════════════════════════════════════════
 // EMPLOYEES TAB
 // ════════════════════════════════════════════════════════════════
@@ -170,6 +344,29 @@ const EmployeesTab = () => {
   };
 
   const filteredPositions = positions.filter(p => !form.branch_id || p.branch_id == form.branch_id);
+
+  // Quick-add jabatan baru tanpa menutup form karyawan
+  const [showQuickPos, setShowQuickPos] = useState(false);
+  const [quickPosName, setQuickPosName] = useState('');
+  const [savingPos, setSavingPos]       = useState(false);
+
+  const handleQuickAddPosition = async () => {
+    if (!form.branch_id) { toast.error('Pilih cabang dulu sebelum tambah jabatan'); return; }
+    if (!quickPosName.trim()) { toast.error('Nama jabatan wajib diisi'); return; }
+    setSavingPos(true);
+    try {
+      const res = await incentiveService.createPosition({ branch_id: form.branch_id, name: quickPosName.trim(), level: 1 });
+      const newPos = res.data.data.position;
+      toast.success(`Jabatan "${quickPosName}" ditambahkan`);
+      // Refresh positions list & auto-select new position
+      const pRes = await incentiveService.getPositions({ branch_id: form.branch_id });
+      setPositions(pRes.data.data.positions);
+      sf('position_id', String(newPos.id));
+      setQuickPosName('');
+      setShowQuickPos(false);
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal menambah jabatan'); }
+    finally { setSavingPos(false); }
+  };
 
   return (
     <div className="space-y-3">
@@ -513,6 +710,7 @@ const BonusTargetsTab = () => {
 // ════════════════════════════════════════════════════════════════
 const TABS = [
   { id:'branches',  label:'Cabang',    icon:Building2 },
+  { id:'positions', label:'Jabatan',   icon:Briefcase },
   { id:'employees', label:'Karyawan',  icon:Users },
   { id:'channels',  label:'Jalur',     icon:Percent },
   { id:'activities',label:'Aktivitas', icon:Star },
@@ -546,6 +744,7 @@ export default function MasterDataPage() {
       </div>
 
       {activeTab === 'branches'   && <BranchesTab />}
+      {activeTab === 'positions'  && <PositionsTab />}
       {activeTab === 'employees'  && <EmployeesTab />}
       {activeTab === 'channels'   && <ChannelsTab />}
       {activeTab === 'activities' && <ActivityTypesTab />}
