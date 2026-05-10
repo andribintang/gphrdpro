@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  MessageCircle, ShoppingBag, Globe, Star, Plus,
+  MessageCircle, Star, Plus,
   Trash2, X, Loader2, ChevronLeft, AlertTriangle,
-  CheckCircle2, RefreshCw, Calculator, Info
+  CheckCircle2, Calculator
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { incentiveService, toRp, toRpShort, MONTHS_ID } from '../../utils/incentive/incentiveService';
+import { incentiveService, toRp, toRpShort, MONTHS_ID, PERIOD_STATUS } from '../../utils/incentive/incentiveService';
 
 // ── Shared ────────────────────────────────────────────────────
 const SectionTitle = ({ title, sub }) => (
