@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/attendance',  icon: Clock,           label: 'Absensi' },
   { to: '/leaves',      icon: CalendarOff,     label: 'Cuti' },
   { to: '/payroll-pro', icon: DollarSign,      label: 'Gaji',     roles: ['admin', 'hr', 'supervisor', 'employee'] },
+  { to: '/incentive',   icon: TrendingUp,      label: 'Insentif', roles: ['admin', 'hr'] },
   { to: '/employees',   icon: Users,           label: 'Karyawan', roles: ['admin', 'hr', 'supervisor'] },
 ];
 
