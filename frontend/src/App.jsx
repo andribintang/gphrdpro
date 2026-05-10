@@ -11,6 +11,7 @@ import LeavesPage from './pages/LeavesPage';
 import PayrollPage from './pages/PayrollPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
+import PayrollEnginePage from './pages/PayrollEnginePage';
 import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
@@ -56,6 +57,14 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={['admin', 'hr', 'supervisor']}>
                     <ReportsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="payroll-pro"
+                element={
+                  <ProtectedRoute roles={['admin', 'hr', 'supervisor', 'employee']}>
+                    <PayrollEnginePage />
                   </ProtectedRoute>
                 }
               />

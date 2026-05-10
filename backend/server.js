@@ -12,7 +12,8 @@ const attendanceRoutes = require('./routes/attendance');
 const leaveRoutes      = require('./routes/leaves');
 const payrollRoutes    = require('./routes/payroll');
 const employeeRoutes   = require('./routes/employees');
-const reportsRoutes    = require('./routes/reports');
+const reportsRoutes      = require('./routes/reports');
+const payrollEngineRoutes = require('./routes/payrollEngine');
 
 const app  = express();
 // ── Railway requires PORT from env, bound to 0.0.0.0 ──
@@ -84,7 +85,8 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves',     leaveRoutes);
 app.use('/api/payroll',    payrollRoutes);
 app.use('/api/employees',  employeeRoutes);
-app.use('/api/reports',    reportsRoutes);
+app.use('/api/reports',       reportsRoutes);
+app.use('/api/payroll-engine', payrollEngineRoutes);
 
 // ── 404 + Error ───────────────────────────────────────────────
 app.use(notFound);

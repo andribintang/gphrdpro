@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { sequelize } = require('../config/database');
-const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll, OfficeSetting, EmployeeFace } = require('../models');
+const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll, OfficeSetting, EmployeeFace, PayrollSetting, PayrollComponent } = require('../models');
+const { seedDefaultComponents } = require('../controllers/payrollEngineController');
 const bcrypt = require('bcryptjs');
 
 const migrate = async () => {
@@ -240,6 +241,20 @@ const migrate = async () => {
       });
       console.log('✅ Office settings created (lat:-6.2088, lng:106.8456, radius:100m)');
       console.log('   → Ubah koordinat kantor di menu Settings > Pengaturan Kantor');
+    }
+
+    // Seed payroll settings
+    const psExists = await PayrollSetting.findOne();
+    if (!psExists) {
+      await PayrollSetting.create({});
+      console.log('✅ Payroll settings created (default)');
+    }
+
+    // Seed default payroll components
+    const compCount = await PayrollComponent.count();
+    if (compCount === 0) {
+      await seedDefaultComponents();
+      console.log('✅ Default payroll components seeded (15 komponen)');
     }
 
     console.log('\n🎉 Migration complete!');
