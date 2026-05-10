@@ -69,11 +69,6 @@ export default function App() {
                 }
               />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="payroll-pro" element={
-                <ProtectedRoute roles={['admin','hr','supervisor','employee']}>
-                  <PayrollEnginePage />
-                </ProtectedRoute>
-              } />
             </Route>
 
             {/* 404 */}

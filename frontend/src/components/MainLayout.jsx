@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/attendance', icon: Clock, label: 'Absensi' },
   { to: '/leaves', icon: CalendarOff, label: 'Cuti' },
-  { to: '/payroll-pro', icon: DollarSign, label: 'Gaji', roles: ['admin', 'hr', 'supervisor', 'employee'] },
+  { to: '/payroll', icon: DollarSign, label: 'Gaji', roles: ['admin', 'hr'] },
   { to: '/employees', icon: Users, label: 'Karyawan', roles: ['admin', 'hr', 'supervisor'] },
 ];
 
