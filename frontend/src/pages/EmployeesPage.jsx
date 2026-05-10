@@ -134,8 +134,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
   const ROLES = ['employee', 'hr', 'supervisor'];
   const STATUSES = ['active', 'inactive', 'on_leave', 'terminated'];
 
-  const InputField = ({ label, field, type = 'text', placeholder, required }) => (
-    <div>
+  // InputField defined as regular function call, not component
+  // to avoid re-mount on re-render (which loses focus)
+  const renderInput = (label, field, type = 'text', placeholder, required) => (
+    <div key={field}>
       <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -144,6 +146,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
         value={form[field]}
         onChange={e => set(field, e.target.value)}
         placeholder={placeholder}
+        autoComplete="off"
         className={`input-base text-sm ${errors[field] ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
       />
       {errors[field] && <p className="text-xs text-red-500 mt-1 font-medium">{errors[field]}</p>}
@@ -194,12 +197,12 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
 
           {step === 1 && (
             <>
-              <InputField label="Nama Lengkap" field="name" placeholder="Ahmad Fauzi" required />
-              <InputField label="Email" field="email" type="email" placeholder="ahmad@perusahaan.com" required />
+              {renderInput("Nama Lengkap", "name", "text", "Ahmad Fauzi", true)}
+              {renderInput("Email", "email", "email", "ahmad@perusahaan.com", true)}
               {!isEdit && (
-                <InputField label="Password Default" field="password" type="password" placeholder="Min 6 karakter" required />
+                {renderInput("Password Default", "password", "password", "Min 6 karakter", true)}
               )}
-              <InputField label="NIP" field="nip" placeholder="NIP-005" required />
+              {renderInput("NIP", "nip", "text", "NIP-005", true)}
 
               {/* Role selector */}
               <div>
@@ -218,7 +221,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <InputField label="Jabatan" field="position" placeholder="Staff IT" required />
+              {renderInput("Jabatan", "position", "text", "Staff IT", true)}
 
               {/* Department */}
               <div>
@@ -240,7 +243,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 {errors.department && <p className="text-xs text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              <InputField label="Telepon" field="phone" type="tel" placeholder="08xxxxxxxxxx" />
+              {renderInput("Telepon", "phone", "tel", "08xxxxxxxxxx")}
             </>
           )}
 
@@ -298,9 +301,9 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <InputField label="Alamat" field="address" placeholder="Jl. Contoh No.1, Jakarta" />
-              <InputField label="Kontak Darurat" field="emergency_contact" placeholder="Nama kontak darurat" />
-              <InputField label="Telepon Darurat" field="emergency_phone" type="tel" placeholder="08xxxxxxxxxx" />
+              {renderInput("Alamat", "address", "text", "Jl. Contoh No.1, Jakarta")}
+              {renderInput("Kontak Darurat", "emergency_contact", "text", "Nama kontak darurat")}
+              {renderInput("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx")}
             </>
           )}
         </div>
@@ -566,30 +569,34 @@ export default function EmployeesPage() {
 
   const searchTimeout = useRef(null);
 
+  // Use ref to store latest params to avoid stale closure
+  const fetchParamsRef = useRef({ search, deptFilter, statusFilter, canManage });
+  fetchParamsRef.current = { search, deptFilter, statusFilter, canManage };
+
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
+    const { search: s, deptFilter: d, statusFilter: sf, canManage: cm } = fetchParamsRef.current;
     try {
       const params = {};
-      if (search)      params.search     = search;
-      if (deptFilter)  params.department = deptFilter;
-      if (statusFilter) params.status    = statusFilter;
+      if (s)  params.search     = s;
+      if (d)  params.department = d;
+      if (sf) params.status     = sf;
 
       const [empRes, statsRes] = await Promise.all([
         employeeService.getAll(params),
-        canManage ? employeeService.getStats() : Promise.resolve(null),
+        cm ? employeeService.getStats() : Promise.resolve(null),
       ]);
 
       setEmployees(empRes.data.data.employees);
       if (statsRes) setStats(statsRes.data.data.stats);
-
-      // Collect departments
       const depts = Object.keys(empRes.data.data.departments || {}).sort();
       setDepartments(depts);
     } catch { toast.error('Gagal memuat data karyawan'); }
-    finally   { setLoading(false); }
-  }, [search, deptFilter, statusFilter, canManage]);
+    finally { setLoading(false); }
+  }, []); // ← stable reference, no dependencies
 
-  useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
+  // Fetch when filters change
+  useEffect(() => { fetchEmployees(); }, [search, deptFilter, statusFilter, fetchEmployees]);
 
   const handleSearch = (v) => {
     clearTimeout(searchTimeout.current);
