@@ -15,6 +15,9 @@ import PayrollEnginePage from './pages/PayrollEnginePage';
 import SettingsPage from './pages/SettingsPage';
 import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
 import MasterDataPage from './pages/incentive/MasterDataPage';
+import PeriodsPage from './pages/incentive/PeriodsPage';
+import InputDataPage from './pages/incentive/InputDataPage';
+import ResultsPage from './pages/incentive/ResultsPage';
 
 export default function App() {
   return (
@@ -74,6 +77,9 @@ export default function App() {
               <Route path="incentive" element={<ProtectedRoute roles={['admin','hr']}><IncentiveDashboard /></ProtectedRoute>} />
               <Route path="incentive/master" element={<ProtectedRoute roles={['admin','hr']}><MasterDataPage /></ProtectedRoute>} />
               <Route path="incentive/master/:section" element={<ProtectedRoute roles={['admin','hr']}><MasterDataPage /></ProtectedRoute>} />
+              <Route path="incentive/periods" element={<ProtectedRoute roles={['admin','hr']}><PeriodsPage /></ProtectedRoute>} />
+              <Route path="incentive/input/:periodId" element={<ProtectedRoute roles={['admin','hr']}><InputDataPage /></ProtectedRoute>} />
+              <Route path="incentive/results/:periodId" element={<ProtectedRoute roles={['admin','hr']}><ResultsPage /></ProtectedRoute>} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 
