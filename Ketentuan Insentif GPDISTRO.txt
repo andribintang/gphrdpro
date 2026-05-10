@@ -1,0 +1,88 @@
+
+Tambahkan Modul untuk Setting Data Perusahaan.
+Perusahaan ini memiliki 2 Cabang.
+1. GPRACING (Online Store Spare Part Racing) (4 karyawan)
+2. GPDISTRO (Online Store Produk Fashion) (4 karyawan)
+
+--------------------------------------
+
+Pengaturan Insentif di bagi per Cabang.
+KOMPONEN INSENTIF:
+1. Insentif Sales
+2. Insentif Aktifitas
+3. Bonus Target
+
+--------------------------------------
+
+1. Insentif Sales : insentif berdasarkan performance penjualan berdasarkan jalur sales (nominal penjualan x ...%)
+Ada 3 jalur Sales :
+-Jalur WA (direct ke karyawan)
+-Jalur marketplace
+-Jalur Web
+
+Penjelasan :
+-Jalur WA :
+HRD input data penjualan dari Jalur WA untuk masing-masing karyawan.
+
+-Jalur marketplace:
+HRD dapat mengatur porsi penjualan marketplace, misalkan Penjualan marketplace 100juta, ini di bagi porsinya ke karyawan dengan persentase yang berbeda-beda misal; karyawan A :50%, karyawan B : 30%, Karyawan C : 20%, ini akan menjadi performance untuk tiap karyawan.
+
+-Jalur Web 
+HRD dapat mengatur porsi penjualan dari Jalur Web, misalkan Penjualan Web 50juta, ini di bagi porsinya ke karyawan dengan persentase yang berbeda-beda misal; karyawan A :50%, karyawan B : 30%, Karyawan C : 20%, ini akan menjadi performance untuk tiap karyawan.
+
+Parameter Perhitungan Insentif :
+Setelah itu HRD mengatur % Insentif pada setiap Jalur Penjualan : misal Jalur marketplace : 0,5%, Jalur Web : 2%, Jalur WA : 3%.
+
+--------------------------------------
+
+2. Insentif Aktifitas
+Hrd dapat menambahkan komponen insentif aktifitas, contohnya :
+- Insentif Live Stream : perhitungannya per jam, contoh : 10.000 x ...Jam (nominal insentif per jam dapat di atur oleh HRD)
+- Insentif Kontent : perhitungannya per konten : 15.000 x jml konten (nominal insentif per konten dapat di atur oleh HRD)
+Contoh :
+HRD membuat komponen "insentif Live Stream" dengan nilai: 10.000/jam.
+- Karyawan A melakukan Live Stream selama 4 jam, maka Insentifnya : 4 x 10.000 = 40.000
+HRD membuat komponen "insentif Konten" dengan nilai: 15.000/jam.
+- Karyawan A membuat Konten = 10, maka Insentifnya : 10 x 15.000 = 150.000
+
+--------------------------------------
+
+2. Bonus Target : (ini gabungan penjualan dari 2 cabang)
+HRD Mengatur ketentuan Bonus Target : (bisa multiple target), contoh :
+- Penjualan >100JT = 200.000 (nilai ini akan di bagi ke setiap karyawan)
+- Penjualan >200JT = 300.000 (nilai ini akan di bagi ke setiap karyawan)
+- Penjualan >300JT = 400.000 (nilai ini akan di bagi ke setiap karyawan)
+dst.....
+
+Angka aktual Nominal Penjualan di dapat dari data input dari penjualan tiap jalur dari semua cabang, misalkan :
+-Jalur WA : 50.000.000
+-Jalur marketplace : 300.000.000
+-Jalur Web : 10.000.000
+Total Penjualan : 360.000.000
+Karena Total Penjualan adalah 360.000.000 , maka Bonus target adalah 400.000 ini akan di bagi rata ke semua karyawan.
+
+Contoh slip insentif adalah sebagai berikut :
+1. Header Perusahaan
+2. Data karyawan (Cabang, No ID, Nama, Jabatan)
+3. Performance Karyawan
+- Penjualan marketplace : 40.000.000
+- Penjualan WA : 5.000.000
+- Penjualan Web : 5.000.000
+- Aktifitas (Live Stream) : 10
+- Aktifitas (Konten) : 10
+4. Insentif Karyawan
+- Penjualan marketplace : 1.000.000
+- Penjualan WA : 125.000
+- Penjualan Web : 125.000
+- Bonus Target : 100.000
+- Aktifitas (Live Stream) : 100.000
+- Aktifitas (Konten) : 150.000
+- Total Insentif : 1.600.000
+
+
+
+
+
+
+
+

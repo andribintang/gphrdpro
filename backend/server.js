@@ -79,6 +79,52 @@ app.get('/health', (_req, res) => res.json({
   port: PORT,
 }));
 
+// ── Clear demo data endpoint
+require('./scripts/clearDemo')(app);
+
+// ── One-time migrate endpoint (protected by secret key) ──────
+app.post('/run-migrate', async (req, res) => {
+  const secret = req.headers['x-migrate-secret'];
+  if (!secret || secret !== process.env.MIGRATE_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  try {
+    const { sequelize } = require('./config/database');
+    const models = require('./models');
+    const { seedDefaultComponents } = require('./controllers/payrollEngineController');
+    const { PayrollSetting, PayrollComponent, OfficeSetting } = models;
+
+    // Sync all tables
+    await sequelize.sync({ alter: true });
+
+    // Seed payroll settings
+    const psExists = await PayrollSetting.findOne();
+    if (!psExists) await PayrollSetting.create({});
+
+    // Seed components
+    const compCount = await PayrollComponent.count();
+    if (compCount === 0) await seedDefaultComponents();
+
+    // Seed office settings
+    const offExists = await OfficeSetting.findOne();
+    if (!offExists) await OfficeSetting.create({
+      name: 'Kantor HRD Lite', address: 'Jakarta',
+      lat: -6.2088, lng: 106.8456, radius: 100,
+      check_in_start: '06:00', check_in_deadline: '08:05',
+      check_out_start: '15:00', work_hours_required: 8, is_active: true,
+    });
+
+    const compTotal = await PayrollComponent.count();
+    return res.json({
+      success: true,
+      message: 'Migration berhasil!',
+      data: { tables_synced: true, components: compTotal }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── API Routes ────────────────────────────────────────────────
 app.use('/api/auth',       authRoutes);
 app.use('/api/attendance', attendanceRoutes);
