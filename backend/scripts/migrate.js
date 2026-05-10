@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { sequelize } = require('../config/database');
 const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll, OfficeSetting, EmployeeFace, PayrollSetting, PayrollComponent } = require('../models');
+const { Branch, SalesChannel, IncEmployee, Position, ActivityType, BonusTarget, IncentivePeriod, WaSale, MarketplaceSale, MarketplaceShare, WebSale, WebShare, EmployeeActivity, IncentiveResult, AuditLog } = require('../models/incentive');
 const { seedDefaultComponents } = require('../controllers/payrollEngineController');
 const bcrypt = require('bcryptjs');
 
@@ -257,13 +258,9 @@ const migrate = async () => {
       console.log('✅ Default payroll components seeded (15 komponen)');
     }
 
-    // Sync incentive system models
-    const incModels = require('../models/incentive');
-    // Tables already synced via sequelize.sync above
-    // Seed default data if not exists
+    // Seed default incentive data if not exists
 
     // Seed default branches
-    const { Branch, SalesChannel } = incModels;
     const branchCount = await Branch.count();
     if (branchCount === 0) {
       await Branch.bulkCreate([
