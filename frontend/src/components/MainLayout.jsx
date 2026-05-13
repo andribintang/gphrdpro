@@ -3,9 +3,10 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Users, Clock, CalendarOff,
   DollarSign, Menu, X, Sun, Moon, LogOut,
-  Shield, Bell, ChevronRight, Settings, BarChart3, TrendingUp
+  Shield, Bell, ChevronRight, Settings, BarChart3, TrendingUp, Building2, SlidersHorizontal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
 import { useTheme } from '../context/ThemeContext';
 import toast from 'react-hot-toast';
 
@@ -23,6 +24,7 @@ const ROLE_LABELS = { admin: 'Admin', hr: 'HR', supervisor: 'Supervisor', employ
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
+  const { settings } = useCompany();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -44,10 +46,13 @@ export default function MainLayout() {
       <header className="sticky top-0 z-40 safe-top glass border-b border-[var(--border)]">
         <div className="flex items-center justify-between h-14 px-4 max-w-screen-xl mx-auto">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-brand-500 dark:bg-brand-400 rounded-lg flex items-center justify-center shadow-glow">
-              <Shield className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm">
+              <img src={settings.logo_url || '/logo-gpdistro.png'} alt="Logo"
+                className="w-full h-full object-contain"
+                onError={e => { e.target.style.display='none'; }}
+              />
             </div>
-            <span className="font-bold text-[var(--text-primary)] tracking-tight hidden sm:block">HRD Lite</span>
+            <span className="font-bold text-[var(--text-primary)] tracking-tight hidden sm:block">{settings.app_name || 'GPDISTRO HR Pro'}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -74,7 +79,7 @@ export default function MainLayout() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
           <aside className="relative w-72 h-full bg-[var(--bg-card)] border-l border-[var(--border)] animate-slide-down flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <span className="font-bold text-[var(--text-primary)]">Menu</span>
+  <div><span className="font-bold text-[var(--text-primary)]">{settings.app_name || 'GPDISTRO HR Pro'}</span></div>
               <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] transition-colors">
                 <X className="w-4 h-4" />
               </button>
@@ -117,6 +122,28 @@ export default function MainLayout() {
               )}
             </nav>
             <div className="p-3 border-t border-[var(--border)] space-y-1">
+              {['admin','hr'].includes(user?.role) && (
+                <NavLink to="/payroll-components" onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150
+                    ${isActive ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'}`
+                  }>
+                  <SlidersHorizontal className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm font-medium">Komponen Gaji</span>
+                  <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-40" />
+                </NavLink>
+              )}
+              {user?.role === 'admin' && (
+                <NavLink to="/company-settings" onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150
+                    ${isActive ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'}`
+                  }>
+                  <Building2 className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm font-medium">Pengaturan Perusahaan</span>
+                  <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-40" />
+                </NavLink>
+              )}
               <NavLink to="/settings" onClick={() => setSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-all">
                 <Settings className="w-5 h-5" />

@@ -5,7 +5,7 @@ const { sequelize } = require('../config/database');
 const {
   User, Employee, Attendance, LeaveRequest, LeaveQuota,
   Payroll, OfficeSetting, EmployeeFace,
-  PayrollSetting, PayrollComponent,
+  PayrollSetting, PayrollComponent, CompanySetting,
 } = require('../models');
 
 // Import incentive models di awal juga agar tabelnya ikut di-sync
@@ -188,6 +188,19 @@ const migrate = async () => {
         { code: 'WEB',         name: 'Website',     percentage: 2.000, input_type: 'per_period',      sort_order: 3 },
       ]);
       console.log('✅ Default sales channels seeded (WA 3%, Marketplace 0.5%, Web 2%)');
+    }
+
+    // ── Company Settings ─────────────────────────────────────
+    const csExists = await CompanySetting.findOne();
+    if (!csExists) {
+      await CompanySetting.create({
+        company_name:    'GPDISTRO HR Pro',
+        company_tagline: 'Human Resource Management System',
+        app_name:        'GPDISTRO HR Pro',
+        logo_url:        '/logo-gpdistro.png',
+        primary_color:   '#e11d48',
+      });
+      console.log('✅ Company settings seeded (GPDISTRO HR Pro)');
     }
 
     console.log('\n🎉 Migration complete!');

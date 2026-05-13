@@ -6,6 +6,7 @@ const LeaveQuota         = require('./LeaveQuota');
 const OfficeSetting      = require('./OfficeSetting');
 const EmployeeFace       = require('./EmployeeFace');
 const Payroll            = require('./Payroll'); // legacy
+const CompanySetting     = require('./CompanySetting');
 const PayrollSetting     = require('./PayrollSetting');
 const PayrollComponent   = require('./PayrollComponent');
 const EmployeeAllowance  = require('./EmployeeAllowance');
@@ -59,4 +60,5 @@ module.exports = {
   PayrollSetting, PayrollComponent, EmployeeAllowance,
   PayrollRun, PayrollItem, LoanManagement,
   IncentiveParameter, IncentiveEmployeeRate,
+  CompanySetting,
 };

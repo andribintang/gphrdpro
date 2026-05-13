@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { CompanyProvider } from './context/CompanyContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
@@ -13,6 +14,8 @@ import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
 import PayrollEnginePage from './pages/PayrollEnginePage';
 import SettingsPage from './pages/SettingsPage';
+import CompanySettingsPage from './pages/CompanySettingsPage';
+import PayrollComponentManager from './pages/PayrollComponentManager';
 import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
 import MasterDataPage from './pages/incentive/MasterDataPage';
 import PeriodsPage from './pages/incentive/PeriodsPage';
@@ -81,6 +84,12 @@ export default function App() {
               <Route path="incentive/input/:periodId" element={<ProtectedRoute roles={['admin','hr']}><InputDataPage /></ProtectedRoute>} />
               <Route path="incentive/results/:periodId" element={<ProtectedRoute roles={['admin','hr']}><ResultsPage /></ProtectedRoute>} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="company-settings" element={
+                <ProtectedRoute roles={['admin']}><CompanySettingsPage /></ProtectedRoute>
+              } />
+              <Route path="payroll-components" element={
+                <ProtectedRoute roles={['admin','hr']}><PayrollComponentManager /></ProtectedRoute>
+              } />
             </Route>
 
             {/* 404 */}
