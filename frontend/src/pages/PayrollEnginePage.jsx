@@ -1228,7 +1228,6 @@ const LoanTab = () => {
 const TABS_HR = [
   { id:'runs',       label:'Payroll',   icon:DollarSign },
   { id:'myslip',     label:'Slip Saya', icon:FileText },
-  { id:'incentif',   label:'Insentif',  icon:Target },
   { id:'loan',       label:'Kasbon',    icon:Wallet },
   { id:'components', label:'Komponen',  icon:Settings },
 ];
@@ -1248,7 +1247,7 @@ export default function PayrollEnginePage() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Penggajian Pro</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Gaji · Insentif · THR · Bonus</p>
+          <p className="text-sm text-[var(--text-secondary)]">Gaji · THR · Bonus · Kasbon</p>
         </div>
         <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center">
           <DollarSign className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -1272,7 +1271,6 @@ export default function PayrollEnginePage() {
 
       {activeTab === 'runs'       && <RunsTab />}
       {activeTab === 'myslip'     && <MySlipTab />}
-      {activeTab === 'incentif'    && <InsentifTab />}
       {activeTab === 'loan'        && <LoanTab />}
       {activeTab === 'components' && <ComponentsTab />}
     </div>
