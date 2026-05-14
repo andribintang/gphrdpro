@@ -4,7 +4,7 @@ import {
   Plus, X, Loader2, Settings, Users, FileText, RefreshCw,
   ChevronLeft, ChevronDown, AlertTriangle, ToggleLeft,
   ToggleRight, Edit3, Eye, ArrowUpRight, ArrowDownRight,
-  Calendar, TrendingUp, Banknote, Star, Moon, Target,
+  Calendar, TrendingUp, Banknote, Star, Moon,
   Percent, Clock, Info, CheckCheck, Wallet, UserCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -348,17 +348,11 @@ const RunsTab = () => {
 // ── Generate Modal ─────────────────────────────────────────────
 const GenerateModal = ({ onClose, onSuccess }) => {
   const [form, setForm] = useState({ type:'monthly', period_month: currentMonth(), period_year: currentYear(), notes:'' });
-  const [incentiveParams, setIncentiveParams] = useState([]);
   const [selectedParam, setSelectedParam] = useState('');
   const [loading, setLoading] = useState(false);
   const [thrPreview, setThrPreview] = useState(null);
 
   useEffect(() => {
-    if (form.type === 'incentive') {
-      payrollEngineService.getIncentiveParams({ year: currentYear(), month: form.period_month })
-        .then(r => setIncentiveParams(r.data.data.parameters))
-        .catch(() => {});
-    }
     if (form.type === 'thr') {
       payrollEngineService.previewTHR()
         .then(r => setThrPreview(r.data.data))
@@ -370,7 +364,7 @@ const GenerateModal = ({ onClose, onSuccess }) => {
     setLoading(true);
     try {
       const payload = { ...form };
-      if (form.type === 'incentive' && selectedParam) payload.incentive_parameter_id = selectedParam;
+
       const res = await payrollEngineService.generateRun(payload);
       const d   = res.data.data;
       toast.success(`${res.data.message}`);
@@ -425,22 +419,7 @@ const GenerateModal = ({ onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Incentive param selector */}
-          {form.type === 'incentive' && (
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Parameter Insentif</label>
-              {incentiveParams.length === 0 ? (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 text-xs">
-                  <AlertTriangle className="w-4 h-4" /> Belum ada parameter insentif untuk periode ini. Buat dulu di tab Insentif.
-                </div>
-              ) : (
-                <select value={selectedParam} onChange={e => setSelectedParam(e.target.value)} className="input-base text-sm">
-                  <option value="">Pilih parameter...</option>
-                  {incentiveParams.map(p => <option key={p.id} value={p.id}>{p.name} - Total Sales: {toRupiah(p.total_sales)}</option>)}
-                </select>
-              )}
-            </div>
-          )}
+
 
           {/* THR preview */}
           {form.type === 'thr' && thrPreview && (
@@ -470,7 +449,7 @@ const GenerateModal = ({ onClose, onSuccess }) => {
 
         <div className="px-5 pb-5 flex gap-2">
           <button onClick={onClose} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
-          <button onClick={handleSubmit} disabled={loading || (form.type === 'incentive' && !selectedParam && incentiveParams.length > 0)}
+          <button onClick={handleSubmit} disabled={loading}
             className="btn-primary flex-1 h-11 text-sm">
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Play className="w-4 h-4" /> Generate</>}
           </button>
@@ -718,299 +697,7 @@ const ComponentsTab = () => {
 // ════════════════════════════════════════════════════════════════
 // TAB: INSENTIF — Parameter Sales & % per Karyawan
 // ════════════════════════════════════════════════════════════════
-const InsentifTab = () => {
-  const [params, setParams]         = useState([]);
-  const [employees, setEmployees]   = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [showForm, setShowForm]     = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
-  const [form, setForm] = useState({
-    name: 'Sales Bulan Ini',
-    period_month: new Date().getMonth() + 1,
-    period_year:  new Date().getFullYear(),
-    total_sales: '',
-    description: '',
-    rates: [],
-  });
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [pRes, eRes] = await Promise.all([
-        payrollEngineService.getIncentiveParams({ year: new Date().getFullYear() }),
-        fetch('/api/employees?status=active', { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } }).then(r => r.json()),
-      ]);
-      setParams(pRes.data.data.parameters);
-      if (eRes.success) {
-        const emps = eRes.data.employees || [];
-        setEmployees(emps);
-        // Init rates with 0 for each employee
-        setForm(f => ({
-          ...f,
-          rates: emps.map(e => ({ user_id: e.id, name: e.name, department: e.employee?.department, rate_percentage: '' })),
-        }));
-      }
-    } catch { toast.error('Gagal memuat data'); } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  const setRate = (userId, val) => {
-    setForm(f => ({
-      ...f,
-      rates: f.rates.map(r => r.user_id === userId ? { ...r, rate_percentage: val } : r),
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!form.total_sales || parseFloat(form.total_sales) <= 0) {
-      toast.error('Total sales harus diisi'); return;
-    }
-    const activeRates = form.rates.filter(r => r.rate_percentage && parseFloat(r.rate_percentage) > 0);
-    if (activeRates.length === 0) {
-      toast.error('Minimal 1 karyawan harus punya persentase'); return;
-    }
-    try {
-      await payrollEngineService.createIncentiveParam({
-        ...form,
-        total_sales: parseFloat(form.total_sales),
-        rates: activeRates.map(r => ({ user_id: r.user_id, rate_percentage: parseFloat(r.rate_percentage) })),
-      });
-      toast.success('Parameter insentif berhasil disimpan!');
-      setShowForm(false);
-      fetchAll();
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
-  };
-
-  const totalPct = form.rates.reduce((s, r) => s + (parseFloat(r.rate_percentage) || 0), 0);
-  const previewTotal = form.total_sales
-    ? form.rates.reduce((s, r) => s + (parseFloat(form.total_sales) * (parseFloat(r.rate_percentage) || 0) / 100), 0)
-    : 0;
-
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Parameter Insentif</h3>
-          <p className="text-xs text-[var(--text-muted)]">Input sales bulanan & % per karyawan</p>
-        </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary h-9 px-3 text-xs">
-          <Plus className="w-3.5 h-3.5" /> Buat Parameter
-        </button>
-      </div>
-
-      {/* Info box */}
-      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-purple-100 dark:bg-purple-950 border border-purple-200 dark:border-purple-900">
-        <Target className="w-4 h-4 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
-        <div className="text-xs text-purple-700 dark:text-purple-300 leading-relaxed">
-          <strong>Cara kerja insentif:</strong> HR input total penjualan bulan ini → set % per karyawan → Generate Payroll type "Insentif" → sistem hitung otomatis.
-          <br />Contoh: Sales Rp 100jt × 0.5% = Rp 500rb untuk karyawan A.
-        </div>
-      </div>
-
-      {/* Existing params */}
-      {loading ? (
-        <div className="space-y-2">{[...Array(3)].map((_,i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
-      ) : params.length === 0 ? (
-        <div className="text-center py-12">
-          <Target className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
-          <p className="text-sm text-[var(--text-muted)]">Belum ada parameter insentif</p>
-          <p className="text-xs text-[var(--text-muted)] mt-1">Klik "Buat Parameter" untuk mulai</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {params.map(p => (
-            <div key={p.id} className="card overflow-hidden">
-              <button className="w-full flex items-center gap-3 p-4 text-left hover:bg-[var(--bg-secondary)]"
-                onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}>
-                <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center flex-shrink-0">
-                  <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-[var(--text-primary)]">{p.name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {MONTHS_ID[p.period_month]} {p.period_year} · {p.rates?.length || 0} karyawan
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-black text-purple-600 dark:text-purple-400">{toRupiahShort(p.total_sales)}</p>
-                  <p className="text-[10px] text-[var(--text-muted)]">Total Sales</p>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${expandedId === p.id ? 'rotate-180' : ''}`} />
-              </button>
-
-              {expandedId === p.id && p.rates?.length > 0 && (
-                <div className="border-t border-[var(--border)] divide-y divide-[var(--border-subtle)]">
-                  <div className="grid grid-cols-3 px-4 py-2 bg-[var(--bg-secondary)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    <span>Karyawan</span><span className="text-center">%</span><span className="text-right">Insentif</span>
-                  </div>
-                  {p.rates.map(r => (
-                    <div key={r.id} className="grid grid-cols-3 items-center px-4 py-2.5">
-                      <div>
-                        <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{r.user?.name}</p>
-                        <p className="text-[10px] text-[var(--text-muted)]">{r.user?.employee?.department}</p>
-                      </div>
-                      <p className="text-xs font-bold text-purple-600 dark:text-purple-400 text-center">{r.rate_percentage}%</p>
-                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 text-right">{toRupiahShort(r.calculated_amount)}</p>
-                    </div>
-                  ))}
-                  <div className="flex justify-between px-4 py-2.5 bg-[var(--bg-secondary)]">
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Total Insentif</span>
-                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                      {toRupiah(p.rates.reduce((s,r) => s + parseFloat(r.calculated_amount || 0), 0))}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowForm(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="relative w-full sm:max-w-lg bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex justify-center pt-3 sm:hidden flex-shrink-0"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
-              <div>
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">Parameter Insentif Baru</h3>
-                <p className="text-xs text-[var(--text-muted)]">Input total sales & % per karyawan</p>
-              </div>
-              <button onClick={() => setShowForm(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><X className="w-4 h-4" /></button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
-
-              {/* Nama parameter */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Nama Parameter</label>
-                <input value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))}
-                  placeholder="Sales Bulan Ini" className="input-base text-sm" />
-              </div>
-
-              {/* Periode */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Bulan</label>
-                  <select value={form.period_month} onChange={e => setForm(f=>({...f,period_month:parseInt(e.target.value)}))} className="input-base text-sm">
-                    {MONTHS_ID.slice(1).map((m,i) => <option key={i+1} value={i+1}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Tahun</label>
-                  <select value={form.period_year} onChange={e => setForm(f=>({...f,period_year:parseInt(e.target.value)}))} className="input-base text-sm">
-                    {[2023,2024,2025,2026].map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Total sales */}
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
-                  Total Penjualan Bulan Ini <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-medium">Rp</span>
-                  <input type="number" value={form.total_sales}
-                    onChange={e => setForm(f=>({...f,total_sales:e.target.value}))}
-                    placeholder="100000000" className="input-base pl-10 text-sm" />
-                </div>
-                {form.total_sales && (
-                  <p className="text-xs text-[var(--text-muted)] mt-1">{toRupiah(form.total_sales)}</p>
-                )}
-              </div>
-
-              {/* % per karyawan */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                    % Insentif per Karyawan
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold ${totalPct > 100 ? 'text-red-500' : 'text-[var(--text-muted)]'}`}>
-                      Total: {totalPct.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
-                  {/* Header */}
-                  <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[var(--bg-secondary)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    <span className="col-span-5">Karyawan</span>
-                    <span className="col-span-3 text-center">% Insentif</span>
-                    <span className="col-span-4 text-right">Hasil</span>
-                  </div>
-                  {form.rates.map(r => {
-                    const amount = form.total_sales ? (parseFloat(form.total_sales) * (parseFloat(r.rate_percentage) || 0) / 100) : 0;
-                    return (
-                      <div key={r.user_id} className="grid grid-cols-12 gap-2 items-center px-3 py-2.5">
-                        <div className="col-span-5 min-w-0">
-                          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{r.name}</p>
-                          <p className="text-[10px] text-[var(--text-muted)] truncate">{r.department}</p>
-                        </div>
-                        <div className="col-span-3">
-                          <div className="relative">
-                            <input
-                              type="number" step="0.001" min="0" max="100"
-                              value={r.rate_percentage}
-                              onChange={e => setRate(r.user_id, e.target.value)}
-                              placeholder="0"
-                              className="input-base text-xs text-center pr-6 h-8"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)] font-bold">%</span>
-                          </div>
-                        </div>
-                        <div className="col-span-4 text-right">
-                          <p className={`text-xs font-bold ${amount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-muted)]'}`}>
-                            {amount > 0 ? toRupiahShort(amount) : '—'}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {/* Total row */}
-                  <div className="grid grid-cols-12 gap-2 items-center px-3 py-2.5 bg-[var(--bg-secondary)]">
-                    <span className="col-span-5 text-xs font-bold text-[var(--text-primary)]">Total</span>
-                    <span className={`col-span-3 text-xs font-black text-center ${totalPct > 100 ? 'text-red-500' : 'text-purple-600 dark:text-purple-400'}`}>
-                      {totalPct.toFixed(2)}%
-                    </span>
-                    <span className="col-span-4 text-xs font-black text-right text-emerald-600 dark:text-emerald-400">
-                      {previewTotal > 0 ? toRupiahShort(previewTotal) : '—'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Catatan (opsional)</label>
-                <input value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))}
-                  placeholder="Keterangan tambahan..." className="input-base text-sm" />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 py-4 border-t border-[var(--border)] flex gap-2 flex-shrink-0">
-              <button onClick={() => setShowForm(false)} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
-              <button onClick={handleSubmit} className="btn-primary flex-1 h-11 text-sm">
-                <CheckCircle2 className="w-4 h-4" /> Simpan Parameter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════
-// TAB: KASBON & HUTANG
-// ════════════════════════════════════════════════════════════════
 const LoanTab = () => {
   const { user, isHR } = useAuth();
   const canManage = isHR || user?.role === 'admin';
