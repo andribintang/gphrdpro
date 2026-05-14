@@ -11,8 +11,8 @@ const clearDemoData = async (app) => {
     }
 
     try {
-      const { sequelize } = require('./config/database');
-      const models = require('./models');
+      const { sequelize } = require('../config/database');
+      const models = require('../models');
       const {
         User, Employee, Attendance, LeaveRequest, LeaveQuota,
         Payroll, PayrollRun, PayrollItem, LoanManagement,
@@ -25,7 +25,7 @@ const clearDemoData = async (app) => {
         WebSale, WebShare, EmployeeActivity,
         IncentiveResult, IncentivePeriod, IncEmployee,
         Position, AuditLog,
-      } = require('./models/incentive');
+      } = require('../models/incentive');
 
       // Urutan hapus: child tables first
       await AuditLog.destroy({ where: {}, truncate: true });
