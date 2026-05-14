@@ -74,8 +74,7 @@ const calculatePeriod = async (periodId) => {
   const waSales = await WaSale.findAll({ where: { period_id: periodId } });
   const waByEmp = {};
   let totalWaSales = 0;
-  const waChannel = channelsMap['WA'];
-  const waEligibleStatuses = waChannel?.eligible_statuses || ['kontrak','tetap'];
+  const waEligibleStatuses = channelsMap['WA']?.eligible_statuses || ['kontrak','tetap'];
   for (const s of waSales) {
     const emp = employees.find(e => e.id === s.employee_id);
     const effectiveWaPct = await getEffectiveRate('WA', emp?.branch_id, channelsMap);
