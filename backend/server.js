@@ -93,36 +93,112 @@ app.post('/run-migrate', async (req, res) => {
   try {
     const { sequelize } = require('./config/database');
     const models = require('./models');
+    const incModels = require('./models/incentive');
     const { seedDefaultComponents } = require('./controllers/payrollEngineController');
-    const { PayrollSetting, PayrollComponent, OfficeSetting } = models;
+    const {
+      User, Employee, Attendance, LeaveRequest, LeaveQuota,
+      Payroll, OfficeSetting, EmployeeFace, CompanySetting,
+      PayrollSetting, PayrollComponent, EmployeeAllowance,
+      PayrollRun, PayrollItem, LoanManagement,
+      IncentiveParameter, IncentiveEmployeeRate,
+    } = models;
+    const {
+      Branch, Position, IncEmployee, SalesChannel, ChannelRate,
+      ActivityType, BonusTarget, IncentivePeriod,
+      WaSale, MarketplaceSale, MarketplaceShare,
+      WebSale, WebShare, EmployeeActivity,
+      IncentiveResult, AuditLog,
+    } = incModels;
 
-    // Sync all tables
-    await sequelize.sync({ alter: true });
+    // Smart sync — only create tables that don't exist
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
 
-    // Seed payroll settings
+    const [existingRows] = await sequelize.query(
+      'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()'
+    );
+    const existing = new Set(existingRows.map(t => t.TABLE_NAME || t.table_name));
+
+    const syncIfNew = async (model) => {
+      const tbl = model.getTableName();
+      if (!existing.has(tbl)) await model.sync({ force: false });
+    };
+
+    // HRD core
+    await syncIfNew(User);         await syncIfNew(Employee);
+    await syncIfNew(Attendance);   await syncIfNew(LeaveRequest);
+    await syncIfNew(LeaveQuota);   await syncIfNew(Payroll);
+    await syncIfNew(OfficeSetting);await syncIfNew(EmployeeFace);
+    await syncIfNew(CompanySetting);
+    // Payroll engine
+    await syncIfNew(PayrollSetting);    await syncIfNew(PayrollComponent);
+    await syncIfNew(EmployeeAllowance); await syncIfNew(PayrollRun);
+    await syncIfNew(PayrollItem);       await syncIfNew(LoanManagement);
+    await syncIfNew(IncentiveParameter);await syncIfNew(IncentiveEmployeeRate);
+    // Incentive system
+    await syncIfNew(Branch);       await syncIfNew(Position);
+    await syncIfNew(IncEmployee);  await syncIfNew(SalesChannel);
+    await syncIfNew(ChannelRate);  await syncIfNew(ActivityType);
+    await syncIfNew(BonusTarget);  await syncIfNew(IncentivePeriod);
+    await syncIfNew(WaSale);       await syncIfNew(MarketplaceSale);
+    await syncIfNew(MarketplaceShare); await syncIfNew(WebSale);
+    await syncIfNew(WebShare);     await syncIfNew(EmployeeActivity);
+    await syncIfNew(IncentiveResult);  await syncIfNew(AuditLog);
+
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+
+    // Seeds
     const psExists = await PayrollSetting.findOne();
     if (!psExists) await PayrollSetting.create({});
 
-    // Seed components
     const compCount = await PayrollComponent.count();
     if (compCount === 0) await seedDefaultComponents();
 
-    // Seed office settings
     const offExists = await OfficeSetting.findOne();
     if (!offExists) await OfficeSetting.create({
-      name: 'Kantor HRD Lite', address: 'Jakarta',
+      name: 'GPDISTRO HR Pro', address: 'Jakarta',
       lat: -6.2088, lng: 106.8456, radius: 100,
       check_in_start: '06:00', check_in_deadline: '08:05',
       check_out_start: '15:00', work_hours_required: 8, is_active: true,
     });
 
+    const csExists = await CompanySetting.findOne();
+    if (!csExists) await CompanySetting.create({
+      company_name: 'GPDISTRO HR Pro',
+      app_name: 'GPDISTRO HR Pro',
+      logo_url: '/logo-gpdistro.png',
+      primary_color: '#e11d48',
+    });
+
+    const branchCount = await Branch.count();
+    if (branchCount === 0) {
+      await Branch.bulkCreate([
+        { code:'GPRACING', name:'GP Racing', business_type:'Online Store Spare Part Racing', sort_order:1 },
+        { code:'GPDISTRO', name:'GP Distro', business_type:'Online Store Fashion', sort_order:2 },
+      ]);
+    }
+
+    const channelCount = await SalesChannel.count();
+    if (channelCount === 0) {
+      await SalesChannel.bulkCreate([
+        { code:'WA',          name:'WhatsApp',    percentage:3.000, input_type:'per_transaction', sort_order:1 },
+        { code:'MARKETPLACE', name:'Marketplace', percentage:0.500, input_type:'per_period',      sort_order:2 },
+        { code:'WEB',         name:'Website',     percentage:2.000, input_type:'per_period',      sort_order:3 },
+      ]);
+    }
+
     const compTotal = await PayrollComponent.count();
+    const newTables = [...existing].length;
     return res.json({
       success: true,
       message: 'Migration berhasil!',
-      data: { tables_synced: true, components: compTotal }
+      data: {
+        tables_synced: true,
+        new_tables_created: newTables,
+        payroll_components: compTotal,
+      }
     });
   } catch (err) {
+    try { const { sequelize } = require('./config/database'); await sequelize.query('SET FOREIGN_KEY_CHECKS = 1'); } catch {}
     return res.status(500).json({ success: false, message: err.message });
   }
 });
