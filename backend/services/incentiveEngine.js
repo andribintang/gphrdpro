@@ -4,13 +4,34 @@
  */
 const { Op } = require('sequelize');
 const {
-  IncEmployee, SalesChannel, BonusTarget,
+  IncEmployee, SalesChannel, BonusTarget, ChannelRate,
   WaSale, MarketplaceSale, MarketplaceShare,
   WebSale, WebShare, EmployeeActivity,
   IncentiveResult, IncentivePeriod,
 } = require('../models/incentive');
 
 const round2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
+
+/**
+ * Get effective percentage for a branch+channel combo
+ * Returns branch-specific rate if exists, falls back to global channel rate
+ */
+const getEffectiveRate = async (channelCode, branchId, channelsMap) => {
+  const channel = channelsMap[channelCode];
+  if (!channel) return 0;
+
+  // Check branch-specific rate first
+  if (branchId) {
+    const branchRate = await ChannelRate.findOne({
+      where: { branch_id: branchId, channel_id: channel.id, is_active: true },
+    });
+    if (branchRate && parseFloat(branchRate.percentage) > 0) {
+      return parseFloat(branchRate.percentage);
+    }
+  }
+  // Fallback to global rate
+  return parseFloat(channel.percentage) || 0;
+};
 
 /**
  * Main calculation engine for a period
@@ -38,42 +59,63 @@ const calculatePeriod = async (periodId) => {
   const activeCount = employees.length;
   if (!activeCount) throw new Error('Tidak ada karyawan aktif');
 
-  // ── 1. WA Sales per employee ──────────────────────────────
+  // Build channels map for quick lookup
+  const channelsMap = {};
+  channels.forEach(ch => { channelsMap[ch.code] = ch; });
+
+  // ── 1. WA Sales per employee — recalculate with branch-specific rate ────
   const waSales = await WaSale.findAll({ where: { period_id: periodId } });
   const waByEmp = {};
   let totalWaSales = 0;
-  waSales.forEach(s => {
-    if (!waByEmp[s.employee_id]) waByEmp[s.employee_id] = { amount: 0, incentive: 0 };
+  for (const s of waSales) {
+    // Get effective WA rate for this employee's branch
+    const emp = employees.find(e => e.id === s.employee_id);
+    const effectiveWaPct = await getEffectiveRate('WA', emp?.branch_id, channelsMap);
+    const recalcIncentive = round2(parseFloat(s.sale_amount) * effectiveWaPct / 100);
+
+    if (!waByEmp[s.employee_id]) waByEmp[s.employee_id] = { amount: 0, incentive: 0, pct: effectiveWaPct };
     waByEmp[s.employee_id].amount   += parseFloat(s.sale_amount);
-    waByEmp[s.employee_id].incentive += parseFloat(s.incentive_amount);
+    waByEmp[s.employee_id].incentive += recalcIncentive;
     totalWaSales += parseFloat(s.sale_amount);
-  });
+  }
 
-  // ── 2. Marketplace per employee ───────────────────────────
-  const mpSales  = await MarketplaceSale.findAll({ where: { period_id: periodId }, include: [{ model: MarketplaceShare, as: 'shares' }] });
-  const mpByEmp  = {};
+  // ── 2. Marketplace per employee — recalculate with branch-specific rate ─
+  const mpSales = await MarketplaceSale.findAll({
+    where: { period_id: periodId },
+    include: [{ model: MarketplaceShare, as: 'shares' }],
+  });
+  const mpByEmp = {};
   let totalMpSales = 0;
-  mpSales.forEach(sale => {
+  for (const sale of mpSales) {
     totalMpSales += parseFloat(sale.total_amount);
-    (sale.shares || []).forEach(sh => {
-      if (!mpByEmp[sh.employee_id]) mpByEmp[sh.employee_id] = { performance: 0, incentive: 0 };
-      mpByEmp[sh.employee_id].performance += parseFloat(sh.performance_amount);
-      mpByEmp[sh.employee_id].incentive   += parseFloat(sh.incentive_amount);
-    });
-  });
+    const effectiveMpPct = await getEffectiveRate('MARKETPLACE', sale.branch_id, channelsMap);
+    for (const sh of (sale.shares || [])) {
+      const performance = parseFloat(sh.performance_amount);
+      const incentive   = round2(performance * effectiveMpPct / 100);
+      if (!mpByEmp[sh.employee_id]) mpByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveMpPct };
+      mpByEmp[sh.employee_id].performance += performance;
+      mpByEmp[sh.employee_id].incentive   += incentive;
+    }
+  }
 
-  // ── 3. Web per employee ───────────────────────────────────
-  const webSales = await WebSale.findAll({ where: { period_id: periodId }, include: [{ model: WebShare, as: 'shares' }] });
+  // ── 3. Web per employee — recalculate with branch-specific rate ─────────
+  const webSales = await WebSale.findAll({
+    where: { period_id: periodId },
+    include: [{ model: WebShare, as: 'shares' }],
+  });
   const webByEmp = {};
   let totalWebSales = 0;
-  webSales.forEach(sale => {
+  for (const sale of webSales) {
     totalWebSales += parseFloat(sale.total_amount);
-    (sale.shares || []).forEach(sh => {
-      if (!webByEmp[sh.employee_id]) webByEmp[sh.employee_id] = { performance: 0, incentive: 0 };
-      webByEmp[sh.employee_id].performance += parseFloat(sh.performance_amount);
-      webByEmp[sh.employee_id].incentive   += parseFloat(sh.incentive_amount);
-    });
-  });
+    const effectiveWebPct = await getEffectiveRate('WEB', sale.branch_id, channelsMap);
+    for (const sh of (sale.shares || [])) {
+      const performance = parseFloat(sh.performance_amount);
+      const incentive   = round2(performance * effectiveWebPct / 100);
+      if (!webByEmp[sh.employee_id]) webByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveWebPct };
+      webByEmp[sh.employee_id].performance += performance;
+      webByEmp[sh.employee_id].incentive   += incentive;
+    }
+  }
 
   // ── 4. Activities per employee ────────────────────────────
   const activities = await EmployeeActivity.findAll({
@@ -117,9 +159,9 @@ const calculatePeriod = async (periodId) => {
     );
 
     const detailsJson = {
-      wa:          { sales: wa.amount,        incentive: wa.incentive,  channel_pct: waChannel?.percentage },
-      marketplace: { performance: mp.performance, incentive: mp.incentive, channel_pct: mpChannel?.percentage },
-      web:         { performance: web.performance, incentive: web.incentive, channel_pct: webChannel?.percentage },
+      wa:          { sales: wa.amount,        incentive: wa.incentive,  channel_pct: wa.pct  || waChannel?.percentage },
+      marketplace: { performance: mp.performance, incentive: mp.incentive, channel_pct: mp.pct  || mpChannel?.percentage },
+      web:         { performance: web.performance, incentive: web.incentive, channel_pct: web.pct || webChannel?.percentage },
       activities:  { incentive: act.incentive, details: act.details },
       bonus_target:{ amount: bonusPerEmp, tier: achievedTarget ? { name: achievedTarget.name, min: achievedTarget.min_amount, total_bonus: achievedTarget.bonus_amount } : null },
     };

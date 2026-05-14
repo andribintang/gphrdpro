@@ -26,8 +26,13 @@ export const incentiveService = {
   deleteEmployee: (id)     => api.delete(`${BASE}/employees/${id}`),
 
   // Master — Channels
-  getChannels:    ()      => api.get(`${BASE}/channels`),
-  updateChannel:  (id, d) => api.put(`${BASE}/channels/${id}`, d),
+  getChannels:       ()      => api.get(`${BASE}/channels`),
+  updateChannel:     (id, d) => api.put(`${BASE}/channels/${id}`, d),
+
+  // Channel Rates (per branch)
+  getChannelRates:   ()      => api.get(`${BASE}/channel-rates`),
+  upsertChannelRate: (data)  => api.post(`${BASE}/channel-rates`, data),
+  deleteChannelRate: (id)    => api.delete(`${BASE}/channel-rates/${id}`),
 
   // Master — Activity Types
   getActivityTypes:   (params) => api.get(`${BASE}/activity-types`, { params }),

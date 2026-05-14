@@ -10,7 +10,7 @@ const {
 
 // Import incentive models di awal juga agar tabelnya ikut di-sync
 const {
-  Branch, Position, IncEmployee, SalesChannel,
+  Branch, Position, IncEmployee, SalesChannel, ChannelRate,
   ActivityType, BonusTarget, IncentivePeriod,
   WaSale, MarketplaceSale, MarketplaceShare,
   WebSale, WebShare, EmployeeActivity,

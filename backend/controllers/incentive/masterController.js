@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
 const {
   Branch, Position, IncEmployee, SalesChannel,
-  ActivityType, BonusTarget, AuditLog,
+  ActivityType, BonusTarget, AuditLog, ChannelRate,
 } = require('../../models/incentive');
 
 // ── Audit helper ──────────────────────────────────────────────
@@ -293,8 +293,93 @@ const deleteBonusTarget = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ─────────────────────────────────────────────────────────────
+// CHANNEL RATES — persentase per cabang per jalur
+// ─────────────────────────────────────────────────────────────
+const getChannelRates = async (req, res, next) => {
+  try {
+    // Return all channels with per-branch rates
+    const [channels, branches, rates] = await Promise.all([
+      SalesChannel.findAll({ where: { is_active: true }, order: [['sort_order','ASC']] }),
+      Branch.findAll({ where: { is_active: true }, order: [['sort_order','ASC']] }),
+      ChannelRate.findAll({ include: [
+        { model: Branch,       as: 'branch',  attributes: ['id','name','code'] },
+        { model: SalesChannel, as: 'channel', attributes: ['id','name','code'] },
+      ]}),
+    ]);
+
+    // Build matrix: channel → branch → rate
+    const matrix = channels.map(ch => ({
+      channel: ch,
+      branches: branches.map(br => {
+        const rate = rates.find(r => r.channel_id === ch.id && r.branch_id === br.id);
+        return {
+          branch:     br,
+          rate_id:    rate?.id || null,
+          percentage: rate ? parseFloat(rate.percentage) : null, // null = pakai global
+          is_active:  rate?.is_active ?? true,
+          notes:      rate?.notes || '',
+          using_global: !rate || parseFloat(rate.percentage) === 0,
+        };
+      }),
+    }));
+
+    return res.json({ success: true, data: { channels, branches, matrix, rates } });
+  } catch (err) { next(err); }
+};
+
+const upsertChannelRate = async (req, res, next) => {
+  try {
+    const { branch_id, channel_id, percentage, notes } = req.body;
+    if (!branch_id || !channel_id) {
+      return res.status(400).json({ success: false, message: 'branch_id dan channel_id wajib diisi' });
+    }
+
+    const pct = parseFloat(percentage);
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      return res.status(400).json({ success: false, message: 'Persentase harus antara 0-100' });
+    }
+
+    const [rate, created] = await ChannelRate.findOrCreate({
+      where: { branch_id, channel_id },
+      defaults: { percentage: pct, notes, is_active: true },
+    });
+
+    if (!created) {
+      await rate.update({ percentage: pct, notes, is_active: pct > 0 });
+    }
+
+    const channel = await SalesChannel.findByPk(channel_id);
+    const branch  = await Branch.findByPk(branch_id);
+
+    await AuditLog.create({
+      user_id: req.user?.id, user_name: req.user?.name,
+      action: created ? 'CREATE' : 'UPDATE',
+      module: 'channel_rates',
+      record_id: rate.id,
+      description: `${branch?.name} — ${channel?.name}: ${pct}%`,
+    }).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: `Rate ${branch?.name} / ${channel?.name} → ${pct}% berhasil disimpan`,
+      data: { rate },
+    });
+  } catch (err) { next(err); }
+};
+
+const deleteChannelRate = async (req, res, next) => {
+  try {
+    const rate = await ChannelRate.findByPk(req.params.id);
+    if (!rate) return res.status(404).json({ success: false, message: 'Rate tidak ditemukan' });
+    await rate.destroy();
+    return res.json({ success: true, message: 'Rate dihapus — akan menggunakan rate global' });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getBranches, createBranch, updateBranch, deleteBranch,
+  getChannelRates, upsertChannelRate, deleteChannelRate,
   getPositions, createPosition, updatePosition, deletePosition,
   getIncEmployees, getIncEmployee, createIncEmployee, updateIncEmployee, deleteIncEmployee,
   getSalesChannels, updateSalesChannel,

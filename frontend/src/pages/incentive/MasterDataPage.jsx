@@ -433,78 +433,189 @@ const EmployeesTab = () => {
 };
 
 // ════════════════════════════════════════════════════════════════
-// CHANNELS TAB — Sales Channels dengan %
+// CHANNELS TAB — Persentase per Cabang per Jalur
 // ════════════════════════════════════════════════════════════════
 const ChannelsTab = () => {
+  const [matrix, setMatrix]     = useState([]);
   const [channels, setChannels] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [editing, setEditing]   = useState(null);
-  const [pct, setPct]           = useState('');
+  const [editing, setEditing]   = useState(null); // { channel_id, branch_id, current_pct, channel_name, branch_name }
+  const [pctInput, setPctInput] = useState('');
   const [saving, setSaving]     = useState(false);
+  const [globalEdit, setGlobalEdit] = useState(null); // editing global rate
+  const [globalPct, setGlobalPct]   = useState('');
 
   const fetch = useCallback(async () => {
     setLoading(true);
-    try { const r = await incentiveService.getChannels(); setChannels(r.data.data.channels); }
-    catch { toast.error('Gagal'); } finally { setLoading(false); }
+    try {
+      const res = await incentiveService.getChannelRates();
+      setMatrix(res.data.data.matrix || []);
+      setChannels(res.data.data.channels || []);
+      setBranches(res.data.data.branches || []);
+    } catch { toast.error('Gagal memuat data jalur'); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const handleSave = async (ch) => {
-    if (!pct || isNaN(parseFloat(pct))) { toast.error('Masukkan persentase yang valid'); return; }
+  const handleSaveBranchRate = async () => {
+    if (pctInput === '' || isNaN(parseFloat(pctInput))) { toast.error('Masukkan persentase yang valid'); return; }
     setSaving(true);
     try {
-      await incentiveService.updateChannel(ch.id, { percentage: parseFloat(pct) });
-      toast.success(`${ch.name} diperbarui ke ${pct}%`);
-      setEditing(null); fetch();
-    } catch { toast.error('Gagal'); }
+      await incentiveService.upsertChannelRate({
+        branch_id:   editing.branch_id,
+        channel_id:  editing.channel_id,
+        percentage:  parseFloat(pctInput),
+      });
+      toast.success(`${editing.branch_name} / ${editing.channel_name} → ${pctInput}%`);
+      setEditing(null);
+      fetch();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
     finally { setSaving(false); }
+  };
+
+  const handleSaveGlobal = async (channelId) => {
+    if (globalPct === '' || isNaN(parseFloat(globalPct))) { toast.error('Masukkan persentase yang valid'); return; }
+    setSaving(true);
+    try {
+      await incentiveService.updateChannel(channelId, { percentage: parseFloat(globalPct) });
+      toast.success('Rate global diperbarui');
+      setGlobalEdit(null);
+      fetch();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  const handleResetBranchRate = async (rateId, channelName, branchName) => {
+    if (!rateId) return;
+    if (!confirm(`Reset rate ${branchName} / ${channelName} ke rate global?`)) return;
+    try {
+      await incentiveService.deleteChannelRate(rateId);
+      toast.success('Rate direset ke global');
+      fetch();
+    } catch { toast.error('Gagal reset'); }
   };
 
   const ICONS = { WA: '💬', MARKETPLACE: '🛒', WEB: '🌐' };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Info */}
       <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-xs text-amber-700 dark:text-amber-300">
-        ⚠️ Perubahan persentase akan berpengaruh ke kalkulasi insentif periode berikutnya.
+        ⚙️ Setiap cabang bisa punya persentase berbeda per jalur penjualan. Jika tidak diset, akan menggunakan <strong>rate global</strong>.
       </div>
-      {loading ? <div className="space-y-2">{[...Array(3)].map((_,i)=><div key={i} className="skeleton h-16 rounded-xl"/>)}</div>
-      : channels.map(ch => (
-        <div key={ch.id} className="card p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">{ICONS[ch.code] || '📊'}</span>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-[var(--text-primary)]">{ch.name}</p>
-              <p className="text-xs text-[var(--text-muted)]">{ch.input_type === 'per_transaction' ? 'Input per transaksi' : 'Input per periode'}</p>
+
+      {loading ? (
+        <div className="space-y-3">{[...Array(3)].map((_,i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}</div>
+      ) : (
+        matrix.map(({ channel, branches: branchRates }) => (
+          <div key={channel.id} className="card overflow-hidden">
+            {/* Channel header */}
+            <div className="flex items-center gap-3 px-4 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
+              <span className="text-2xl">{ICONS[channel.code] || '📊'}</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-[var(--text-primary)]">{channel.name}</p>
+                <p className="text-xs text-[var(--text-muted)]">{channel.input_type === 'per_transaction' ? 'Input per transaksi' : 'Input per periode'}</p>
+              </div>
+              {/* Global rate */}
+              <div className="text-right">
+                {globalEdit === channel.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative">
+                      <input type="number" step="0.001" value={globalPct}
+                        onChange={e => setGlobalPct(e.target.value)}
+                        className="input-base text-xs text-center h-8 w-20 pr-5"
+                        autoFocus
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[var(--text-muted)]">%</span>
+                    </div>
+                    <button onClick={() => handleSaveGlobal(channel.id)} disabled={saving}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-white">
+                      {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}
+                    </button>
+                    <button onClick={() => setGlobalEdit(null)}
+                      className="px-2 py-1.5 rounded-lg text-xs border border-[var(--border)] text-[var(--text-muted)]">✕</button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setGlobalEdit(channel.id); setGlobalPct(String(parseFloat(channel.percentage))); }}
+                    className="text-right group">
+                    <p className="text-sm font-black text-[var(--text-secondary)] group-hover:text-brand-500 transition-colors">
+                      {parseFloat(channel.percentage)}% <span className="text-[10px] font-normal text-[var(--text-muted)]">global</span>
+                    </p>
+                    <p className="text-[10px] text-[var(--text-muted)] group-hover:text-brand-400">tap untuk ubah</p>
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xl font-black text-brand-600 dark:text-brand-400">{parseFloat(ch.percentage)}%</p>
-              <p className="text-[10px] text-[var(--text-muted)]">persentase</p>
+
+            {/* Per-branch rates */}
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {branchRates.map(({ branch, rate_id, percentage, using_global }) => (
+                <div key={branch.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                    {branch.code?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{branch.name}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      {using_global
+                        ? `Menggunakan rate global (${parseFloat(channel.percentage)}%)`
+                        : `Rate khusus cabang ini`}
+                    </p>
+                  </div>
+
+                  {/* Rate display / edit */}
+                  {editing?.channel_id === channel.id && editing?.branch_id === branch.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="relative">
+                        <input type="number" step="0.001" min="0" max="100"
+                          value={pctInput}
+                          onChange={e => setPctInput(e.target.value)}
+                          className="input-base text-xs text-center h-9 w-24 pr-5"
+                          autoFocus
+                          onKeyDown={e => e.key === 'Enter' && handleSaveBranchRate()}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[var(--text-muted)]">%</span>
+                      </div>
+                      <button onClick={handleSaveBranchRate} disabled={saving}
+                        className="w-9 h-9 rounded-xl bg-brand-500 hover:bg-brand-600 text-white flex items-center justify-center">
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </button>
+                      <button onClick={() => setEditing(null)}
+                        className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)]">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {!using_global && rate_id && (
+                        <button onClick={() => handleResetBranchRate(rate_id, channel.name, branch.name)}
+                          className="text-[10px] text-[var(--text-muted)] hover:text-red-500 transition-colors px-1.5 py-1 rounded">
+                          reset
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditing({ channel_id: channel.id, branch_id: branch.id, channel_name: channel.name, branch_name: branch.name });
+                          setPctInput(using_global ? String(parseFloat(channel.percentage)) : String(percentage || 0));
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-black transition-all
+                          ${using_global
+                            ? 'text-[var(--text-muted)] hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-950'
+                            : 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950 hover:bg-brand-100'
+                          }`}>
+                        {using_global ? `${parseFloat(channel.percentage)}%` : `${percentage}%`}
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-
-          {editing === ch.id ? (
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input type="number" step="0.001" value={pct} onChange={e => setPct(e.target.value)}
-                  placeholder="0.000" className="input-base text-sm pr-8" autoFocus />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-bold">%</span>
-              </div>
-              <button onClick={() => handleSave(ch)} disabled={saving}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Simpan'}
-              </button>
-              <button onClick={() => setEditing(null)}
-                className="px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)]">Batal</button>
-            </div>
-          ) : (
-            <button onClick={() => { setEditing(ch.id); setPct(ch.percentage); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
-              <Edit3 className="w-3 h-3" /> Ubah Persentase
-            </button>
-          )}
-        </div>
-      ))}
+        ))
+      )}
     </div>
   );
 };

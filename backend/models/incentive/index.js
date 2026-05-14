@@ -2,13 +2,14 @@ const Branch        = require('./Branch');
 const Position      = require('./Position');
 const IncEmployee   = require('./IncEmployee');
 const SalesChannel  = require('./SalesChannel');
+const ChannelRate   = require('./ChannelRate');
 const ActivityType  = require('./ActivityType');
 const BonusTarget   = require('./BonusTarget');
 const IncentivePeriod = require('./IncentivePeriod');
 const {
   WaSale, MarketplaceSale, MarketplaceShare,
   WebSale, WebShare, EmployeeActivity,
-  IncentiveResult, AuditLog,
+  IncentiveResult, AuditLog, ChannelRate,
 } = require('./Transactions');
 
 // ── Branch ↔ Position ─────────────────────────────────────────
@@ -61,6 +62,12 @@ WebShare.belongsTo(WebSale,       { foreignKey: 'web_sale_id', as: 'sale' });
 IncEmployee.hasMany(WebShare,     { foreignKey: 'employee_id', as: 'webShares' });
 WebShare.belongsTo(IncEmployee,   { foreignKey: 'employee_id', as: 'employee' });
 
+// ── Branch/Channel ↔ ChannelRate ─────────────────────────────
+Branch.hasMany(ChannelRate,       { foreignKey: 'branch_id',  as: 'channelRates' });
+ChannelRate.belongsTo(Branch,     { foreignKey: 'branch_id',  as: 'branch' });
+SalesChannel.hasMany(ChannelRate, { foreignKey: 'channel_id', as: 'branchRates' });
+ChannelRate.belongsTo(SalesChannel,{ foreignKey: 'channel_id', as: 'channel' });
+
 // ── ActivityType ↔ EmployeeActivity ─────────────────────────
 ActivityType.hasMany(EmployeeActivity,   { foreignKey: 'activity_type_id', as: 'activities' });
 EmployeeActivity.belongsTo(ActivityType, { foreignKey: 'activity_type_id', as: 'activityType' });
@@ -71,5 +78,5 @@ module.exports = {
   IncentivePeriod,
   WaSale, MarketplaceSale, MarketplaceShare,
   WebSale, WebShare, EmployeeActivity,
-  IncentiveResult, AuditLog,
+  IncentiveResult, AuditLog, ChannelRate,
 };

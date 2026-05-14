@@ -33,6 +33,11 @@ router.delete('/employees/:id', master.deleteIncEmployee);
 router.get('/channels',     master.getSalesChannels);
 router.put('/channels/:id', master.updateSalesChannel);
 
+// ── Channel Rates (per branch) ───────────────────────────────
+router.get('/channel-rates',          master.getChannelRates);
+router.post('/channel-rates',         master.upsertChannelRate);
+router.delete('/channel-rates/:id',   master.deleteChannelRate);
+
 // ── Master: Activity Types ───────────────────────────────────
 router.get('/activity-types',     master.getActivityTypes);
 router.post('/activity-types',    master.createActivityType);
