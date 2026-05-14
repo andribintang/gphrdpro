@@ -930,7 +930,7 @@ export default function PayrollEnginePage() {
   const [activeTab, setActiveTab] = useState(canManage ? 'runs' : 'myslip');
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg lg:max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Penggajian Pro</h1>

@@ -674,7 +674,7 @@ export default function InputDataPage() {
   const isLocked   = period?.status === 'locked';
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg lg:max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/incentive/periods')}

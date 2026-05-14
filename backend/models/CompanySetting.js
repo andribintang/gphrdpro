@@ -14,7 +14,7 @@ const CompanySetting = sequelize.define('CompanySetting', {
 
   // Branding
   logo_url:     {
-    type: DataTypes.STRING(500),
+    type: DataTypes.TEXT, // TEXT to support base64 fallback
     defaultValue: '/logo-gpdistro.png',
     comment: 'URL logo — bisa Cloudinary URL atau path lokal',
   },

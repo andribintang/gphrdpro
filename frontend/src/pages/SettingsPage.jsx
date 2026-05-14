@@ -117,7 +117,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-5 animate-slide-up">
+    <div className="max-w-lg lg:max-w-3xl mx-auto space-y-5 animate-slide-up">
       {/* Profile card */}
       <div className="card p-5">
         <div className="flex items-center gap-4">

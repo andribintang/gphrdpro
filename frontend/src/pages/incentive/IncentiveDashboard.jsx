@@ -178,7 +178,7 @@ export default function IncentiveDashboard() {
       )}
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={Building2} label="Cabang Aktif"    value={summary.total_branches}
           color="text-purple-600 dark:text-purple-400" bg="bg-purple-100 dark:bg-purple-950"
           onClick={() => navigate('/incentive/master')} />

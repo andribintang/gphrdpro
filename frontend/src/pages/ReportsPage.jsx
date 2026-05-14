@@ -747,7 +747,7 @@ export default function ReportsPage() {
   const [year, setYear]     = useState(currentYear());
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg lg:max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>

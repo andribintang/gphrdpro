@@ -84,7 +84,7 @@ export default function CompanySettingsPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-5 animate-slide-up">
+    <div className="max-w-lg lg:max-w-3xl mx-auto space-y-5 animate-slide-up">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -465,7 +465,7 @@ export default function PayrollComponentManager() {
   );
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg lg:max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
