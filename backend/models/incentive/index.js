@@ -9,7 +9,7 @@ const IncentivePeriod = require('./IncentivePeriod');
 const {
   WaSale, MarketplaceSale, MarketplaceShare,
   WebSale, WebShare, EmployeeActivity,
-  IncentiveResult, AuditLog, ChannelRate,
+  IncentiveResult, AuditLog,
 } = require('./Transactions');
 
 // ── Branch ↔ Position ─────────────────────────────────────────
