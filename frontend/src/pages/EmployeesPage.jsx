@@ -179,8 +179,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
   const STATUS_LABELS = { active:'Aktif', inactive:'Tidak Aktif', on_leave:'Cuti', terminated:'Berhenti' };
 
   // Simple field renderer — inline, no sub-component
-  const F = ({ label, field, type = 'text', placeholder, required, disabled }) => (
-    <div>
+  // renderF is a FUNCTION not a component — called as renderF(...)
+  // This prevents React from unmounting/remounting the input on re-render
+  const renderF = (label, field, type = 'text', placeholder, required = false, disabled = false) => (
+    <div key={field}>
       <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -231,10 +233,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
           {step === 1 && (
             <>
-              <F label="Nama Lengkap" field="name" placeholder="Ahmad Fauzi" required />
-              <F label="Email" field="email" type="email" placeholder="ahmad@perusahaan.com" required />
-              {!isEdit && <F label="Password Default" field="password" type="password" placeholder="Min 6 karakter" required />}
-              <F label="NIP" field="nip" placeholder="NIP-005" required />
+              {renderF("Nama Lengkap", "name", "text", "Ahmad Fauzi", true, false)}
+              {renderF("Email", "email", "email", "ahmad@perusahaan.com", true, false)}
+              {!isEdit && renderF("Password Default", "password", "password", "Min 6 karakter", true, false)}
+              {renderF("NIP", "nip", "text", "NIP-005", true, false)}
 
               {/* Role */}
               <div>
@@ -253,7 +255,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <F label="Jabatan" field="position" placeholder="Staff IT" required />
+              {renderF("Jabatan", "position", "text", "Staff IT", true, false)}
 
               {/* Departemen */}
               <div>
@@ -271,7 +273,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 {errors.department && <p className="text-xs text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              <F label="Telepon" field="phone" type="tel" placeholder="08xxxxxxxxxx" />
+              {renderF("Telepon", "phone", "tel", "08xxxxxxxxxx", false, false)}
             </>
           )}
 
@@ -325,9 +327,9 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <F label="Alamat" field="address" placeholder="Jl. Contoh No.1, Jakarta" />
-              <F label="Kontak Darurat" field="emergency_contact" placeholder="Nama kontak darurat" />
-              <F label="Telepon Darurat" field="emergency_phone" type="tel" placeholder="08xxxxxxxxxx" />
+              {renderF("Alamat", "address", "text", "Jl. Contoh No.1, Jakarta", false, false)}
+              {renderF("Kontak Darurat", "emergency_contact", "text", "Nama kontak darurat", false, false)}
+              {renderF("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx", false, false)}
 
               {/* ── Sync ke Sistem Insentif ─────────────────── */}
               {!isEdit && (
