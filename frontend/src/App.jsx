@@ -27,7 +27,8 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
+          <CompanyProvider>
+            <Routes>
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -94,7 +95,8 @@ export default function App() {
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+            </Routes>
+          </CompanyProvider>
         </BrowserRouter>
 
         {/* Toast notifications */}
