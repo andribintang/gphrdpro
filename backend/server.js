@@ -84,6 +84,30 @@ app.get('/health', (_req, res) => res.json({
 // ── Clear demo data endpoint
 require('./scripts/clearDemo')(app);
 
+// ── Quick clear payroll demo data only ───────────────────────
+app.post('/clear-payroll-demo', async (req, res) => {
+  const secret = req.headers['x-migrate-secret'];
+  if (!secret || secret !== process.env.MIGRATE_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  try {
+    const { sequelize } = require('./config/database');
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    await sequelize.query('TRUNCATE TABLE payrolls');
+    await sequelize.query('TRUNCATE TABLE payroll_items');
+    await sequelize.query('TRUNCATE TABLE payroll_runs');
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    return res.json({
+      success: true,
+      message: 'Data payroll demo berhasil dihapus!',
+      data: { cleared: ['payrolls', 'payroll_items', 'payroll_runs'] }
+    });
+  } catch (err) {
+    try { const { sequelize } = require('./config/database'); await sequelize.query('SET FOREIGN_KEY_CHECKS = 1'); } catch {}
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── One-time migrate endpoint (protected by secret key) ──────
 app.post('/run-migrate', async (req, res) => {
   const secret = req.headers['x-migrate-secret'];
