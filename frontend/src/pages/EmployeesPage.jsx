@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Plus, X, ChevronRight, Filter,
   Loader2, RefreshCw, Phone, MapPin, AlertTriangle,
-  Briefcase, Building2, Calendar, DollarSign, Clock,
+  Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
-  Mail, Shield, Eye, Camera, ShieldCheck
+  Mail, Shield, Camera, ShieldCheck, Link2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,8 @@ import {
   toRupiah, formatJoinDate, avatarColor,
 } from '../utils/employeeService';
 import { attendanceService } from '../utils/attendanceService';
+import { incentiveService } from '../utils/incentive/incentiveService';
+import api from '../utils/api';
 
 // ── Shared ────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
@@ -24,16 +26,10 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
-
 const RoleBadge = ({ role }) => {
   const r = ROLE_CONFIG[role] || ROLE_CONFIG.employee;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${r.bg} ${r.color}`}>
-      {r.label}
-    </span>
-  );
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${r.bg} ${r.color}`}>{r.label}</span>;
 };
-
 const Avatar = ({ name, size = 'md' }) => {
   const sizes = { sm:'w-8 h-8 text-sm', md:'w-10 h-10 text-base', lg:'w-14 h-14 text-xl', xl:'w-20 h-20 text-3xl' };
   return (
@@ -44,338 +40,162 @@ const Avatar = ({ name, size = 'md' }) => {
 };
 
 // ════════════════════════════════════════════════════════════════
-// FACE REGISTRATION MODAL — kamera untuk daftarkan wajah
+// EMPLOYEE FORM — menggunakan controlled inputs dengan useReducer
+// Tidak ada sub-component di dalam — semua inline untuk stabilitas
 // ════════════════════════════════════════════════════════════════
-const FaceRegisterModal = ({ userId, userName, onClose, onSuccess }) => {
-  const videoRef  = useRef(null);
-  const streamRef = useRef(null);
-  const [phase, setPhase]   = useState('loading'); // loading | ready | captured | error
-  const [errMsg, setErrMsg] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [capturedImg, setCapturedImg] = useState(null);
-  const [descriptor, setDescriptor]   = useState(null);
-
-  const FACE_SCRIPT = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
-  const FACE_MODELS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-
-  useEffect(() => {
-    let interval;
-    const init = async () => {
-      try {
-        // Load face-api if needed
-        if (!window.faceapi) {
-          await new Promise((resolve, reject) => {
-            const s = document.createElement('script');
-            s.src = FACE_SCRIPT;
-            s.onload = resolve;
-            s.onerror = () => reject(new Error('Gagal load face-api'));
-            document.head.appendChild(s);
-          });
-        }
-        const fa = window.faceapi;
-        if (!fa.nets.tinyFaceDetector.isLoaded) {
-          await Promise.all([
-            fa.nets.tinyFaceDetector.loadFromUri(FACE_MODELS),
-            fa.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS),
-            fa.nets.faceRecognitionNet.loadFromUri(FACE_MODELS),
-          ]);
-        }
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 400 }, height: { ideal: 400 } }
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setPhase('ready');
-      } catch (err) {
-        setErrMsg(err.message || 'Gagal mengakses kamera');
-        setPhase('error');
-      }
-    };
-    init();
-    return () => {
-      clearInterval(interval);
-      streamRef.current?.getTracks().forEach(t => t.stop());
-    };
-  }, []);
-
-  const handleCapture = async () => {
-    if (!videoRef.current || phase !== 'ready') return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 400; canvas.height = 400;
-    const ctx = canvas.getContext('2d');
-    const vw = videoRef.current.videoWidth, vh = videoRef.current.videoHeight;
-    const size = Math.min(vw, vh);
-    ctx.drawImage(videoRef.current, (vw-size)/2, (vh-size)/2, size, size, 0, 0, 400, 400);
-    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-    setCapturedImg(`data:image/jpeg;base64,${base64}`);
-
-    try {
-      const fa = window.faceapi;
-      const det = await fa.detectSingleFace(videoRef.current,
-        new fa.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
-      ).withFaceLandmarks(true).withFaceDescriptor();
-      if (det) setDescriptor(Array.from(det.descriptor));
-    } catch {}
-
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    setPhase('captured');
-  };
-
-  const handleSave = async () => {
-    if (!capturedImg) return;
-    if (!descriptor) {
-      toast('⚠️ Wajah tidak terdeteksi jelas, tetap disimpan tanpa descriptor', { icon: '⚠️' });
-    }
-    setLoading(true);
-    try {
-      await attendanceService.registerFace({
-        user_id: userId,
-        face_descriptor: descriptor || Array(128).fill(0),
-        selfie_base64: capturedImg.split(',')[1],
-      });
-      toast.success(`Wajah ${userName} berhasil didaftarkan!`);
-      onSuccess?.();
-      onClose();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal mendaftarkan wajah');
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl overflow-hidden animate-slide-up"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <div>
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Daftarkan Wajah</h3>
-            <p className="text-xs text-[var(--text-muted)]">{userName}</p>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Camera viewport */}
-        <div className="relative bg-black" style={{ paddingBottom: '100%' }}>
-          {phase === 'loading' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-brand-400" />
-              <p className="text-white/60 text-xs">Memuat model AI & kamera...</p>
-            </div>
-          )}
-          {phase === 'error' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6">
-              <AlertTriangle className="w-10 h-10 text-red-400" />
-              <p className="text-white/80 text-sm text-center">{errMsg}</p>
-            </div>
-          )}
-          <video ref={videoRef} playsInline muted
-            className={`absolute inset-0 w-full h-full object-cover ${phase === 'captured' ? 'hidden' : ''}`}
-            style={{ transform: 'scaleX(-1)' }}
-          />
-          {capturedImg && (
-            <img src={capturedImg} alt="captured"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: 'scaleX(-1)' }}
-            />
-          )}
-          {phase === 'ready' && (
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <defs><mask id="oval"><rect width="100" height="100" fill="white"/><ellipse cx="50" cy="50" rx="34" ry="42" fill="black"/></mask></defs>
-              <rect width="100" height="100" fill="rgba(0,0,0,0.35)" mask="url(#oval)"/>
-              <ellipse cx="50" cy="50" rx="34" ry="42" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5"/>
-            </svg>
-          )}
-          {phase === 'captured' && (
-            <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/20">
-              <CheckCircle2 className="w-16 h-16 text-emerald-400" />
-            </div>
-          )}
-        </div>
-
-        <div className="p-5 space-y-3">
-          {phase === 'captured' ? (
-            <>
-              <p className="text-xs text-center text-[var(--text-muted)]">
-                {descriptor ? '✅ Wajah terdeteksi' : '⚠️ Wajah kurang jelas, coba pencahayaan lebih baik'}
-              </p>
-              <div className="flex gap-2">
-                <button onClick={() => { setCapturedImg(null); setDescriptor(null); setPhase('loading');
-                  // reinit camera
-                  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
-                    .then(s => { streamRef.current = s; if(videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play(); } setPhase('ready'); })
-                    .catch(() => setPhase('error'));
-                }} className="btn-secondary flex-1 h-11 text-sm">
-                  Ulangi
-                </button>
-                <button onClick={handleSave} disabled={loading} className="btn-primary flex-1 h-11 text-sm">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                  Simpan
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-xs text-center text-[var(--text-muted)]">Posisikan wajah di tengah lingkaran</p>
-              <button onClick={handleCapture} disabled={phase !== 'ready'}
-                className="btn-primary w-full h-12 disabled:opacity-50">
-                <Camera className="w-4 h-4" /> Ambil Foto
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ── StableInput — fully controlled, outside EmployeeForm ──────────────────
-// Using controlled input inside its own memo = stable identity + keeps value
-const StableInput = memo(({ label, type = 'text', placeholder, required,
-  initialValue = '', error, onClearError, onValueChange }) => {
-  const [val, setVal] = useState(initialValue);
-  return (
-    <div>
-      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <input
-        type={type}
-        value={val}
-        placeholder={placeholder}
-        autoComplete="off"
-        className={`input-base text-sm ${error ? 'border-red-400' : ''}`}
-        onChange={e => {
-          setVal(e.target.value);
-          onValueChange(e.target.value);
-          if (error) onClearError();
-        }}
-      />
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </div>
-  );
-}, (prev, next) => {
-  // Only re-render when error changes — NOT when parent re-renders from role/dept change
-  return prev.error === next.error && prev.label === next.label;
-});
-
-// ════════════════════════════════════════════════════════════════
-// EMPLOYEE FORM — all field values in one state object
-// StableInput manages own display but reports back via onValueChange
-// setRole/setDept won't reset text fields because StableInput is memo
-// ════════════════════════════════════════════════════════════════
-const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
+const EmployeeForm = ({ employee, onClose, onSuccess }) => {
   const isEdit = !!employee;
-  const [step, setStep]       = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors]   = useState({});
+  const [step, setStep]   = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
   const [departments, setDepts] = useState([]);
+  const [syncInsentif, setSyncInsentif] = useState(true);
+  const [branches, setBranches] = useState([]);
+  const [positions, setPositions] = useState([]);
 
-  // Store all text field values in a ref (not state) to avoid triggering re-renders
-  const fieldValues = useRef({
+  // ── Single form state object — stable, no sub-components ──
+  const [form, setForm] = useState({
     name:              employee?.name                        || '',
     email:             employee?.email                       || '',
     password:          '',
     nip:               employee?.employee?.nip               || '',
     position:          employee?.employee?.position          || '',
+    role:              employee?.role                        || 'employee',
+    department:        employee?.employee?.department        || '',
     phone:             employee?.employee?.phone             || '',
     address:           employee?.employee?.address           || '',
     emergency_contact: employee?.employee?.emergency_contact || '',
     emergency_phone:   employee?.employee?.emergency_phone   || '',
-    salary_base:       employee?.employee?.salary_base       ? String(employee.employee.salary_base) : '',
+    salary_base:       employee?.employee?.salary_base       || '',
+    join_date:         employee?.employee?.join_date         || '',
+    status:            employee?.employee?.status            || 'active',
+    // Incentive fields
+    inc_branch_id:     '',
+    inc_position_id:   '',
   });
 
-  // These cause re-render but StableInput won't reset because of memo comparison
-  const [role, setRole]         = useState(employee?.role || 'employee');
-  const [dept, setDept]         = useState(employee?.employee?.department || '');
-  const [status, setStatus]     = useState(employee?.employee?.status || 'active');
-  const [joinDate, setJoinDate] = useState(employee?.employee?.join_date || '');
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const clearErr = (k) => setErrors(e => ({ ...e, [k]: '' }));
 
   useEffect(() => {
-    employeeService.getDepartments()
-      .then(r => setDepts(r.data.data.departments))
-      .catch(() => {});
+    Promise.all([
+      employeeService.getDepartments().then(r => setDepts(r.data.data.departments)).catch(() => {}),
+      incentiveService.getBranches().then(r => setBranches(r.data.data.branches)).catch(() => {}),
+    ]);
   }, []);
 
-  const getVal = (field) => fieldValues.current[field] || '';
-  const setVal = (field, val) => { fieldValues.current[field] = val; };
+  useEffect(() => {
+    if (form.inc_branch_id) {
+      incentiveService.getPositions({ branch_id: form.inc_branch_id })
+        .then(r => setPositions(r.data.data.positions))
+        .catch(() => {});
+    } else {
+      setPositions([]);
+    }
+  }, [form.inc_branch_id]);
 
   const validateStep1 = () => {
     const e = {};
-    if (!getVal('name').trim())     e.name     = 'Nama diperlukan';
-    if (!getVal('email').trim())    e.email    = 'Email diperlukan';
-    else if (!/\S+@\S+\.\S+/.test(getVal('email'))) e.email = 'Email tidak valid';
-    if (!isEdit && !getVal('password')) e.password = 'Password diperlukan';
-    if (!getVal('nip').trim())      e.nip      = 'NIP diperlukan';
-    if (!getVal('position').trim()) e.position = 'Jabatan diperlukan';
-    if (!dept.trim())               e.department = 'Departemen diperlukan';
+    if (!form.name.trim())     e.name     = 'Nama diperlukan';
+    if (!form.email.trim())    e.email    = 'Email diperlukan';
+    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Format email tidak valid';
+    if (!isEdit && !form.password) e.password = 'Password diperlukan';
+    if (!form.nip.trim())      e.nip      = 'NIP diperlukan';
+    if (!form.position.trim()) e.position = 'Jabatan diperlukan';
+    if (!form.department)      e.department = 'Departemen diperlukan';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const validateStep2 = () => {
     const e = {};
-    const sal = getVal('salary_base');
-    if (!sal || isNaN(parseFloat(sal))) e.salary_base = 'Gaji harus berupa angka';
-    if (!joinDate) e.join_date = 'Tanggal bergabung diperlukan';
+    if (!form.salary_base || isNaN(parseFloat(form.salary_base))) e.salary_base = 'Gaji harus berupa angka';
+    if (!form.join_date) e.join_date = 'Tanggal bergabung diperlukan';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateStep2()) return;
-    setLoading(true);
+    setSaving(true);
     try {
       const payload = {
-        name:              getVal('name').trim(),
-        email:             getVal('email').trim(),
-        password:          getVal('password'),
-        role,
-        nip:               getVal('nip').trim(),
-        position:          getVal('position').trim(),
-        department:        dept,
-        salary_base:       parseFloat(getVal('salary_base')) || 0,
-        join_date:         joinDate,
-        status,
-        phone:             getVal('phone'),
-        address:           getVal('address'),
-        emergency_contact: getVal('emergency_contact'),
-        emergency_phone:   getVal('emergency_phone'),
+        name:              form.name.trim(),
+        email:             form.email.trim(),
+        role:              form.role,
+        nip:               form.nip.trim(),
+        position:          form.position.trim(),
+        department:        form.department,
+        salary_base:       parseFloat(form.salary_base),
+        join_date:         form.join_date,
+        status:            form.status,
+        phone:             form.phone,
+        address:           form.address,
+        emergency_contact: form.emergency_contact,
+        emergency_phone:   form.emergency_phone,
       };
-      if (isEdit && !payload.password) delete payload.password;
+      if (!isEdit) payload.password = form.password;
 
+      let userId;
       if (isEdit) {
         await employeeService.update(employee.id, payload);
+        userId = employee.id;
         toast.success('Data karyawan berhasil diperbarui');
       } else {
-        await employeeService.create(payload);
-        toast.success(`Karyawan ${payload.name} berhasil ditambahkan!`);
+        const res = await employeeService.create(payload);
+        userId = res.data.data?.user?.id || res.data.data?.id;
+        toast.success(`${form.name} berhasil ditambahkan!`);
       }
+
+      // Sync ke sistem insentif jika dipilih
+      if (syncInsentif && form.inc_branch_id) {
+        try {
+          await incentiveService.createEmployee({
+            user_id:     userId,
+            branch_id:   form.inc_branch_id,
+            position_id: form.inc_position_id || null,
+            name:        form.name.trim(),
+            email:       form.email.trim(),
+            phone:       form.phone,
+            join_date:   form.join_date,
+            is_active:   true,
+          });
+          toast.success('✅ Karyawan juga ditambahkan ke Sistem Insentif');
+        } catch (e) {
+          toast(`⚠️ Gagal sync ke insentif: ${e.response?.data?.message || e.message}`, { icon: '⚠️' });
+        }
+      }
+
       onSuccess();
       onClose();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Gagal menyimpan data';
+      const msg = err.response?.data?.message || 'Gagal menyimpan';
       toast.error(msg);
-      if (err.response?.data?.errors) {
-        const fe = {};
-        err.response.data.errors.forEach(e => { fe[e.path || e.param] = e.msg; });
-        setErrors(fe);
-        setStep(1);
-      }
-    } finally { setLoading(false); }
+    } finally { setSaving(false); }
   };
-
-  // FieldInput is defined outside this component (prevents unmount on re-render)
 
   const ROLES    = ['employee', 'hr', 'supervisor'];
   const STATUSES = ['active', 'inactive', 'on_leave', 'terminated'];
+  const STATUS_LABELS = { active:'Aktif', inactive:'Tidak Aktif', on_leave:'Cuti', terminated:'Berhenti' };
+
+  // Simple field renderer — inline, no sub-component
+  const F = ({ label, field, type = 'text', placeholder, required, disabled }) => (
+    <div>
+      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={form[field]}
+        onChange={e => { set(field, e.target.value); clearErr(field); }}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+        className={`input-base text-sm ${errors[field] ? 'border-red-400' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      />
+      {errors[field] && <p className="text-xs text-red-500 mt-1">{errors[field]}</p>}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -383,7 +203,6 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
       <div className="relative w-full sm:max-w-lg bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
-        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-[var(--border2)]" />
         </div>
@@ -402,7 +221,7 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
             <div className="flex gap-1">
               {[1,2].map(s => <div key={s} className={`w-2 h-2 rounded-full transition-colors ${s === step ? 'bg-brand-500' : 'bg-[var(--border)]'}`} />)}
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] transition-colors ml-2">
+            <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] ml-2">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -412,12 +231,10 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
           {step === 1 && (
             <>
-              {renderField('Nama Lengkap', 'name', 'text', 'Ahmad Fauzi', true, employee?.name || '')}
-              {renderField('Email', 'email', 'email', 'ahmad@perusahaan.com', true, employee?.email || '')}
-              {!isEdit && (
-                {renderField('Password Default', 'password', 'password', 'Min 6 karakter', true)}
-              )}
-              {renderField('NIP', 'nip', 'text', 'NIP-005', true, employee?.employee?.nip || '')}
+              <F label="Nama Lengkap" field="name" placeholder="Ahmad Fauzi" required />
+              <F label="Email" field="email" type="email" placeholder="ahmad@perusahaan.com" required />
+              {!isEdit && <F label="Password Default" field="password" type="password" placeholder="Min 6 karakter" required />}
+              <F label="NIP" field="nip" placeholder="NIP-005" required />
 
               {/* Role */}
               <div>
@@ -426,9 +243,9 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                   {ROLES.map(r => {
                     const rc = ROLE_CONFIG[r];
                     return (
-                      <button key={r} type="button" onClick={() => setRole(r)}
-                        className={`py-2.5 rounded-xl text-xs font-semibold border transition-all active:scale-95
-                          ${role === r ? `${rc.bg} ${rc.color} border-current` : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
+                      <button key={r} type="button" onClick={() => set('role', r)}
+                        className={`py-2.5 rounded-xl text-xs font-semibold border transition-all
+                          ${form.role === r ? `${rc.bg} ${rc.color} border-current` : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
                         {rc.label}
                       </button>
                     );
@@ -436,14 +253,15 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {renderField('Jabatan', 'position', 'text', 'Staff IT', true, employee?.employee?.position || '')}
+              <F label="Jabatan" field="position" placeholder="Staff IT" required />
 
               {/* Departemen */}
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
                   Departemen <span className="text-red-500">*</span>
                 </label>
-                <select value={dept} onChange={e => { setDept(e.target.value); setErrors(er => ({...er, department:''})); }}
+                <select value={form.department}
+                  onChange={e => { set('department', e.target.value); clearErr('department'); }}
                   className={`input-base text-sm ${errors.department ? 'border-red-400' : ''}`}>
                   <option value="">Pilih departemen...</option>
                   {(departments.length ? departments : ['Technology','Human Resources','Finance','Operations','Marketing','Sales']).map(d => (
@@ -453,7 +271,7 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 {errors.department && <p className="text-xs text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              {renderField('Telepon', 'phone', 'tel', '08xxxxxxxxxx', false, employee?.employee?.phone || '')}
+              <F label="Telepon" field="phone" type="tel" placeholder="08xxxxxxxxxx" />
             </>
           )}
 
@@ -466,17 +284,15 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-medium">Rp</span>
-                  <StableInput
-                    key="salary_base"
-                    label=""
+                  <input
                     type="number"
+                    value={form.salary_base}
+                    onChange={e => { set('salary_base', e.target.value); clearErr('salary_base'); }}
                     placeholder="5000000"
-                    initialValue={employee?.employee?.salary_base ? String(employee.employee.salary_base) : ''}
-                    error={errors.salary_base}
-                    onClearError={() => setErrors(e => ({...e, salary_base:''}))}
-                    onValueChange={val => setVal('salary_base', val)}
+                    className={`input-base pl-10 text-sm ${errors.salary_base ? 'border-red-400' : ''}`}
                   />
                 </div>
+                {form.salary_base > 0 && <p className="text-xs text-[var(--text-muted)] mt-1">{toRupiah(form.salary_base)}</p>}
                 {errors.salary_base && <p className="text-xs text-red-500 mt-1">{errors.salary_base}</p>}
               </div>
 
@@ -485,9 +301,9 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
                   Tanggal Bergabung <span className="text-red-500">*</span>
                 </label>
-                <input type="date" value={joinDate}
+                <input type="date" value={form.join_date}
                   max={new Date().toISOString().split('T')[0]}
-                  onChange={e => { setJoinDate(e.target.value); setErrors(er => ({...er, join_date:''})); }}
+                  onChange={e => { set('join_date', e.target.value); clearErr('join_date'); }}
                   className={`input-base text-sm ${errors.join_date ? 'border-red-400' : ''}`}
                 />
                 {errors.join_date && <p className="text-xs text-red-500 mt-1">{errors.join_date}</p>}
@@ -497,22 +313,75 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
               <div>
                 <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Status</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {STATUSES.map(s => {
-                    const sc = EMP_STATUS[s];
-                    return (
-                      <button key={s} type="button" onClick={() => setStatus(s)}
-                        className={`py-2.5 rounded-xl text-xs font-semibold border transition-all active:scale-95
-                          ${status === s ? `${sc.bg} ${sc.color} border-current` : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
-                        {sc.label}
-                      </button>
-                    );
-                  })}
+                  {STATUSES.map(s => (
+                    <button key={s} type="button" onClick={() => set('status', s)}
+                      className={`py-2.5 rounded-xl text-xs font-semibold border transition-all
+                        ${form.status === s
+                          ? 'bg-brand-500 text-white border-brand-500'
+                          : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
+                      {STATUS_LABELS[s]}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {renderField('Alamat', 'address', 'text', 'Jl. Contoh No.1, Jakarta', false, employee?.employee?.address || '')}
-              {renderField('Kontak Darurat', 'emergency_contact', 'text', 'Nama kontak darurat', false, employee?.employee?.emergency_contact || '')}
-              {renderField('Telepon Darurat', 'emergency_phone', 'tel', '08xxxxxxxxxx', false, employee?.employee?.emergency_phone || '')}
+              <F label="Alamat" field="address" placeholder="Jl. Contoh No.1, Jakarta" />
+              <F label="Kontak Darurat" field="emergency_contact" placeholder="Nama kontak darurat" />
+              <F label="Telepon Darurat" field="emergency_phone" type="tel" placeholder="08xxxxxxxxxx" />
+
+              {/* ── Sync ke Sistem Insentif ─────────────────── */}
+              {!isEdit && (
+                <div className="rounded-2xl border border-[var(--border)] overflow-hidden">
+                  <button type="button"
+                    onClick={() => setSyncInsentif(v => !v)}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 transition-all
+                      ${syncInsentif ? 'bg-brand-50 dark:bg-brand-950' : 'bg-[var(--bg-secondary)]'}`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+                      ${syncInsentif ? 'bg-brand-100 dark:bg-brand-900' : 'bg-[var(--bg-tertiary)]'}`}>
+                      <Link2 className={`w-4 h-4 ${syncInsentif ? 'text-brand-600 dark:text-brand-400' : 'text-[var(--text-muted)]'}`} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className={`text-sm font-semibold ${syncInsentif ? 'text-brand-700 dark:text-brand-300' : 'text-[var(--text-secondary)]'}`}>
+                        Tambah ke Sistem Insentif
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">Karyawan ini akan muncul di modul insentif</p>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
+                      ${syncInsentif ? 'bg-brand-500 border-brand-500' : 'border-[var(--border2)]'}`}>
+                      {syncInsentif && <CheckCircle2 className="w-3 h-3 text-white" />}
+                    </div>
+                  </button>
+
+                  {syncInsentif && (
+                    <div className="px-4 pb-4 pt-2 space-y-3 bg-brand-50 dark:bg-brand-950 border-t border-brand-100 dark:border-brand-900">
+                      <div>
+                        <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                          Cabang Insentif <span className="text-red-500">*</span>
+                        </label>
+                        <select value={form.inc_branch_id}
+                          onChange={e => { set('inc_branch_id', e.target.value); set('inc_position_id', ''); }}
+                          className="input-base text-sm">
+                          <option value="">Pilih cabang...</option>
+                          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      {form.inc_branch_id && (
+                        <div>
+                          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                            Jabatan Insentif
+                          </label>
+                          <select value={form.inc_position_id}
+                            onChange={e => set('inc_position_id', e.target.value)}
+                            className="input-base text-sm">
+                            <option value="">Pilih jabatan...</option>
+                            {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -529,23 +398,136 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
               Lanjut <ChevronRight className="w-4 h-4" />
             </button>
           ) : (
-            <button type="button" onClick={handleSubmit} disabled={loading} className="btn-primary flex-1 h-11 text-sm">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
-                       : <><CheckCircle2 className="w-4 h-4" /> {isEdit ? 'Simpan' : 'Tambah Karyawan'}</>}
+            <button type="button" onClick={handleSubmit} disabled={saving} className="btn-primary flex-1 h-11 text-sm">
+              {saving
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
+                : <><CheckCircle2 className="w-4 h-4" /> {isEdit ? 'Simpan' : 'Tambah Karyawan'}</>}
             </button>
           )}
         </div>
       </div>
     </div>
   );
-});
+};
+
+// ════════════════════════════════════════════════════════════════
+// FACE REGISTRATION MODAL
+// ════════════════════════════════════════════════════════════════
+const FaceRegisterModal = ({ userId, userName, onClose, onSuccess }) => {
+  const videoRef  = useRef(null);
+  const streamRef = useRef(null);
+  const [phase, setPhase]   = useState('loading');
+  const [errMsg, setErrMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [capturedImg, setCapturedImg] = useState(null);
+  const [descriptor, setDescriptor]   = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const init = async () => {
+      try {
+        if (!window.faceapi) {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
+            s.onload = resolve; s.onerror = reject;
+            document.head.appendChild(s);
+          });
+        }
+        const fa = window.faceapi;
+        if (!fa.nets.tinyFaceDetector.isLoaded) {
+          await Promise.all([
+            fa.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
+            fa.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
+            fa.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
+          ]);
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 400 }, height: { ideal: 400 } } });
+        streamRef.current = stream;
+        if (videoRef.current && mounted) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setPhase('ready');
+        }
+      } catch (err) { setErrMsg(err.message || 'Gagal mengakses kamera'); setPhase('error'); }
+    };
+    init();
+    return () => { mounted = false; streamRef.current?.getTracks().forEach(t => t.stop()); };
+  }, []);
+
+  const handleCapture = async () => {
+    if (!videoRef.current || phase !== 'ready') return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 400; canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    const vw = videoRef.current.videoWidth, vh = videoRef.current.videoHeight;
+    const size = Math.min(vw, vh);
+    ctx.drawImage(videoRef.current, (vw-size)/2, (vh-size)/2, size, size, 0, 0, 400, 400);
+    const b64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    setCapturedImg(`data:image/jpeg;base64,${b64}`);
+    try {
+      const fa = window.faceapi;
+      const det = await fa.detectSingleFace(videoRef.current, new fa.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true).withFaceDescriptor();
+      if (det) setDescriptor(Array.from(det.descriptor));
+    } catch {}
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setPhase('captured');
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await attendanceService.registerFace({ user_id: userId, face_descriptor: descriptor || Array(128).fill(0), selfie_base64: capturedImg.split(',')[1] });
+      toast.success(`Wajah ${userName} berhasil didaftarkan!`);
+      onSuccess?.(); onClose();
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal mendaftarkan wajah'); }
+    finally { setLoading(false); }
+  };
+
+  const retake = () => {
+    setCapturedImg(null); setDescriptor(null); setPhase('loading');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      .then(s => { streamRef.current = s; if(videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play(); } setPhase('ready'); })
+      .catch(() => setPhase('error'));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <div><h3 className="text-sm font-bold text-[var(--text-primary)]">Daftarkan Wajah</h3><p className="text-xs text-[var(--text-muted)]">{userName}</p></div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="relative bg-black" style={{ paddingBottom: '100%' }}>
+          {phase === 'loading' && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3"><Loader2 className="w-8 h-8 animate-spin text-brand-400" /><p className="text-white/60 text-xs">Memuat kamera...</p></div>}
+          {phase === 'error'   && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6"><AlertTriangle className="w-10 h-10 text-red-400" /><p className="text-white/80 text-sm text-center">{errMsg}</p></div>}
+          <video ref={videoRef} playsInline muted className={`absolute inset-0 w-full h-full object-cover ${phase === 'captured' ? 'hidden' : ''}`} style={{ transform: 'scaleX(-1)' }} />
+          {capturedImg && <img src={capturedImg} alt="captured" className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+          {phase === 'ready' && <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none"><defs><mask id="oval2"><rect width="100" height="100" fill="white"/><ellipse cx="50" cy="50" rx="34" ry="42" fill="black"/></mask></defs><rect width="100" height="100" fill="rgba(0,0,0,0.35)" mask="url(#oval2)"/><ellipse cx="50" cy="50" rx="34" ry="42" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5"/></svg>}
+          {phase === 'captured' && <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/20"><CheckCircle2 className="w-16 h-16 text-emerald-400" /></div>}
+        </div>
+        <div className="p-5 space-y-3">
+          {phase === 'captured' ? (
+            <><p className="text-xs text-center text-[var(--text-muted)]">{descriptor ? '✅ Wajah terdeteksi' : '⚠️ Wajah kurang jelas'}</p>
+            <div className="flex gap-2"><button onClick={retake} className="btn-secondary flex-1 h-11 text-sm">Ulangi</button><button onClick={handleSave} disabled={loading} className="btn-primary flex-1 h-11 text-sm">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Simpan</button></div></>
+          ) : (
+            <><p className="text-xs text-center text-[var(--text-muted)]">Posisikan wajah di tengah lingkaran</p>
+            <button onClick={handleCapture} disabled={phase !== 'ready'} className="btn-primary w-full h-12 disabled:opacity-50"><Camera className="w-4 h-4" /> Ambil Foto</button></>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ════════════════════════════════════════════════════════════════
 // PROFILE DRAWER
 // ════════════════════════════════════════════════════════════════
 const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, canManage }) => {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData]         = useState(null);
+  const [loading, setLoading]   = useState(true);
   const [faceStatus, setFaceStatus] = useState(null);
   const [showFaceReg, setShowFaceReg] = useState(false);
   const { user: currentUser } = useAuth();
@@ -555,20 +537,17 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
     Promise.all([
       employeeService.getOne(userId),
       attendanceService.getFaceStatus(userId),
-    ])
-      .then(([r, fr]) => {
-        setData(r.data.data);
-        setFaceStatus(fr.data.data);
-      })
-      .catch(() => toast.error('Gagal memuat profil'))
+    ]).then(([r, fr]) => {
+      setData(r.data.data);
+      setFaceStatus(fr.data.data);
+    }).catch(() => toast.error('Gagal memuat profil'))
       .finally(() => setLoading(false));
   }, [userId]);
 
   if (loading) return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] p-8 flex items-center justify-center"
-        onClick={e => e.stopPropagation()}>
+      <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] p-8 flex items-center justify-center" onClick={e => e.stopPropagation()}>
         <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
       </div>
     </div>
@@ -581,60 +560,34 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-        onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
         <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto scrollbar-thin"
           onClick={e => e.stopPropagation()}>
-          <div className="flex justify-center pt-3 pb-1 sm:hidden">
-            <div className="w-10 h-1 rounded-full bg-[var(--border2)]" />
-          </div>
-
-          {/* Header */}
+          <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
           <div className="px-5 pt-4 pb-5 border-b border-[var(--border)]">
             <div className="flex items-start justify-between mb-4">
-              <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
-                <X className="w-4 h-4" />
-              </button>
+              <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]"><X className="w-4 h-4" /></button>
               {canManage && !isSelf && (
                 <div className="flex gap-2 flex-wrap justify-end">
-                  {/* Daftarkan Wajah button */}
                   <button onClick={() => setShowFaceReg(true)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all
-                      ${faceStatus?.registered
-                        ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400'
-                        : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400'
-                      }`}>
-                    <Camera className="w-3 h-3" />
-                    {faceStatus?.registered ? '✓ Update Wajah' : 'Daftarkan Wajah'}
+                      ${faceStatus?.registered ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400'}`}>
+                    <Camera className="w-3 h-3" />{faceStatus?.registered ? '✓ Update Wajah' : 'Daftarkan Wajah'}
                   </button>
-                  <button onClick={() => { onClose(); onEdit(user); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+                  <button onClick={() => { onClose(); onEdit(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
                     <Edit3 className="w-3 h-3" /> Edit
                   </button>
-                  {user.is_active ? (
-                    <button onClick={() => { onClose(); onDeactivate(user); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950">
-                      <UserX className="w-3 h-3" /> Nonaktifkan
-                    </button>
-                  ) : (
-                    <button onClick={() => { onClose(); onReactivate(user); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white">
-                      <UserCheck className="w-3 h-3" /> Aktifkan
-                    </button>
-                  )}
+                  {user.is_active
+                    ? <button onClick={() => { onClose(); onDeactivate(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"><UserX className="w-3 h-3" /> Nonaktifkan</button>
+                    : <button onClick={() => { onClose(); onReactivate(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white"><UserCheck className="w-3 h-3" /> Aktifkan</button>}
                 </div>
               )}
             </div>
-
             <div className="flex items-center gap-4">
               <div className="relative">
                 <Avatar name={user.name} size="xl" />
-                {faceStatus?.registered && (
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-[var(--bg-card)] flex items-center justify-center">
-                    <ShieldCheck className="w-3 h-3 text-white" />
-                  </div>
-                )}
+                {faceStatus?.registered && <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-[var(--bg-card)] flex items-center justify-center"><ShieldCheck className="w-3 h-3 text-white" /></div>}
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-black text-[var(--text-primary)] truncate">{user.name}</h2>
@@ -647,139 +600,50 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
             </div>
           </div>
 
-          {/* Stats */}
           {stats && (
             <div className="grid grid-cols-3 divide-x divide-[var(--border)] border-b border-[var(--border)]">
-              <div className="p-3.5 text-center">
-                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{stats.attendance_this_month?.present || 0}</p>
-                <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">Hadir</p>
-              </div>
-              <div className="p-3.5 text-center">
-                <p className="text-lg font-black text-amber-600 dark:text-amber-400">{stats.leave_quota?.remaining ?? '—'}</p>
-                <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">Sisa Cuti</p>
-              </div>
-              <div className="p-3.5 text-center">
-                <p className="text-lg font-black text-brand-600 dark:text-brand-400">
-                  {stats.last_salary ? `${Math.round(stats.last_salary.amount/1000000)}jt` : '—'}
-                </p>
-                <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">Gaji</p>
-              </div>
+              {[
+                { v: stats.attendance_this_month?.present || 0, l:'Hadir', c:'text-emerald-600 dark:text-emerald-400' },
+                { v: stats.leave_quota?.remaining ?? '—',       l:'Sisa Cuti', c:'text-amber-600 dark:text-amber-400' },
+                { v: stats.last_salary ? `${Math.round(stats.last_salary.amount/1000000)}jt` : '—', l:'Gaji', c:'text-brand-600 dark:text-brand-400' },
+              ].map((s,i) => (
+                <div key={i} className="p-3.5 text-center">
+                  <p className={`text-lg font-black ${s.c}`}>{s.v}</p>
+                  <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">{s.l}</p>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Details */}
-          <div className="p-5 space-y-4">
-            <div>
-              <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Informasi Kerja</p>
-              <div className="space-y-2.5">
-                {[
-                  { icon: Shield,     label: 'NIP',        value: emp?.nip },
-                  { icon: Building2,  label: 'Departemen', value: emp?.department },
-                  { icon: Briefcase,  label: 'Jabatan',    value: emp?.position },
-                  { icon: Calendar,   label: 'Bergabung',  value: formatJoinDate(emp?.join_date) },
-                  { icon: Clock,      label: 'Masa Kerja', value: stats?.tenure },
-                  { icon: DollarSign, label: 'Gaji Pokok', value: toRupiah(emp?.salary_base), hide: !canManage },
-                  { icon: Mail,       label: 'Email',      value: user.email },
-                  { icon: Camera,     label: 'Wajah',      value: faceStatus?.registered ? '✅ Terdaftar' : '❌ Belum Didaftarkan' },
-                ].filter(i => !i.hide).map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
-                      <item.icon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide">{item.label}</p>
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item.value || '—'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {(emp?.phone || emp?.address || emp?.emergency_contact) && (
-              <div>
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Kontak</p>
-                <div className="space-y-2.5">
-                  {emp.phone && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
-                        <Phone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide">Telepon</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{emp.phone}</p>
-                      </div>
-                    </div>
-                  )}
-                  {emp.address && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide">Alamat</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)] leading-relaxed">{emp.address}</p>
-                      </div>
-                    </div>
-                  )}
-                  {emp.emergency_contact && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
-                        <AlertTriangle className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide">Kontak Darurat</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">
-                          {emp.emergency_contact}{emp.emergency_phone && ` · ${emp.emergency_phone}`}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+          <div className="p-5 space-y-3">
+            {[
+              { icon: Shield,    l:'NIP',        v: emp?.nip },
+              { icon: Building2, l:'Departemen', v: emp?.department },
+              { icon: Briefcase, l:'Jabatan',    v: emp?.position },
+              { icon: Calendar,  l:'Bergabung',  v: formatJoinDate(emp?.join_date) },
+              { icon: Mail,      l:'Email',      v: user.email },
+              { icon: Camera,    l:'Wajah',      v: faceStatus?.registered ? '✅ Terdaftar' : '❌ Belum' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
+                  <item.icon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide">{item.l}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item.v || '—'}</p>
                 </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Face registration modal */}
-      {showFaceReg && (
-        <FaceRegisterModal
-          userId={userId}
-          userName={user.name}
-          onClose={() => setShowFaceReg(false)}
-          onSuccess={() => {
-            setFaceStatus({ registered: true });
-          }}
-        />
-      )}
+      {showFaceReg && <FaceRegisterModal userId={userId} userName={user.name} onClose={() => setShowFaceReg(false)} onSuccess={() => setFaceStatus({ registered: true })} />}
     </>
   );
 };
 
 // ════════════════════════════════════════════════════════════════
-// STATS ROW
-// ════════════════════════════════════════════════════════════════
-const StatsRow = ({ stats }) => {
-  if (!stats) return null;
-  return (
-    <div className="grid grid-cols-4 gap-2">
-      {[
-        { label:'Total',   value:stats.total,            color:'text-[var(--text-primary)]' },
-        { label:'Aktif',   value:stats.active,           color:'text-emerald-600 dark:text-emerald-400' },
-        { label:'Inactive',value:stats.inactive,         color:'text-red-600 dark:text-red-400' },
-        { label:'Baru',    value:stats.new_this_month,   color:'text-brand-600 dark:text-brand-400' },
-      ].map((s,i) => (
-        <div key={i} className="card p-3 text-center">
-          <p className={`text-lg font-bold ${s.color}`}>{s.value ?? 0}</p>
-          <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">{s.label}</p>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════
-// MAIN EMPLOYEES PAGE
+// MAIN PAGE
 // ════════════════════════════════════════════════════════════════
 export default function EmployeesPage() {
   const { user: currentUser, isHR } = useAuth();
@@ -791,16 +655,14 @@ export default function EmployeesPage() {
   const [search, setSearch]         = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
-  const [showAddForm, setShowAddForm]   = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null);
   const [profileId, setProfileId]   = useState(null);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
-
   const searchTimeout = useRef(null);
 
-  // Stable fetch — no changing dependencies
   const fetchEmployees = useCallback(async (params = {}) => {
     setLoading(true);
     try {
@@ -815,7 +677,6 @@ export default function EmployeesPage() {
     finally   { setLoading(false); }
   }, [canManage]);
 
-  // Rebuild params and fetch when filters change
   useEffect(() => {
     const params = {};
     if (search)       params.search     = search;
@@ -856,7 +717,6 @@ export default function EmployeesPage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Karyawan</h1>
@@ -864,7 +724,7 @@ export default function EmployeesPage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => fetchEmployees({ status: statusFilter, department: deptFilter, search })}
-            className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] transition-all">
+            className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
             <RefreshCw className="w-4 h-4" />
           </button>
           {canManage && (
@@ -875,7 +735,22 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {canManage && <div className="mb-4"><StatsRow stats={stats} /></div>}
+      {/* Stats */}
+      {canManage && stats && (
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {[
+            { l:'Total',   v:stats.total,          c:'text-[var(--text-primary)]' },
+            { l:'Aktif',   v:stats.active,          c:'text-emerald-600 dark:text-emerald-400' },
+            { l:'Inactive',v:stats.inactive,         c:'text-red-600 dark:text-red-400' },
+            { l:'Baru',    v:stats.new_this_month,   c:'text-brand-600 dark:text-brand-400' },
+          ].map((s,i) => (
+            <div key={i} className="card p-3 text-center">
+              <p className={`text-lg font-bold ${s.c}`}>{s.v ?? 0}</p>
+              <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">{s.l}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Search + Filter */}
       <div className="flex gap-2 mb-3">
@@ -887,14 +762,11 @@ export default function EmployeesPage() {
         </div>
         <button onClick={() => setShowFilters(f => !f)}
           className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all
-            ${showFilters || deptFilter || statusFilter !== 'active'
-              ? 'bg-brand-500 border-brand-500 text-white'
-              : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]'}`}>
+            ${showFilters || deptFilter || statusFilter !== 'active' ? 'bg-brand-500 border-brand-500 text-white' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]'}`}>
           <Filter className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Filter panel */}
       {showFilters && (
         <div className="card p-3 mb-3 space-y-3 animate-slide-down">
           <div>
@@ -902,8 +774,7 @@ export default function EmployeesPage() {
             <div className="flex gap-1.5 flex-wrap">
               {[{v:'',l:'Semua'},{v:'active',l:'Aktif'},{v:'inactive',l:'Tidak Aktif'},{v:'terminated',l:'Berhenti'}].map(f => (
                 <button key={f.v} onClick={() => setStatusFilter(f.v)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${statusFilter===f.v ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter===f.v ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
                   {f.l}
                 </button>
               ))}
@@ -913,15 +784,9 @@ export default function EmployeesPage() {
             <div>
               <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Departemen</p>
               <div className="flex gap-1.5 flex-wrap">
-                <button onClick={() => setDeptFilter('')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${!deptFilter ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-                  Semua
-                </button>
+                <button onClick={() => setDeptFilter('')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${!deptFilter ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>Semua</button>
                 {departments.map(d => (
-                  <button key={d} onClick={() => setDeptFilter(d)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${deptFilter===d ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-                    {d}
-                  </button>
+                  <button key={d} onClick={() => setDeptFilter(d)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${deptFilter===d ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>{d}</button>
                 ))}
               </div>
             </div>
@@ -931,7 +796,7 @@ export default function EmployeesPage() {
 
       {/* List */}
       {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-18 rounded-2xl" style={{height:'72px'}} />)}</div>
+        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-[72px] rounded-2xl" />)}</div>
       ) : employees.length === 0 ? (
         <div className="text-center py-14">
           <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
@@ -948,12 +813,9 @@ export default function EmployeesPage() {
                   <p className="text-sm font-bold text-[var(--text-primary)] truncate">{emp.name}</p>
                   <RoleBadge role={emp.role} />
                 </div>
-                <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
-                  {emp.employee?.position} · {emp.employee?.department}
-                </p>
+                <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{emp.employee?.position} · {emp.employee?.department}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <StatusBadge status={emp.employee?.status} />
-                  {emp.employee?.tenure && <span className="text-[10px] text-[var(--text-muted)]">{emp.employee.tenure}</span>}
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
@@ -963,49 +825,20 @@ export default function EmployeesPage() {
       )}
 
       {/* Modals */}
-      {showAddForm && (
-        <EmployeeForm
-          key="add-form"
-          onClose={() => setShowAddForm(false)}
-          onSuccess={handleFormSuccess}
-        />
-      )}
-      {editEmployee && (
-        <EmployeeForm
-          key={`edit-${editEmployee.id}`}
-          employee={editEmployee}
-          onClose={() => setEditEmployee(null)}
-          onSuccess={handleFormSuccess}
-        />
-      )}
-      {profileId && (
-        <ProfileDrawer
-          userId={profileId}
-          onClose={() => setProfileId(null)}
-          onEdit={(emp) => { setProfileId(null); setEditEmployee(emp); }}
-          onDeactivate={(emp) => { setProfileId(null); setDeactivateTarget(emp); }}
-          onReactivate={(emp) => handleReactivate(emp)}
-          canManage={canManage}
-        />
-      )}
+      {showAddForm && <EmployeeForm key="add-form" onClose={() => setShowAddForm(false)} onSuccess={handleFormSuccess} />}
+      {editEmployee && <EmployeeForm key={`edit-${editEmployee.id}`} employee={editEmployee} onClose={() => setEditEmployee(null)} onSuccess={handleFormSuccess} />}
+      {profileId && <ProfileDrawer userId={profileId} onClose={() => setProfileId(null)} onEdit={emp => { setProfileId(null); setEditEmployee(emp); }} onDeactivate={emp => { setProfileId(null); setDeactivateTarget(emp); }} onReactivate={emp => handleReactivate(emp)} canManage={canManage} />}
+
       {deactivateTarget && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setDeactivateTarget(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-6 shadow-2xl animate-scale-in"
-            onClick={e => e.stopPropagation()}>
-            <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950 flex items-center justify-center mx-auto mb-4">
-              <UserX className="w-6 h-6 text-red-600 dark:text-red-400" />
-            </div>
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-6 shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950 flex items-center justify-center mx-auto mb-4"><UserX className="w-6 h-6 text-red-600 dark:text-red-400" /></div>
             <h3 className="text-base font-bold text-[var(--text-primary)] text-center mb-2">Nonaktifkan Karyawan</h3>
-            <p className="text-sm text-[var(--text-secondary)] text-center mb-5">
-              Akun <strong>{deactivateTarget.name}</strong> akan dinonaktifkan. Data tetap tersimpan.
-            </p>
+            <p className="text-sm text-[var(--text-secondary)] text-center mb-5">Akun <strong>{deactivateTarget.name}</strong> akan dinonaktifkan.</p>
             <div className="flex gap-2">
               <button onClick={() => setDeactivateTarget(null)} className="btn-secondary flex-1">Batal</button>
-              <button onClick={() => handleDeactivate(deactivateTarget)}
-                className="flex-1 h-11 flex items-center justify-center gap-2 rounded-xl text-sm font-semibold bg-red-500 hover:bg-red-600 text-white transition-all active:scale-95">
-                <UserX className="w-4 h-4" /> Nonaktifkan
-              </button>
+              <button onClick={() => handleDeactivate(deactivateTarget)} className="flex-1 h-11 flex items-center justify-center gap-2 rounded-xl text-sm font-semibold bg-red-500 hover:bg-red-600 text-white transition-all"><UserX className="w-4 h-4" /> Nonaktifkan</button>
             </div>
           </div>
         </div>
