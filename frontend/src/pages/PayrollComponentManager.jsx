@@ -72,11 +72,19 @@ const ComponentModal = ({ component, onClose, onSuccess }) => {
     }
     setSaving(true);
     try {
+      // Fix: kirim null bukan string kosong untuk DECIMAL fields
+      const payload = {
+        ...form,
+        default_value:      form.default_value === '' ? 0 : parseFloat(form.default_value) || 0,
+        percentage_of_base: form.percentage_of_base === '' || form.percentage_of_base == null
+          ? null
+          : parseFloat(form.percentage_of_base) || null,
+      };
       if (isEdit) {
-        await payrollEngineService.updateComponent(component.id, form);
+        await payrollEngineService.updateComponent(component.id, payload);
         toast.success(`Komponen ${form.name} berhasil diperbarui`);
       } else {
-        await payrollEngineService.createComponent(form);
+        await payrollEngineService.createComponent(payload);
         toast.success(`Komponen ${form.name} berhasil ditambahkan`);
       }
       onSuccess();

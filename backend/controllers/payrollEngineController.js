@@ -346,7 +346,19 @@ const createComponent = async (req, res, next) => {
     const { code, name, type, category, default_value, percentage_of_base, applicable_to, sort_order, is_taxable, description } = req.body;
     const exists = await PayrollComponent.findOne({ where: { code: code.toUpperCase() } });
     if (exists) return res.status(409).json({ success: false, message: 'Kode komponen sudah ada' });
-    const comp = await PayrollComponent.create({ code: code.toUpperCase(), name, type, category: category || 'flat', default_value: default_value || 0, percentage_of_base, applicable_to: applicable_to || ['monthly'], sort_order: sort_order || 100, is_taxable: is_taxable !== false, is_system: false, description });
+    const comp = await PayrollComponent.create({
+      code:               code.toUpperCase(),
+      name,
+      type,
+      category:           category || 'flat',
+      default_value:      parseFloat(default_value) || 0,
+      percentage_of_base: (percentage_of_base === '' || percentage_of_base == null) ? null : parseFloat(percentage_of_base),
+      applicable_to:      applicable_to || ['monthly'],
+      sort_order:         sort_order || 100,
+      is_taxable:         is_taxable !== false,
+      is_system:          false,
+      description,
+    });
     return res.status(201).json({ success: true, message: 'Komponen berhasil ditambahkan', data: { component: comp } });
   } catch (err) { next(err); }
 };
@@ -356,7 +368,13 @@ const updateComponent = async (req, res, next) => {
     const comp = await PayrollComponent.findByPk(req.params.id);
     if (!comp) return res.status(404).json({ success: false, message: 'Komponen tidak ditemukan' });
     if (comp.is_system && req.body.category) return res.status(400).json({ success: false, message: 'Komponen sistem tidak bisa diubah kategorinya' });
-    await comp.update(req.body);
+    const updateData = { ...req.body };
+    if (updateData.default_value !== undefined) updateData.default_value = parseFloat(updateData.default_value) || 0;
+    if (updateData.percentage_of_base !== undefined) {
+      updateData.percentage_of_base = (updateData.percentage_of_base === '' || updateData.percentage_of_base == null)
+        ? null : parseFloat(updateData.percentage_of_base);
+    }
+    await comp.update(updateData);
     return res.json({ success: true, message: 'Komponen berhasil diperbarui', data: { component: comp } });
   } catch (err) { next(err); }
 };

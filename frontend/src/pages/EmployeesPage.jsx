@@ -236,6 +236,25 @@ const FaceRegisterModal = ({ userId, userName, onClose, onSuccess }) => {
   );
 };
 
+// ── FieldInput — OUTSIDE EmployeeForm to prevent unmount on re-render ───────
+const FieldInput = memo(({ label, fieldName, type, placeholder, required, defaultValue, inputRef, error, onClearError }) => (
+  <div>
+    <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+      {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+    <input
+      ref={inputRef}
+      type={type || 'text'}
+      defaultValue={defaultValue || ''}
+      placeholder={placeholder}
+      autoComplete="off"
+      className={`input-base text-sm ${error ? 'border-red-400' : ''}`}
+      onChange={() => { if (error) onClearError(); }}
+    />
+    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+  </div>
+));
+
 // ════════════════════════════════════════════════════════════════
 // EMPLOYEE FORM — completely isolated, no parent dependencies
 // Key fix: state is fully self-contained, no external triggers
@@ -340,24 +359,7 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
     } finally { setLoading(false); }
   };
 
-  // Simple uncontrolled input — NO value prop, NO onChange that touches parent state
-  const Field = ({ label, fieldName, type = 'text', placeholder, required, defaultValue = '' }) => (
-    <div>
-      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <input
-        ref={refs[fieldName]}
-        type={type}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        autoComplete="off"
-        className={`input-base text-sm ${errors[fieldName] ? 'border-red-400' : ''}`}
-        onChange={() => { if (errors[fieldName]) setErrors(e => ({ ...e, [fieldName]: '' })); }}
-      />
-      {errors[fieldName] && <p className="text-xs text-red-500 mt-1">{errors[fieldName]}</p>}
-    </div>
-  );
+  // FieldInput is defined outside this component (prevents unmount on re-render)
 
   const ROLES    = ['employee', 'hr', 'supervisor'];
   const STATUSES = ['active', 'inactive', 'on_leave', 'terminated'];
@@ -397,15 +399,12 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
           {step === 1 && (
             <>
-              <Field label="Nama Lengkap" fieldName="name" placeholder="Ahmad Fauzi" required
-                defaultValue={employee?.name || ''} />
-              <Field label="Email" fieldName="email" type="email" placeholder="ahmad@perusahaan.com" required
-                defaultValue={employee?.email || ''} />
+              {renderField('Nama Lengkap', 'name', 'text', 'Ahmad Fauzi', true, employee?.name || '')}
+              {renderField('Email', 'email', 'email', 'ahmad@perusahaan.com', true, employee?.email || '')}
               {!isEdit && (
-                <Field label="Password Default" fieldName="password" type="password" placeholder="Min 6 karakter" required />
+                {renderField('Password Default', 'password', 'password', 'Min 6 karakter', true)}
               )}
-              <Field label="NIP" fieldName="nip" placeholder="NIP-005" required
-                defaultValue={employee?.employee?.nip || ''} />
+              {renderField('NIP', 'nip', 'text', 'NIP-005', true, employee?.employee?.nip || '')}
 
               {/* Role */}
               <div>
@@ -424,8 +423,7 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <Field label="Jabatan" fieldName="position" placeholder="Staff IT" required
-                defaultValue={employee?.employee?.position || ''} />
+              {renderField('Jabatan', 'position', 'text', 'Staff IT', true, employee?.employee?.position || '')}
 
               {/* Departemen */}
               <div>
@@ -442,8 +440,7 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 {errors.department && <p className="text-xs text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              <Field label="Telepon" fieldName="phone" type="tel" placeholder="08xxxxxxxxxx"
-                defaultValue={employee?.employee?.phone || ''} />
+              {renderField('Telepon', 'phone', 'tel', '08xxxxxxxxxx', false, employee?.employee?.phone || '')}
             </>
           )}
 
@@ -498,12 +495,9 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <Field label="Alamat" fieldName="address" placeholder="Jl. Contoh No.1, Jakarta"
-                defaultValue={employee?.employee?.address || ''} />
-              <Field label="Kontak Darurat" fieldName="emergency_contact" placeholder="Nama kontak darurat"
-                defaultValue={employee?.employee?.emergency_contact || ''} />
-              <Field label="Telepon Darurat" fieldName="emergency_phone" type="tel" placeholder="08xxxxxxxxxx"
-                defaultValue={employee?.employee?.emergency_phone || ''} />
+              {renderField('Alamat', 'address', 'text', 'Jl. Contoh No.1, Jakarta', false, employee?.employee?.address || '')}
+              {renderField('Kontak Darurat', 'emergency_contact', 'text', 'Nama kontak darurat', false, employee?.employee?.emergency_contact || '')}
+              {renderField('Telepon Darurat', 'emergency_phone', 'tel', '08xxxxxxxxxx', false, employee?.employee?.emergency_phone || '')}
             </>
           )}
         </div>
