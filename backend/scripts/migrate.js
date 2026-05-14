@@ -25,9 +25,52 @@ const migrate = async () => {
     console.log('🔄 Running database migration...');
 
     // sync() sekarang akan include SEMUA model yang sudah di-import di atas
-    // Disable FK checks during sync to prevent constraint errors
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-    await sequelize.sync({ force: false, alter: true });
+
+    // Sync existing HRD tables WITHOUT alter (avoid FK constraint errors)
+    await User.sync({ force: false });
+    await Employee.sync({ force: false });
+    await Attendance.sync({ force: false });
+    await LeaveRequest.sync({ force: false });
+    await LeaveQuota.sync({ force: false });
+    await Payroll.sync({ force: false });
+    await OfficeSetting.sync({ force: false });
+    await EmployeeFace.sync({ force: false });
+    await CompanySetting.sync({ force: false });
+
+    // Sync payroll engine tables (new — safe to alter)
+    const {
+      PayrollSetting, PayrollComponent, EmployeeAllowance,
+      PayrollRun, PayrollItem, LoanManagement,
+      IncentiveParameter, IncentiveEmployeeRate,
+    } = require('../models');
+    await PayrollSetting.sync({ force: false });
+    await PayrollComponent.sync({ force: false });
+    await EmployeeAllowance.sync({ force: false });
+    await PayrollRun.sync({ force: false });
+    await PayrollItem.sync({ force: false });
+    await LoanManagement.sync({ force: false });
+    await IncentiveParameter.sync({ force: false });
+    await IncentiveEmployeeRate.sync({ force: false });
+
+    // Sync incentive system tables (new — safe to create)
+    await Branch.sync({ force: false });
+    await Position.sync({ force: false });
+    await IncEmployee.sync({ force: false });
+    await SalesChannel.sync({ force: false });
+    await ChannelRate.sync({ force: false });
+    await ActivityType.sync({ force: false });
+    await BonusTarget.sync({ force: false });
+    await IncentivePeriod.sync({ force: false });
+    await WaSale.sync({ force: false });
+    await MarketplaceSale.sync({ force: false });
+    await MarketplaceShare.sync({ force: false });
+    await WebSale.sync({ force: false });
+    await WebShare.sync({ force: false });
+    await EmployeeActivity.sync({ force: false });
+    await IncentiveResult.sync({ force: false });
+    await AuditLog.sync({ force: false });
+
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
 
     console.log('✅ Database tables synced successfully (HRD + Incentive)');
