@@ -301,7 +301,7 @@ const EmployeesTab = () => {
   const [loading, setLoading]  = useState(true);
   const [modal, setModal]      = useState(null);
   const [filterBranch, setFB]  = useState('');
-  const [form, setForm]        = useState({ name:'', email:'', phone:'', branch_id:'', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'' });
+  const [form, setForm]        = useState({ name:'', email:'', phone:'', branch_id:'', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'', employment_status:'kontrak', is_active: true });
   const [saving, setSaving]    = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -321,8 +321,8 @@ const EmployeesTab = () => {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const openAdd  = () => { setForm({ name:'', email:'', phone:'', branch_id: branches[0]?.id || '', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'' }); setModal('add'); };
-  const openEdit = (e) => { setForm({ ...e, branch_id: e.branch_id, position_id: e.position_id || '' }); setModal(e); };
+  const openAdd  = () => { setForm({ name:'', email:'', phone:'', branch_id: branches[0]?.id || '', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'', employment_status:'kontrak', is_active: true }); setModal('add'); };
+  const openEdit = (e) => { setForm({ ...e, branch_id: e.branch_id, position_id: e.position_id || '', employment_status: e.employment_status || 'kontrak', is_active: e.is_active !== false }); setModal(e); };
 
   const handleSave = async () => {
     if (!form.name || !form.branch_id) { toast.error('Nama dan cabang wajib diisi'); return; }
@@ -390,7 +390,16 @@ const EmployeesTab = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-semibold truncate ${e.is_active ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] line-through'}`}>{e.name}</p>
-                <p className="text-xs text-[var(--text-muted)] truncate">{e.branch?.name} · {e.position?.name || 'No Position'}</p>
+                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                  <p className="text-xs text-[var(--text-muted)] truncate">{e.branch?.name} · {e.position?.name || 'No Position'}</p>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${
+                    e.employment_status === 'tetap'    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400' :
+                    e.employment_status === 'kontrak'  ? 'bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400' :
+                    e.employment_status === 'training' ? 'bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400' :
+                    'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                    {e.employment_status || 'kontrak'}
+                  </span>
+                </div>
               </div>
               <div className="flex gap-1.5">
                 <button onClick={() => openEdit(e)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><Edit3 className="w-3 h-3" /></button>
@@ -422,6 +431,26 @@ const EmployeesTab = () => {
               {filteredPositions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </Field>
+          {/* Employment Status */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Status Kepegawaian</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { v:'magang',   l:'Magang',   desc:'Tidak dapat insentif',    cls:'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
+                { v:'training', l:'Training', desc:'Tidak dapat insentif',    cls:'bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400' },
+                { v:'kontrak',  l:'Kontrak',  desc:'Dapat insentif ✓',       cls:'bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400' },
+                { v:'tetap',    l:'Tetap',    desc:'Dapat insentif ✓',       cls:'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400' },
+              ].map(s => (
+                <button key={s.v} type="button" onClick={() => sf('employment_status', s.v)}
+                  className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                    form.employment_status === s.v ? \`\${s.cls} border-current\` : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'
+                  }`}>
+                  <p className="text-xs font-bold text-[var(--text-primary)]">{s.l}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{s.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
           <Field label="Kode Karyawan"><input value={form.employee_code} onChange={e => sf('employee_code', e.target.value)} placeholder="EMP-001" className="input-base text-sm" /></Field>
           <Field label="Email"><input type="email" value={form.email} onChange={e => sf('email', e.target.value)} placeholder="email@company.com" className="input-base text-sm" /></Field>
           <Field label="No HP"><input value={form.phone} onChange={e => sf('phone', e.target.value)} placeholder="08xx" className="input-base text-sm" /></Field>
@@ -722,7 +751,7 @@ const BonusTargetsTab = () => {
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal]     = useState(null);
-  const [form, setForm]       = useState({ name:'', min_amount:'', bonus_amount:'', notes:'' });
+  const [form, setForm]       = useState({ name:'', min_amount:'', bonus_amount:'', notes:'', eligible_statuses: ['kontrak','tetap'] });
   const [saving, setSaving]   = useState(false);
 
   const fetch = useCallback(async () => {
@@ -759,7 +788,7 @@ const BonusTargetsTab = () => {
       </div>
       <div className="flex justify-between items-center">
         <p className="text-xs text-[var(--text-muted)]">{targets.length} target terdaftar</p>
-        <button onClick={() => { setForm({ name:'', min_amount:'', bonus_amount:'', notes:'' }); setModal('add'); }}
+        <button onClick={() => { setForm({ name:'', min_amount:'', bonus_amount:'', notes:'', eligible_statuses:['kontrak','tetap'] }); setModal('add'); }}
           className="btn-primary h-8 px-3 text-xs"><Plus className="w-3.5 h-3.5" /> Tambah Target</button>
       </div>
 
@@ -783,7 +812,18 @@ const BonusTargetsTab = () => {
           <div className="bg-[var(--bg-secondary)] rounded-xl px-3 py-2.5">
             <div className="flex justify-between items-center">
               <span className="text-xs text-[var(--text-muted)]">Total Bonus Dibagi Rata</span>
-              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{toRp(t.bonus_amount)}</span>
+              <div className="text-right">
+                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{toRp(t.bonus_amount)}</span>
+                <div className="flex gap-1 justify-end mt-1 flex-wrap">
+                  {(t.eligible_statuses || ['kontrak','tetap']).map(s => (
+                    <span key={s} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      s === 'tetap'    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' :
+                      s === 'kontrak'  ? 'bg-blue-100 dark:bg-blue-950 text-blue-600' :
+                      s === 'training' ? 'bg-orange-100 dark:bg-orange-950 text-orange-600' :
+                      'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{s}</span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -809,6 +849,42 @@ const BonusTargetsTab = () => {
             </div>
             {form.bonus_amount && <p className="text-xs text-[var(--text-muted)] mt-1">{toRp(form.bonus_amount)}</p>}
           </Field>
+          {/* Eligible Statuses */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+              Berlaku untuk Status Karyawan
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { v:'magang',   l:'Magang',        cls:'text-slate-600 dark:text-slate-400' },
+                { v:'training', l:'Training',       cls:'text-orange-600 dark:text-orange-400' },
+                { v:'kontrak',  l:'Kontrak',        cls:'text-blue-600 dark:text-blue-400' },
+                { v:'tetap',    l:'Karyawan Tetap', cls:'text-emerald-600 dark:text-emerald-400' },
+              ].map(s => {
+                const checked = (form.eligible_statuses || []).includes(s.v);
+                return (
+                  <button key={s.v} type="button"
+                    onClick={() => {
+                      const cur = form.eligible_statuses || [];
+                      sf('eligible_statuses', checked ? cur.filter(x => x !== s.v) : [...cur, s.v]);
+                    }}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition-all ${
+                      checked ? 'border-brand-400 bg-brand-50 dark:bg-brand-950' : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'
+                    }`}>
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      checked ? 'bg-brand-500 border-brand-500' : 'border-[var(--border2)]'
+                    }`}>
+                      {checked && <CheckCircle2 className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className={`text-xs font-semibold ${checked ? s.cls : 'text-[var(--text-secondary)]'}`}>{s.l}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {(form.eligible_statuses || []).length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">⚠️ Pilih minimal 1 status</p>
+            )}
+          </div>
           <Field label="Catatan"><input value={form.notes} onChange={e => sf('notes', e.target.value)} className="input-base text-sm" /></Field>
         </Modal>
       )}

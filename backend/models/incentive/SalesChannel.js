@@ -17,6 +17,11 @@ const SalesChannel = sequelize.define('SalesChannel', {
   description: { type: DataTypes.TEXT, allowNull: true },
   is_active:   { type: DataTypes.BOOLEAN, defaultValue: true },
   sort_order:  { type: DataTypes.INTEGER, defaultValue: 0 },
+  eligible_statuses: {
+    type: DataTypes.JSON,
+    defaultValue: ['kontrak', 'tetap'],
+    comment: 'Status karyawan yang berhak dapat insentif jalur ini',
+  },
 }, {
   tableName: 'inc_sales_channels',
   timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at',

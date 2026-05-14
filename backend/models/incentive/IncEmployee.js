@@ -17,6 +17,11 @@ const IncEmployee = sequelize.define('IncEmployee', {
   phone:         { type: DataTypes.STRING(20),  allowNull: true },
   photo_url:     { type: DataTypes.STRING(500), allowNull: true },
   join_date:     { type: DataTypes.DATEONLY,    allowNull: false },
+  employment_status: {
+    type: DataTypes.ENUM('magang', 'training', 'kontrak', 'tetap'),
+    defaultValue: 'kontrak',
+    comment: 'Status kepegawaian: magang, training, kontrak, tetap',
+  },
   is_active:     { type: DataTypes.BOOLEAN, defaultValue: true },
   notes:         { type: DataTypes.TEXT, allowNull: true },
 }, {

@@ -14,6 +14,11 @@ const BonusTarget = sequelize.define('BonusTarget', {
   },
   is_active:   { type: DataTypes.BOOLEAN, defaultValue: true },
   sort_order:  { type: DataTypes.INTEGER, defaultValue: 0 },
+  eligible_statuses: {
+    type: DataTypes.JSON,
+    defaultValue: ['kontrak', 'tetap'],
+    comment: 'Status karyawan yang berhak dapat bonus ini',
+  },
   notes:       { type: DataTypes.TEXT, allowNull: true },
 }, {
   tableName: 'inc_bonus_targets',

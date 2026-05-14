@@ -12,6 +12,13 @@ const {
 
 const round2 = n => Math.round((parseFloat(n) || 0) * 100) / 100;
 
+// Check if employee is eligible based on channel/bonus eligible_statuses
+const isEligible = (employee, eligibleStatuses) => {
+  if (!eligibleStatuses || eligibleStatuses.length === 0) return true;
+  const status = employee.employment_status || 'kontrak';
+  return eligibleStatuses.includes(status);
+};
+
 /**
  * Get effective percentage for a branch+channel combo
  * Returns branch-specific rate if exists, falls back to global channel rate
@@ -67,13 +74,16 @@ const calculatePeriod = async (periodId) => {
   const waSales = await WaSale.findAll({ where: { period_id: periodId } });
   const waByEmp = {};
   let totalWaSales = 0;
+  const waChannel = channelsMap['WA'];
+  const waEligibleStatuses = waChannel?.eligible_statuses || ['kontrak','tetap'];
   for (const s of waSales) {
-    // Get effective WA rate for this employee's branch
     const emp = employees.find(e => e.id === s.employee_id);
     const effectiveWaPct = await getEffectiveRate('WA', emp?.branch_id, channelsMap);
-    const recalcIncentive = round2(parseFloat(s.sale_amount) * effectiveWaPct / 100);
+    // Only calculate incentive if employee status is eligible
+    const eligible = emp ? isEligible(emp, waEligibleStatuses) : true;
+    const recalcIncentive = eligible ? round2(parseFloat(s.sale_amount) * effectiveWaPct / 100) : 0;
 
-    if (!waByEmp[s.employee_id]) waByEmp[s.employee_id] = { amount: 0, incentive: 0, pct: effectiveWaPct };
+    if (!waByEmp[s.employee_id]) waByEmp[s.employee_id] = { amount: 0, incentive: 0, pct: effectiveWaPct, eligible };
     waByEmp[s.employee_id].amount   += parseFloat(s.sale_amount);
     waByEmp[s.employee_id].incentive += recalcIncentive;
     totalWaSales += parseFloat(s.sale_amount);
@@ -89,9 +99,12 @@ const calculatePeriod = async (periodId) => {
   for (const sale of mpSales) {
     totalMpSales += parseFloat(sale.total_amount);
     const effectiveMpPct = await getEffectiveRate('MARKETPLACE', sale.branch_id, channelsMap);
+    const mpEligibleStatuses = channelsMap['MARKETPLACE']?.eligible_statuses || ['kontrak','tetap'];
     for (const sh of (sale.shares || [])) {
+      const emp2 = employees.find(e => e.id === sh.employee_id);
       const performance = parseFloat(sh.performance_amount);
-      const incentive   = round2(performance * effectiveMpPct / 100);
+      const eligible    = emp2 ? isEligible(emp2, mpEligibleStatuses) : true;
+      const incentive   = eligible ? round2(performance * effectiveMpPct / 100) : 0;
       if (!mpByEmp[sh.employee_id]) mpByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveMpPct };
       mpByEmp[sh.employee_id].performance += performance;
       mpByEmp[sh.employee_id].incentive   += incentive;
@@ -108,9 +121,12 @@ const calculatePeriod = async (periodId) => {
   for (const sale of webSales) {
     totalWebSales += parseFloat(sale.total_amount);
     const effectiveWebPct = await getEffectiveRate('WEB', sale.branch_id, channelsMap);
+    const webEligibleStatuses = channelsMap['WEB']?.eligible_statuses || ['kontrak','tetap'];
     for (const sh of (sale.shares || [])) {
+      const emp3 = employees.find(e => e.id === sh.employee_id);
       const performance = parseFloat(sh.performance_amount);
-      const incentive   = round2(performance * effectiveWebPct / 100);
+      const eligible    = emp3 ? isEligible(emp3, webEligibleStatuses) : true;
+      const incentive   = eligible ? round2(performance * effectiveWebPct / 100) : 0;
       if (!webByEmp[sh.employee_id]) webByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveWebPct };
       webByEmp[sh.employee_id].performance += performance;
       webByEmp[sh.employee_id].incentive   += incentive;
@@ -142,9 +158,14 @@ const calculatePeriod = async (periodId) => {
     where: { is_active: true, min_amount: { [Op.lte]: totalAllSales } },
     order: [['min_amount', 'DESC']],
   });
-  const achievedTarget = bonusTargets[0] || null; // Tertinggi yang tercapai
+  const achievedTarget = bonusTargets[0] || null;
   const totalBonus     = achievedTarget ? parseFloat(achievedTarget.bonus_amount) : 0;
-  const bonusPerEmp    = activeCount > 0 ? round2(totalBonus / activeCount) : 0;
+
+  // Eligible statuses for bonus from BonusTarget setting
+  const bonusEligibleStatuses = achievedTarget?.eligible_statuses || ['kontrak','tetap'];
+  const eligibleForBonus      = employees.filter(e => isEligible(e, bonusEligibleStatuses));
+  const eligibleCount         = eligibleForBonus.length;
+  const bonusPerEmp           = eligibleCount > 0 ? round2(totalBonus / eligibleCount) : 0;
 
   // ── 6. Build results per employee ────────────────────────
   const results = [];
@@ -154,8 +175,9 @@ const calculatePeriod = async (periodId) => {
     const web = webByEmp[emp.id] || { performance: 0, incentive: 0 };
     const act = actByEmp[emp.id] || { incentive: 0, details: [] };
 
+    const empBonusAmount = isEligible(emp, bonusEligibleStatuses) ? bonusPerEmp : 0;
     const totalIncentive = round2(
-      wa.incentive + mp.incentive + web.incentive + act.incentive + bonusPerEmp
+      wa.incentive + mp.incentive + web.incentive + act.incentive + empBonusAmount
     );
 
     const detailsJson = {
@@ -163,7 +185,7 @@ const calculatePeriod = async (periodId) => {
       marketplace: { performance: mp.performance, incentive: mp.incentive, channel_pct: mp.pct  || mpChannel?.percentage },
       web:         { performance: web.performance, incentive: web.incentive, channel_pct: web.pct || webChannel?.percentage },
       activities:  { incentive: act.incentive, details: act.details },
-      bonus_target:{ amount: bonusPerEmp, tier: achievedTarget ? { name: achievedTarget.name, min: achievedTarget.min_amount, total_bonus: achievedTarget.bonus_amount } : null },
+      bonus_target:{ amount: isEligible(emp, bonusEligibleStatuses) ? bonusPerEmp : 0, excluded: !isEligible(emp, bonusEligibleStatuses), tier: achievedTarget ? { name: achievedTarget.name, min: achievedTarget.min_amount, total_bonus: achievedTarget.bonus_amount } : null },
     };
 
     results.push({
@@ -177,7 +199,7 @@ const calculatePeriod = async (periodId) => {
       marketplace_incentive:  round2(mp.incentive),
       web_incentive:          round2(web.incentive),
       activity_incentive:     round2(act.incentive),
-      bonus_target:           bonusPerEmp,
+      bonus_target:           empBonusAmount,
       total_incentive:        totalIncentive,
       employee_name:          emp.name,
       branch_name:            emp.branch?.name,
