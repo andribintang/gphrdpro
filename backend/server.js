@@ -93,14 +93,15 @@ app.post('/clear-payroll-demo', async (req, res) => {
   try {
     const { sequelize } = require('./config/database');
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-    await sequelize.query('TRUNCATE TABLE payrolls');
-    await sequelize.query('TRUNCATE TABLE payroll_items');
-    await sequelize.query('TRUNCATE TABLE payroll_runs');
+    // Correct table names from models
+    await sequelize.query('TRUNCATE TABLE `payroll`');
+    await sequelize.query('TRUNCATE TABLE `payroll_items`');
+    await sequelize.query('TRUNCATE TABLE `payroll_runs`');
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
     return res.json({
       success: true,
       message: 'Data payroll demo berhasil dihapus!',
-      data: { cleared: ['payrolls', 'payroll_items', 'payroll_runs'] }
+      data: { cleared: ['payroll', 'payroll_items', 'payroll_runs'] }
     });
   } catch (err) {
     try { const { sequelize } = require('./config/database'); await sequelize.query('SET FOREIGN_KEY_CHECKS = 1'); } catch {}
