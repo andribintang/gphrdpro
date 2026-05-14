@@ -25,7 +25,10 @@ const migrate = async () => {
     console.log('🔄 Running database migration...');
 
     // sync() sekarang akan include SEMUA model yang sudah di-import di atas
+    // Disable FK checks during sync to prevent constraint errors
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
     await sequelize.sync({ force: false, alter: true });
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
 
     console.log('✅ Database tables synced successfully (HRD + Incentive)');
 
