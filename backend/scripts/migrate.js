@@ -25,51 +25,71 @@ const migrate = async () => {
     console.log('🔄 Running database migration...');
 
     // sync() sekarang akan include SEMUA model yang sudah di-import di atas
+    // ── Smart sync: only create tables that don't exist yet ─────
+    // This avoids FK constraint errors from ALTER TABLE on existing tables
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
 
-    // Sync existing HRD tables WITHOUT alter (avoid FK constraint errors)
-    await User.sync({ force: false });
-    await Employee.sync({ force: false });
-    await Attendance.sync({ force: false });
-    await LeaveRequest.sync({ force: false });
-    await LeaveQuota.sync({ force: false });
-    await Payroll.sync({ force: false });
-    await OfficeSetting.sync({ force: false });
-    await EmployeeFace.sync({ force: false });
-    await CompanySetting.sync({ force: false });
+    // Get list of existing tables in DB
+    const [existingTables] = await sequelize.query(
+      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()"
+    );
+    const existing = new Set(existingTables.map(t => t.TABLE_NAME || t.table_name));
+    console.log(`📋 Existing tables: ${existing.size}`);
 
-    // Sync payroll engine tables (new — safe to alter)
+    // Helper: only sync if table doesn't exist yet
+    const syncIfNew = async (model, label) => {
+      const tbl = model.getTableName();
+      if (!existing.has(tbl)) {
+        await model.sync({ force: false });
+        console.log(`  ✅ Created: ${tbl}`);
+      } else {
+        console.log(`  ⏭️  Skip (exists): ${tbl}`);
+      }
+    };
+
+    // HRD core tables
+    await syncIfNew(User,           'users');
+    await syncIfNew(Employee,       'employees');
+    await syncIfNew(Attendance,     'attendance');
+    await syncIfNew(LeaveRequest,   'leave_requests');
+    await syncIfNew(LeaveQuota,     'leave_quotas');
+    await syncIfNew(Payroll,        'payroll');
+    await syncIfNew(OfficeSetting,  'office_settings');
+    await syncIfNew(EmployeeFace,   'employee_faces');
+    await syncIfNew(CompanySetting, 'company_settings');
+
+    // Payroll engine tables
     const {
       PayrollSetting, PayrollComponent, EmployeeAllowance,
       PayrollRun, PayrollItem, LoanManagement,
       IncentiveParameter, IncentiveEmployeeRate,
     } = require('../models');
-    await PayrollSetting.sync({ force: false });
-    await PayrollComponent.sync({ force: false });
-    await EmployeeAllowance.sync({ force: false });
-    await PayrollRun.sync({ force: false });
-    await PayrollItem.sync({ force: false });
-    await LoanManagement.sync({ force: false });
-    await IncentiveParameter.sync({ force: false });
-    await IncentiveEmployeeRate.sync({ force: false });
+    await syncIfNew(PayrollSetting,       'payroll_settings');
+    await syncIfNew(PayrollComponent,     'payroll_components');
+    await syncIfNew(EmployeeAllowance,    'employee_allowances');
+    await syncIfNew(PayrollRun,           'payroll_runs');
+    await syncIfNew(PayrollItem,          'payroll_items');
+    await syncIfNew(LoanManagement,       'loan_management');
+    await syncIfNew(IncentiveParameter,   'incentive_parameters');
+    await syncIfNew(IncentiveEmployeeRate,'incentive_employee_rates');
 
-    // Sync incentive system tables (new — safe to create)
-    await Branch.sync({ force: false });
-    await Position.sync({ force: false });
-    await IncEmployee.sync({ force: false });
-    await SalesChannel.sync({ force: false });
-    await ChannelRate.sync({ force: false });
-    await ActivityType.sync({ force: false });
-    await BonusTarget.sync({ force: false });
-    await IncentivePeriod.sync({ force: false });
-    await WaSale.sync({ force: false });
-    await MarketplaceSale.sync({ force: false });
-    await MarketplaceShare.sync({ force: false });
-    await WebSale.sync({ force: false });
-    await WebShare.sync({ force: false });
-    await EmployeeActivity.sync({ force: false });
-    await IncentiveResult.sync({ force: false });
-    await AuditLog.sync({ force: false });
+    // Incentive system tables
+    await syncIfNew(Branch,           'inc_branches');
+    await syncIfNew(Position,         'inc_positions');
+    await syncIfNew(IncEmployee,      'inc_employees');
+    await syncIfNew(SalesChannel,     'inc_sales_channels');
+    await syncIfNew(ChannelRate,      'inc_channel_rates');
+    await syncIfNew(ActivityType,     'inc_activity_types');
+    await syncIfNew(BonusTarget,      'inc_bonus_targets');
+    await syncIfNew(IncentivePeriod,  'inc_periods');
+    await syncIfNew(WaSale,           'inc_wa_sales');
+    await syncIfNew(MarketplaceSale,  'inc_marketplace_sales');
+    await syncIfNew(MarketplaceShare, 'inc_marketplace_shares');
+    await syncIfNew(WebSale,          'inc_web_sales');
+    await syncIfNew(WebShare,         'inc_web_shares');
+    await syncIfNew(EmployeeActivity, 'inc_employee_activities');
+    await syncIfNew(IncentiveResult,  'inc_results');
+    await syncIfNew(AuditLog,         'inc_audit_logs');
 
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
 
