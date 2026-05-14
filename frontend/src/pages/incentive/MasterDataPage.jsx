@@ -443,7 +443,7 @@ const EmployeesTab = () => {
               ].map(s => (
                 <button key={s.v} type="button" onClick={() => sf('employment_status', s.v)}
                   className={`p-2.5 rounded-xl border-2 text-left transition-all ${
-                    form.employment_status === s.v ? \`\${s.cls} border-current\` : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'
+                    form.employment_status === s.v ? s.cls + ' border-current' : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'
                   }`}>
                   <p className="text-xs font-bold text-[var(--text-primary)]">{s.l}</p>
                   <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{s.desc}</p>
