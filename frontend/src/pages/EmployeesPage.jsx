@@ -236,54 +236,66 @@ const FaceRegisterModal = ({ userId, userName, onClose, onSuccess }) => {
   );
 };
 
-// ── FieldInput — OUTSIDE EmployeeForm to prevent unmount on re-render ───────
-const FieldInput = memo(({ label, fieldName, type, placeholder, required, defaultValue, inputRef, error, onClearError }) => (
-  <div>
-    <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
-      {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-    </label>
-    <input
-      ref={inputRef}
-      type={type || 'text'}
-      defaultValue={defaultValue || ''}
-      placeholder={placeholder}
-      autoComplete="off"
-      className={`input-base text-sm ${error ? 'border-red-400' : ''}`}
-      onChange={() => { if (error) onClearError(); }}
-    />
-    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-  </div>
-));
+// ── StableInput — fully controlled, outside EmployeeForm ──────────────────
+// Using controlled input inside its own memo = stable identity + keeps value
+const StableInput = memo(({ label, type = 'text', placeholder, required,
+  initialValue = '', error, onClearError, onValueChange }) => {
+  const [val, setVal] = useState(initialValue);
+  return (
+    <div>
+      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={val}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={`input-base text-sm ${error ? 'border-red-400' : ''}`}
+        onChange={e => {
+          setVal(e.target.value);
+          onValueChange(e.target.value);
+          if (error) onClearError();
+        }}
+      />
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}, (prev, next) => {
+  // Only re-render when error changes — NOT when parent re-renders from role/dept change
+  return prev.error === next.error && prev.label === next.label;
+});
 
 // ════════════════════════════════════════════════════════════════
-// EMPLOYEE FORM — completely isolated, no parent dependencies
-// Key fix: state is fully self-contained, no external triggers
+// EMPLOYEE FORM — all field values in one state object
+// StableInput manages own display but reports back via onValueChange
+// setRole/setDept won't reset text fields because StableInput is memo
 // ════════════════════════════════════════════════════════════════
 const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
   const isEdit = !!employee;
-  const [step, setStep]     = useState(1);
+  const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors]   = useState({});
   const [departments, setDepts] = useState([]);
 
-  // All form fields as individual refs to avoid re-render focus loss
-  const refs = {
-    name:              useRef(null),
-    email:             useRef(null),
-    password:          useRef(null),
-    nip:               useRef(null),
-    position:          useRef(null),
-    phone:             useRef(null),
-    address:           useRef(null),
-    emergency_contact: useRef(null),
-    emergency_phone:   useRef(null),
-    salary_base:       useRef(null),
-  };
+  // Store all text field values in a ref (not state) to avoid triggering re-renders
+  const fieldValues = useRef({
+    name:              employee?.name                        || '',
+    email:             employee?.email                       || '',
+    password:          '',
+    nip:               employee?.employee?.nip               || '',
+    position:          employee?.employee?.position          || '',
+    phone:             employee?.employee?.phone             || '',
+    address:           employee?.employee?.address           || '',
+    emergency_contact: employee?.employee?.emergency_contact || '',
+    emergency_phone:   employee?.employee?.emergency_phone   || '',
+    salary_base:       employee?.employee?.salary_base       ? String(employee.employee.salary_base) : '',
+  });
 
-  // Controlled state only for non-input fields (select, role buttons)
-  const [role, setRole]     = useState(employee?.role || 'employee');
-  const [dept, setDept]     = useState(employee?.employee?.department || '');
-  const [status, setStatus] = useState(employee?.employee?.status || 'active');
+  // These cause re-render but StableInput won't reset because of memo comparison
+  const [role, setRole]         = useState(employee?.role || 'employee');
+  const [dept, setDept]         = useState(employee?.employee?.department || '');
+  const [status, setStatus]     = useState(employee?.employee?.status || 'active');
   const [joinDate, setJoinDate] = useState(employee?.employee?.join_date || '');
 
   useEffect(() => {
@@ -292,7 +304,8 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
       .catch(() => {});
   }, []);
 
-  const getVal = (field) => refs[field]?.current?.value || '';
+  const getVal = (field) => fieldValues.current[field] || '';
+  const setVal = (field, val) => { fieldValues.current[field] = val; };
 
   const validateStep1 = () => {
     const e = {};
@@ -321,14 +334,14 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
     setLoading(true);
     try {
       const payload = {
-        name:              getVal('name'),
-        email:             getVal('email'),
+        name:              getVal('name').trim(),
+        email:             getVal('email').trim(),
         password:          getVal('password'),
         role,
-        nip:               getVal('nip'),
-        position:          getVal('position'),
+        nip:               getVal('nip').trim(),
+        position:          getVal('position').trim(),
         department:        dept,
-        salary_base:       parseFloat(getVal('salary_base').replace(/\D/g, '')),
+        salary_base:       parseFloat(getVal('salary_base')) || 0,
         join_date:         joinDate,
         status,
         phone:             getVal('phone'),
@@ -453,13 +466,15 @@ const EmployeeForm = memo(({ employee, onClose, onSuccess }) => {
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-medium">Rp</span>
-                  <input
-                    ref={refs.salary_base}
+                  <StableInput
+                    key="salary_base"
+                    label=""
                     type="number"
-                    defaultValue={employee?.employee?.salary_base || ''}
                     placeholder="5000000"
-                    className={`input-base pl-10 text-sm ${errors.salary_base ? 'border-red-400' : ''}`}
-                    onChange={() => { if (errors.salary_base) setErrors(e => ({...e, salary_base:''})); }}
+                    initialValue={employee?.employee?.salary_base ? String(employee.employee.salary_base) : ''}
+                    error={errors.salary_base}
+                    onClearError={() => setErrors(e => ({...e, salary_base:''}))}
+                    onValueChange={val => setVal('salary_base', val)}
                   />
                 </div>
                 {errors.salary_base && <p className="text-xs text-red-500 mt-1">{errors.salary_base}</p>}

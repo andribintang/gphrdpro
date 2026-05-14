@@ -399,7 +399,7 @@ const GenerateModal = ({ onClose, onSuccess }) => {
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Jenis Payroll</label>
             <div className="grid grid-cols-2 gap-2">
-              {Object.entries(RUN_TYPES).map(([k,t]) => (
+              {Object.entries(RUN_TYPES).filter(([k]) => k !== 'incentive').map(([k,t]) => (
                 <button key={k} onClick={() => set('type', k)}
                   className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all text-left
                     ${form.type === k ? `${t.bg} ${t.color} border-current` : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
