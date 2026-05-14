@@ -539,8 +539,12 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
     Promise.all([
       employeeService.getOne(userId),
       attendanceService.getFaceStatus(userId),
-    ]).then(([r, fr]) => {
-      setData(r.data.data);
+      incentiveService.getEmployees({ limit: 1 }).then(r => {
+        // Get all inc employees and find by user_id
+        return api.get('/incentive/employees').then(er => er.data.data.employees.find(e => e.user_id === userId));
+      }).catch(() => null),
+    ]).then(([r, fr, incEmp]) => {
+      setData({ ...r.data.data, inc_employee: incEmp || null });
       setFaceStatus(fr.data.data);
     }).catch(() => toast.error('Gagal memuat profil'))
       .finally(() => setLoading(false));
@@ -625,6 +629,7 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
               { icon: Calendar,  l:'Bergabung',  v: formatJoinDate(emp?.join_date) },
               { icon: Mail,      l:'Email',      v: user.email },
               { icon: Camera,    l:'Wajah',      v: faceStatus?.registered ? '✅ Terdaftar' : '❌ Belum' },
+            { icon: Link2,     l:'Sistem Insentif', v: data?.inc_employee ? `✅ Terhubung (${data.inc_employee.branch?.name || 'Cabang'})` : '❌ Belum terhubung' },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">

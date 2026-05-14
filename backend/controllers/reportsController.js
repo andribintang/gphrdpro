@@ -1,6 +1,6 @@
 const { Op, fn, col, literal } = require('sequelize');
 const { sequelize } = require('../config/database');
-const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll } = require('../models');
+const { User, Employee, Attendance, LeaveRequest, LeaveQuota, Payroll, PayrollRun, PayrollItem } = require('../models');
 
 // ── Helpers ────────────────────────────────────────────────────
 const getMonthRange = (month) => {

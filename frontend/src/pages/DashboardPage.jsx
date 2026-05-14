@@ -87,7 +87,6 @@ export default function DashboardPage() {
   const [empStats, setEmpStats]       = useState(null);
   const [payrollStats, setPayrollStats] = useState(null);
   const [recentAtt, setRecentAtt]     = useState([]);
-  const [checkLoading, setCheckLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -139,26 +138,7 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Check-in / Check-out
-  const handleCheckIn = async () => {
-    setCheckLoading(true);
-    try {
-      await attendanceService.checkIn({ method: 'manual' });
-      toast.success('Check-in berhasil!');
-      fetchData();
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal check-in'); }
-    finally { setCheckLoading(false); }
-  };
 
-  const handleCheckOut = async () => {
-    setCheckLoading(true);
-    try {
-      await attendanceService.checkOut();
-      toast.success('Check-out berhasil!');
-      fetchData();
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal check-out'); }
-    finally { setCheckLoading(false); }
-  };
 
   const attStatus = todayAtt?.attendance?.status;
   const checkedIn  = !!todayAtt?.attendance?.check_in_time;
@@ -189,12 +169,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Check-in/out card ──────────────────────────────── */}
-      <div className={`card p-4 border-l-4 ${
-        checkedOut  ? 'border-l-slate-400' :
-        attStatus === 'late' ? 'border-l-amber-500' :
-        checkedIn   ? 'border-l-emerald-500' : 'border-l-brand-500'
-      }`}>
+      {/* ── Attendance status card — navigate to attendance page ── */}
+      <button onClick={() => navigate('/attendance')}
+        className={`card p-4 border-l-4 text-left w-full hover:border-brand-300 dark:hover:border-brand-700 transition-all ${
+          checkedOut  ? 'border-l-slate-400' :
+          attStatus === 'late' ? 'border-l-amber-500' :
+          checkedIn   ? 'border-l-emerald-500' : 'border-l-brand-500'
+        }`}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Absensi Hari Ini</p>
@@ -202,34 +183,30 @@ export default function DashboardPage() {
               <div className="skeleton h-6 w-28 rounded mt-1" />
             ) : (
               <p className="text-base font-bold text-[var(--text-primary)] mt-0.5">
-                {checkedOut  ? `Check-out ${formatTime(todayAtt?.attendance?.check_out_time)}` :
-                 checkedIn   ? `Check-in ${formatTime(todayAtt?.attendance?.check_in_time)}` :
-                 'Belum check-in'}
+                {checkedOut  ? `✅ Check-out ${formatTime(todayAtt?.attendance?.check_out_time)}` :
+                 checkedIn   ? `✅ Check-in ${formatTime(todayAtt?.attendance?.check_in_time)}` :
+                 '⏰ Belum check-in'}
               </p>
             )}
             {attStatus === 'late' && (
               <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-0.5">⚠️ Terlambat</p>
             )}
+            <p className="text-xs text-brand-500 mt-1 font-semibold">
+              {checkedIn && !checkedOut ? 'Tap untuk check-out →' : !checkedIn ? 'Tap untuk absen sekarang →' : 'Lihat riwayat →'}
+            </p>
           </div>
-          {!checkedIn ? (
-            <button onClick={handleCheckIn} disabled={checkLoading}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all active:scale-95 disabled:opacity-60">
-              <LogIn className="w-4 h-4" />
-              {checkLoading ? 'Proses...' : 'Check In'}
-            </button>
-          ) : !checkedOut ? (
-            <button onClick={handleCheckOut} disabled={checkLoading}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-600 hover:bg-slate-700 text-white transition-all active:scale-95 disabled:opacity-60">
-              <LogOut className="w-4 h-4" />
-              {checkLoading ? 'Proses...' : 'Check Out'}
-            </button>
-          ) : (
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-5 h-5" /> Selesai
-            </span>
-          )}
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+            checkedOut ? 'bg-slate-100 dark:bg-slate-800' :
+            checkedIn  ? 'bg-emerald-100 dark:bg-emerald-950' : 'bg-brand-100 dark:bg-brand-950'
+          }`}>
+            {checkedOut
+              ? <CheckCircle2 className="w-6 h-6 text-slate-500" />
+              : checkedIn
+              ? <LogOut className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              : <LogIn className="w-6 h-6 text-brand-600 dark:text-brand-400" />}
+          </div>
         </div>
-      </div>
+      </button>
 
       {/* ── Stats grid ─────────────────────────────────────── */}
       {/* HR/Admin: 4 stats */}
