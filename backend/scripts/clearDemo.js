@@ -1,6 +1,6 @@
 /**
- * CLEAR DEMO DATA — Hapus semua data, pertahankan admin + settings
- * Dipanggil via: POST /clear-demo-data
+ * CLEAR DEMO DATA
+ * POST /clear-demo-data
  * Header: x-migrate-secret: <MIGRATE_SECRET>
  */
 const clearDemoData = async (app) => {
@@ -12,61 +12,60 @@ const clearDemoData = async (app) => {
 
     try {
       const { sequelize } = require('../config/database');
-      const models = require('../models');
-      const {
-        User, Employee, Attendance, LeaveRequest, LeaveQuota,
-        Payroll, PayrollRun, PayrollItem, LoanManagement,
-        EmployeeFace, EmployeeAllowance,
-      } = models;
+      const { Op }        = require('sequelize');
+      const bcrypt        = require('bcryptjs');
 
-      // Hapus incentive data juga
-      const {
-        WaSale, MarketplaceSale, MarketplaceShare,
-        WebSale, WebShare, EmployeeActivity,
-        IncentiveResult, IncentivePeriod, IncEmployee,
-        Position, AuditLog,
-      } = require('../models/incentive');
+      // Disable FK checks, truncate all, re-enable
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
 
-      // Urutan hapus: child tables first
-      await AuditLog.destroy({ where: {}, truncate: true });
-      await IncentiveResult.destroy({ where: {}, truncate: true });
-      await EmployeeActivity.destroy({ where: {}, truncate: true });
-      await WebShare.destroy({ where: {}, truncate: true });
-      await WebSale.destroy({ where: {}, truncate: true });
-      await MarketplaceShare.destroy({ where: {}, truncate: true });
-      await MarketplaceSale.destroy({ where: {}, truncate: true });
-      await WaSale.destroy({ where: {}, truncate: true });
-      await IncentivePeriod.destroy({ where: {}, truncate: true });
-      await IncEmployee.destroy({ where: {}, truncate: true });
-      await Position.destroy({ where: {}, truncate: true });
+      const tables = [
+        // Incentive transaction tables
+        'inc_audit_logs',
+        'inc_results',
+        'inc_employee_activities',
+        'inc_web_shares',
+        'inc_web_sales',
+        'inc_marketplace_shares',
+        'inc_marketplace_sales',
+        'inc_wa_sales',
+        'inc_periods',
+        'inc_employees',
+        'inc_positions',
+        // HRD transaction tables
+        'payroll_items',
+        'payroll_runs',
+        'loan_management',
+        'employee_allowances',
+        'employee_faces',
+        'leave_requests',
+        'leave_quotas',
+        'attendance',
+        'payrolls',
+        'employees',
+      ];
 
-      // HRD data
-      await PayrollItem.destroy({ where: {}, truncate: true });
-      await PayrollRun.destroy({ where: {}, truncate: true });
-      await Payroll.destroy({ where: {}, truncate: true });
-      await LoanManagement.destroy({ where: {}, truncate: true });
-      await EmployeeAllowance.destroy({ where: {}, truncate: true });
-      await LeaveRequest.destroy({ where: {}, truncate: true });
-      await LeaveQuota.destroy({ where: {}, truncate: true });
-      await Attendance.destroy({ where: {}, truncate: true });
-      await EmployeeFace.destroy({ where: {}, truncate: true });
-      await Employee.destroy({ where: {}, truncate: true });
-
-      // Hapus semua user KECUALI admin
-      const { Op } = require('sequelize');
-      await User.destroy({ where: { role: { [Op.ne]: 'admin' } } });
-
-      // Reset admin password
-      const bcrypt = require('bcryptjs');
-      const adminUser = await User.findOne({ where: { role: 'admin' } });
-      if (adminUser) {
-        const hash = await bcrypt.hash('Admin@123', 12);
-        await adminUser.update({
-          name:          'Admin HRD',
-          email:         'admin@hrd.com',
-          password_hash: hash,
-        });
+      for (const table of tables) {
+        try {
+          await sequelize.query(`TRUNCATE TABLE \`${table}\``);
+        } catch (e) {
+          // Table might not exist yet — skip
+          console.log(`Skip ${table}: ${e.message}`);
+        }
       }
+
+      // Delete non-admin users
+      await sequelize.query(
+        `DELETE FROM users WHERE role != 'admin'`
+      );
+
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+
+      // Reset admin
+      const hash = await bcrypt.hash('Admin@123', 12);
+      await sequelize.query(
+        `UPDATE users SET name='Admin HRD', email='admin@hrd.com', password_hash=? WHERE role='admin'`,
+        { replacements: [hash] }
+      );
 
       return res.json({
         success: true,
@@ -75,14 +74,25 @@ const clearDemoData = async (app) => {
           cleared: [
             'karyawan & users (kecuali admin)',
             'absensi', 'cuti', 'payroll', 'kasbon',
-            'insentif (transaksi, periode, karyawan insentif)',
+            'insentif (transaksi, periode, karyawan)',
             'wajah karyawan',
           ],
-          kept: ['admin account', 'company settings', 'office settings', 'payroll components', 'branches', 'sales channels', 'activity types', 'bonus targets'],
-          admin: { email: 'admin@hrd.com', password: 'Admin@123' },
+          kept: [
+            'admin account (admin@hrd.com / Admin@123)',
+            'company settings', 'office settings',
+            'payroll components', 'payroll settings',
+            'branches', 'sales channels',
+            'activity types', 'bonus targets',
+          ],
         },
       });
+
     } catch (err) {
+      // Make sure FK checks are re-enabled even on error
+      try {
+        const { sequelize } = require('../config/database');
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+      } catch {}
       console.error('clearDemo error:', err);
       return res.status(500).json({ success: false, message: err.message });
     }
