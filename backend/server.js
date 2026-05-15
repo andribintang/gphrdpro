@@ -84,6 +84,101 @@ app.get('/health', (_req, res) => res.json({
 // ── Clear demo data endpoint
 require('./scripts/clearDemo')(app);
 
+// ── Add missing columns (safe ALTER) ─────────────────────────
+app.post('/run-alter', async (req, res) => {
+  const secret = req.headers['x-migrate-secret'];
+  if (!secret || secret !== process.env.MIGRATE_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  try {
+    const { sequelize } = require('./config/database');
+    const results = [];
+    const errors  = [];
+
+    const alters = [
+      // Add employment_status to inc_employees
+      `ALTER TABLE inc_employees ADD COLUMN employment_status ENUM('magang','training','kontrak','tetap') NOT NULL DEFAULT 'kontrak'`,
+      // Add eligible_statuses to inc_bonus_targets
+      `ALTER TABLE inc_bonus_targets ADD COLUMN eligible_statuses JSON`,
+      // Add eligible_statuses to inc_sales_channels
+      `ALTER TABLE inc_sales_channels ADD COLUMN eligible_statuses JSON`,
+      // Add logo_url as TEXT in company_settings (was VARCHAR(500))
+      `ALTER TABLE company_settings MODIFY COLUMN logo_url TEXT`,
+      // Create inc_channel_rates if not exists
+      `CREATE TABLE IF NOT EXISTS inc_channel_rates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        branch_id INT NOT NULL,
+        channel_id INT NOT NULL,
+        percentage DECIMAL(6,3) NOT NULL DEFAULT 0,
+        is_active TINYINT(1) DEFAULT 1,
+        notes VARCHAR(200),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_branch_channel (branch_id, channel_id)
+      )`,
+      // Create inc_bonus_exclusions if not exists
+      `CREATE TABLE IF NOT EXISTS inc_bonus_exclusions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id INT NOT NULL,
+        reason VARCHAR(200),
+        start_date DATE,
+        end_date DATE,
+        is_active TINYINT(1) DEFAULT 1,
+        created_by INT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+      // Create company_settings if not exists
+      `CREATE TABLE IF NOT EXISTS company_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        company_name VARCHAR(100) DEFAULT 'GPDISTRO HR Pro',
+        company_tagline VARCHAR(200),
+        company_address TEXT,
+        company_phone VARCHAR(20),
+        company_email VARCHAR(150),
+        company_website VARCHAR(200),
+        logo_url TEXT,
+        primary_color VARCHAR(20) DEFAULT '#e11d48',
+        favicon_url VARCHAR(500),
+        app_name VARCHAR(100) DEFAULT 'GPDISTRO HR Pro',
+        timezone VARCHAR(50) DEFAULT 'Asia/Jakarta',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    ];
+
+    for (const sql of alters) {
+      try {
+        await sequelize.query(sql);
+        results.push('OK: ' + sql.substring(0, 60) + '...');
+      } catch (e) {
+        // Column already exists = OK
+        if (e.message.includes('Duplicate column') || e.message.includes('already exists')) {
+          results.push('SKIP (already exists): ' + sql.substring(0, 50));
+        } else {
+          errors.push('ERR: ' + e.message.substring(0, 100));
+        }
+      }
+    }
+
+    // Set defaults for eligible_statuses
+    await sequelize.query(
+      `UPDATE inc_bonus_targets SET eligible_statuses = '["kontrak","tetap"]' WHERE eligible_statuses IS NULL`
+    ).catch(() => {});
+    await sequelize.query(
+      `UPDATE inc_sales_channels SET eligible_statuses = '["kontrak","tetap"]' WHERE eligible_statuses IS NULL`
+    ).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: 'ALTER selesai',
+      data: { results, errors }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── Quick clear payroll demo data only ───────────────────────
 app.post('/clear-payroll-demo', async (req, res) => {
   const secret = req.headers['x-migrate-secret'];

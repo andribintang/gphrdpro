@@ -49,7 +49,19 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [departments, setDepts] = useState([]);
-  const [syncInsentif, setSyncInsentif] = useState(true);
+  const [syncInsentif, setSyncInsentif] = useState(!isEdit); // default true for new, false for edit
+  const [isLinked, setIsLinked]         = useState(false);   // already linked to incentive?
+
+  // Check if employee is already linked to incentive system
+  useEffect(() => {
+    if (isEdit && employee?.id) {
+      api.get('/incentive/employees')
+        .then(r => {
+          const linked = r.data.data.employees.find(e => e.user_id === employee.id);
+          setIsLinked(!!linked);
+        }).catch(() => {});
+    }
+  }, [isEdit, employee?.id]);
   const [branches, setBranches] = useState([]);
   const [positions, setPositions] = useState([]);
 
@@ -332,7 +344,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
               {renderF("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx", false, false)}
 
               {/* ── Sync ke Sistem Insentif ─────────────────── */}
-              {!isEdit && (
+              {(!isEdit || (isEdit && !isLinked)) && (
                 <div className="rounded-2xl border border-[var(--border)] overflow-hidden">
                   <button type="button"
                     onClick={() => setSyncInsentif(v => !v)}
@@ -344,9 +356,11 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                     </div>
                     <div className="flex-1 text-left">
                       <p className={`text-sm font-semibold ${syncInsentif ? 'text-brand-700 dark:text-brand-300' : 'text-[var(--text-secondary)]'}`}>
-                        Tambah ke Sistem Insentif
+                        {isEdit ? 'Hubungkan ke Sistem Insentif' : 'Tambah ke Sistem Insentif'}
                       </p>
-                      <p className="text-xs text-[var(--text-muted)]">Karyawan ini akan muncul di modul insentif</p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {isEdit ? 'Karyawan belum terhubung — hubungkan sekarang' : 'Karyawan ini akan muncul di modul insentif'}
+                      </p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
                       ${syncInsentif ? 'bg-brand-500 border-brand-500' : 'border-[var(--border2)]'}`}>
