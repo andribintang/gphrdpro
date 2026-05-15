@@ -1,23 +1,13 @@
 /**
- * EXPORT UTILITIES
- * PDF via jsPDF (loaded from CDN)
- * Excel via SheetJS (xlsx)
- * QR Code via qrcode library
+ * EXPORT UTILITIES — PDF Slip Insentif
+ * Desain profesional tanpa emoji (jsPDF tidak support emoji)
  */
 
-import { toRp, toRpShort, MONTHS_ID } from './incentiveService';
+import { toRp, toRpShort } from './incentiveService';
 
-// ── Load jsPDF from CDN ───────────────────────────────────────
-let jsPDFLoaded = false;
+// ── Load jsPDF ────────────────────────────────────────────────
 const loadJsPDF = () => new Promise((resolve, reject) => {
-  if (window.jspdf) { resolve(window.jspdf.jsPDF); return; }
-  if (jsPDFLoaded) {
-    const check = setInterval(() => {
-      if (window.jspdf) { clearInterval(check); resolve(window.jspdf.jsPDF); }
-    }, 100);
-    return;
-  }
-  jsPDFLoaded = true;
+  if (window.jspdf?.jsPDF) { resolve(window.jspdf.jsPDF); return; }
   const s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   s.onload = () => resolve(window.jspdf.jsPDF);
@@ -25,329 +15,408 @@ const loadJsPDF = () => new Promise((resolve, reject) => {
   document.head.appendChild(s);
 });
 
-// ── Load QRCode from CDN ──────────────────────────────────────
-const loadQRCode = () => new Promise((resolve, reject) => {
-  if (window.QRCode) { resolve(window.QRCode); return; }
-  const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  s.onload = () => resolve(window.QRCode);
-  s.onerror = () => resolve(null); // QR optional
-  document.head.appendChild(s);
-});
-
-// ── Generate QR data URL ──────────────────────────────────────
-const generateQRDataUrl = async (text) => {
-  return new Promise((resolve) => {
-    try {
-      const div = document.createElement('div');
-      div.style.position = 'absolute';
-      div.style.left = '-9999px';
-      document.body.appendChild(div);
-
-      // Use canvas-based QR
-      import('qrcode').then(QRCode => {
-        QRCode.default.toDataURL(text, { width: 80, margin: 1, color: { dark: '#000', light: '#fff' } })
-          .then(url => { document.body.removeChild(div); resolve(url); })
-          .catch(() => { document.body.removeChild(div); resolve(null); });
-      }).catch(() => { resolve(null); });
-    } catch { resolve(null); }
-  });
+// ── Color palette ────────────────────────────────────────────
+const C = {
+  red:      [220,  38,  38],
+  redDark:  [153,  27,  27],
+  redLight: [254, 226, 226],
+  navy:     [ 30,  58, 138],
+  green:    [ 22, 163,  74],
+  greenBg:  [240, 253, 244],
+  gray:     [107, 114, 128],
+  grayL:    [243, 244, 246],
+  dark:     [ 17,  24,  39],
+  white:    [255, 255, 255],
+  line:     [229, 231, 235],
 };
 
+// ── Helper: rounded rect ──────────────────────────────────────
+const rRect = (doc, x, y, w, h, r, color, style='F') => {
+  doc.setFillColor(...color);
+  doc.roundedRect(x, y, w, h, r, r, style);
+};
+
+// ── Format decimal cleanly ────────────────────────────────────
+const fmt = n => toRp(n);
+
 // ════════════════════════════════════════════════════════════════
-// EXPORT SINGLE SLIP PDF
+// SINGLE SLIP PDF — Desain profesional
 // ════════════════════════════════════════════════════════════════
-export const exportSlipPDF = async (result, period, companyName = 'HRD Lite') => {
+export const exportSlipPDF = async (result, period, companyName = 'GPDISTRO HR Pro') => {
   const jsPDF = await loadJsPDF();
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
-  const W   = doc.internal.pageSize.getWidth();
-  const H   = doc.internal.pageSize.getHeight();
-
-  // ── Colors ──────────────────────────────────────────────────
-  const purple    = [103,  58, 183];
-  const darkPurple= [ 49,  27,  93];
-  const emerald   = [ 16, 185, 129];
-  const light     = [248, 248, 252];
-  const gray      = [100, 116, 139];
-  const dark      = [ 15,  23,  42];
+  const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+  const W     = doc.internal.pageSize.getWidth();   // 148mm
+  const H     = doc.internal.pageSize.getHeight();  // 210mm
+  const PAD   = 8;
 
   let y = 0;
 
-  // ── Header gradient block ─────────────────────────────────
-  doc.setFillColor(...purple);
-  doc.rect(0, 0, W, 42, 'F');
+  // ══════════════════════════════════════════════
+  // HEADER — merah solid dengan info perusahaan
+  // ══════════════════════════════════════════════
+  doc.setFillColor(...C.red);
+  doc.rect(0, 0, W, 48, 'F');
 
-  // Decorative circles
-  doc.setFillColor(...darkPurple);
-  doc.circle(W - 10, 5, 18, 'F');
-  doc.circle(10, 35, 12, 'F');
+  // Decorative accent
+  doc.setFillColor(...C.redDark);
+  doc.circle(W + 4, -4, 22, 'F');
+  doc.circle(-4, 48, 14, 'F');
 
   // Company name
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text(companyName.toUpperCase(), W / 2, 10, { align: 'center' });
+  doc.setTextColor(...C.white);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  const compUpper = companyName.toUpperCase();
+  doc.text(compUpper, W / 2, 10, { align: 'center' });
+
+  // Divider line
+  doc.setDrawColor(255, 255, 255, 0.3);
+  doc.setLineWidth(0.3);
+  doc.line(PAD + 10, 13, W - PAD - 10, 13);
 
   // Slip title
-  doc.setFontSize(14);
+  doc.setFontSize(17);
   doc.setFont('helvetica', 'bold');
-  doc.text('SLIP INSENTIF', W / 2, 20, { align: 'center' });
+  doc.text('SLIP INSENTIF', W / 2, 23, { align: 'center' });
 
   // Period
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(period?.name || '', W / 2, 28, { align: 'center' });
+  doc.text(period?.name || '', W / 2, 30, { align: 'center' });
 
-  // Status badge
-  const statusLabel = { draft:'Draft', calculated:'Dihitung', approved:'Disetujui', locked:'Final' }[result.status] || '';
-  doc.setFillColor(255, 255, 255, 0.2);
-  doc.roundedRect(W/2 - 15, 32, 30, 7, 2, 2, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(7);
-  doc.text(statusLabel, W / 2, 37, { align: 'center' });
+  // Status pill
+  const statusLabel = {
+    draft:'Draft', calculated:'Dihitung', approved:'Disetujui', locked:'Final'
+  }[result.status] || '';
+  const pillW = 28;
+  doc.setFillColor(255, 255, 255, 0.18);
+  doc.roundedRect(W/2 - pillW/2, 34, pillW, 8, 2, 2, 'F');
+  doc.setTextColor(...C.white);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(statusLabel, W / 2, 39.5, { align: 'center' });
 
-  y = 48;
+  y = 54;
 
-  // ── Employee info card ────────────────────────────────────
-  doc.setFillColor(...light);
-  doc.roundedRect(6, y, W - 12, 28, 3, 3, 'F');
+  // ══════════════════════════════════════════════
+  // EMPLOYEE INFO CARD
+  // ══════════════════════════════════════════════
+  rRect(doc, PAD, y, W - PAD*2, 30, 3, C.grayL);
 
   // Avatar circle
-  doc.setFillColor(...purple);
-  doc.circle(18, y + 14, 9, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
+  doc.setFillColor(...C.red);
+  doc.circle(PAD + 12, y + 15, 9, 'F');
+  doc.setTextColor(...C.white);
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text((result.employee_name || '?')[0].toUpperCase(), 18, y + 18, { align: 'center' });
+  doc.text(
+    (result.employee_name || '?')[0].toUpperCase(),
+    PAD + 12, y + 18.5, { align: 'center' }
+  );
 
   // Employee details
-  doc.setTextColor(...dark);
+  const ex = PAD + 25;
+  doc.setTextColor(...C.dark);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text(result.employee_name || '', 30, y + 10);
+  doc.text(result.employee_name || '', ex, y + 9);
 
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...gray);
-  doc.text(result.position_name || '-', 30, y + 16);
-  doc.text(result.branch_name || '-',   30, y + 22);
+  doc.setTextColor(...C.gray);
+  doc.text(result.position_name || '-', ex, y + 15);
+  doc.text(result.branch_name   || '-', ex, y + 21);
 
-  y += 34;
+  // No. ID kecil di kanan
+  doc.setFontSize(6);
+  doc.text(`ID: ${result.id}`, W - PAD, y + 9, { align: 'right' });
 
-  // ── Total incentive highlight ────────────────────────────
-  doc.setFillColor(...emerald);
-  doc.roundedRect(6, y, W - 12, 18, 3, 3, 'F');
-  doc.setTextColor(255, 255, 255);
+  y += 36;
+
+  // ══════════════════════════════════════════════
+  // TOTAL BOX — hijau
+  // ══════════════════════════════════════════════
+  rRect(doc, PAD, y, W - PAD*2, 20, 3, C.green);
+
+  doc.setTextColor(...C.white);
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  doc.text('TOTAL INSENTIF', W / 2, y + 6, { align: 'center' });
-  doc.setFontSize(14);
+  doc.text('TOTAL INSENTIF', W / 2, y + 7, { align: 'center' });
+
+  doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  doc.text(toRp(result.total_incentive), W / 2, y + 14, { align: 'center' });
+  doc.text(fmt(result.total_incentive), W / 2, y + 16, { align: 'center' });
 
-  y += 24;
+  y += 26;
 
-  // ── Helper: section header ───────────────────────────────
-  const sectionHeader = (title, color = gray) => {
-    doc.setFillColor(240, 240, 248);
-    doc.rect(6, y, W - 12, 7, 'F');
-    doc.setTextColor(...color);
-    doc.setFontSize(7);
+  // ══════════════════════════════════════════════
+  // HELPER FUNCTIONS
+  // ══════════════════════════════════════════════
+  const d = result.details_json || {};
+
+  // Section header
+  const secHead = (title, textColor = C.navy) => {
+    doc.setFillColor(...C.grayL);
+    doc.rect(PAD, y, W - PAD*2, 7, 'F');
+    // Left accent bar
+    doc.setFillColor(...textColor);
+    doc.rect(PAD, y, 2.5, 7, 'F');
+    doc.setTextColor(...textColor);
+    doc.setFontSize(6.5);
     doc.setFont('helvetica', 'bold');
-    doc.text(title, 10, y + 5);
+    doc.text(title.toUpperCase(), PAD + 5, y + 4.8);
     y += 9;
   };
 
-  // ── Helper: detail row ───────────────────────────────────
-  const detailRow = (label, value, valueColor = dark, isLast = false) => {
-    doc.setTextColor(...dark);
+  // Detail row
+  const row = (label, value, valueColor = C.dark, isLast = false) => {
+    doc.setTextColor(...C.dark);
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(label, 10, y + 4);
+    doc.text(label, PAD + 3, y + 4);
     doc.setTextColor(...valueColor);
     doc.setFont('helvetica', 'bold');
-    doc.text(value, W - 8, y + 4, { align: 'right' });
+    doc.text(value, W - PAD, y + 4, { align: 'right' });
     if (!isLast) {
-      doc.setDrawColor(230, 230, 240);
-      doc.line(6, y + 7, W - 6, y + 7);
+      doc.setDrawColor(...C.line);
+      doc.setLineWidth(0.2);
+      doc.line(PAD, y + 7, W - PAD, y + 7);
     }
     y += 8;
   };
 
-  const d = result.details_json || {};
+  // ══════════════════════════════════════════════
+  // PERFORMANCE PENJUALAN
+  // ══════════════════════════════════════════════
+  const hasPerf = parseFloat(result.wa_sales_amount) > 0 ||
+                  parseFloat(result.marketplace_performance) > 0 ||
+                  parseFloat(result.web_performance) > 0;
 
-  // ── Performance section ──────────────────────────────────
-  sectionHeader('PERFORMANCE PENJUALAN');
-  if (parseFloat(result.wa_sales_amount) > 0)
-    detailRow('💬 Penjualan WA', toRp(result.wa_sales_amount));
-  if (parseFloat(result.marketplace_performance) > 0)
-    detailRow('🛒 Performance Marketplace', toRp(result.marketplace_performance));
-  if (parseFloat(result.web_performance) > 0)
-    detailRow('🌐 Performance Web', toRp(result.web_performance));
+  if (hasPerf) {
+    secHead('Performance Penjualan');
+    if (parseFloat(result.wa_sales_amount)        > 0) row('WhatsApp',    fmt(result.wa_sales_amount));
+    if (parseFloat(result.marketplace_performance) > 0) row('Marketplace', fmt(result.marketplace_performance));
+    if (parseFloat(result.web_performance)         > 0) row('Website',     fmt(result.web_performance));
+    y += 2;
+  }
 
-  y += 2;
+  // ══════════════════════════════════════════════
+  // RINCIAN INSENTIF
+  // ══════════════════════════════════════════════
+  secHead('Rincian Insentif', C.green);
 
-  // ── Incentive section ─────────────────────────────────────
-  sectionHeader('RINCIAN INSENTIF', emerald);
-  if (parseFloat(result.wa_incentive) > 0)
-    detailRow(`💬 WA (${parseFloat(d.wa?.channel_pct || 0)}%)`, toRp(result.wa_incentive), emerald);
-  if (parseFloat(result.marketplace_incentive) > 0)
-    detailRow(`🛒 Marketplace (${parseFloat(d.marketplace?.channel_pct || 0)}%)`, toRp(result.marketplace_incentive), emerald);
-  if (parseFloat(result.web_incentive) > 0)
-    detailRow(`🌐 Web (${parseFloat(d.web?.channel_pct || 0)}%)`, toRp(result.web_incentive), emerald);
-  if (parseFloat(result.activity_incentive) > 0)
-    detailRow('⭐ Insentif Aktivitas', toRp(result.activity_incentive), emerald);
-  if (parseFloat(result.bonus_target) > 0)
-    detailRow('🎯 Bonus Target', toRp(result.bonus_target), emerald);
+  const pct = n => parseFloat(n || 0);
+  const rows = [
+    { label: `WhatsApp    (${pct(d.wa?.channel_pct)}%)`,          val: result.wa_incentive },
+    { label: `Marketplace (${pct(d.marketplace?.channel_pct)}%)`, val: result.marketplace_incentive },
+    { label: `Website     (${pct(d.web?.channel_pct)}%)`,         val: result.web_incentive },
+    { label: 'Insentif Aktivitas',                                  val: result.activity_incentive },
+    { label: `Bonus Target${d.bonus_target?.tier ? ` - ${d.bonus_target.tier.name}` : ''}`, val: result.bonus_target },
+  ].filter(r => parseFloat(r.val) > 0);
+
+  rows.forEach((r, i) => row(r.label, fmt(r.val), C.green, i === rows.length - 1));
 
   y += 2;
 
   // Total row
-  doc.setFillColor(...emerald);
-  doc.roundedRect(6, y, W - 12, 10, 2, 2, 'F');
-  doc.setTextColor(255, 255, 255);
+  rRect(doc, PAD, y, W - PAD*2, 11, 2, C.green);
+  doc.setTextColor(...C.white);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('TOTAL INSENTIF', 10, y + 7);
-  doc.text(toRp(result.total_incentive), W - 8, y + 7, { align: 'right' });
-  y += 14;
+  doc.text('TOTAL', PAD + 4, y + 7.5);
+  doc.text(fmt(result.total_incentive), W - PAD, y + 7.5, { align: 'right' });
+  y += 16;
 
-  // ── Footer ────────────────────────────────────────────────
-  doc.setDrawColor(...purple);
-  doc.setLineWidth(0.5);
-  doc.line(6, y, W - 6, y);
-  y += 4;
+  // ══════════════════════════════════════════════
+  // DETAIL AKTIVITAS (jika ada)
+  // ══════════════════════════════════════════════
+  if (d.activities?.details?.length > 0) {
+    secHead('Detail Aktivitas', C.navy);
+    d.activities.details.forEach((a, i, arr) => {
+      doc.setTextColor(...C.dark);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(a.activity, PAD + 3, y + 3);
+      doc.setFontSize(6);
+      doc.setTextColor(...C.gray);
+      doc.text(`${a.date} | ${a.qty} x ${fmt(a.nominal)}`, PAD + 3, y + 7.5);
+      doc.setTextColor(...C.green);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.text(fmt(a.amount), W - PAD, y + 5, { align: 'right' });
+      if (i < arr.length - 1) {
+        doc.setDrawColor(...C.line); doc.setLineWidth(0.2);
+        doc.line(PAD, y + 10, W - PAD, y + 10);
+      }
+      y += 11;
+    });
+    y += 3;
+  }
 
-  doc.setTextColor(...gray);
+  // ══════════════════════════════════════════════
+  // FOOTER
+  // ══════════════════════════════════════════════
+  // Line
+  doc.setDrawColor(...C.line);
+  doc.setLineWidth(0.4);
+  doc.line(PAD, y, W - PAD, y);
+  y += 5;
+
+  // Date + note
+  doc.setTextColor(...C.gray);
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })}`, W / 2, y + 3, { align: 'center' });
-  doc.text('Dokumen ini dihasilkan secara otomatis oleh sistem', W / 2, y + 8, { align: 'center' });
+  const printDate = new Date().toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+  doc.text(`Dicetak: ${printDate}`, PAD, y + 3);
+  doc.text('Dokumen digenerate otomatis oleh sistem', W - PAD, y + 3, { align: 'right' });
 
-  // QR Code (verification)
+  // QR Code
   try {
-    const QRCode = await import('qrcode');
-    const qrData = `INCENTIVE|${result.id}|${result.employee_name}|${result.total_incentive}|${period?.name}`;
-    const qrUrl  = await QRCode.default.toDataURL(qrData, { width: 60, margin: 0 });
-    doc.addImage(qrUrl, 'PNG', W - 20, H - 22, 14, 14);
-    doc.setTextColor(...gray);
+    const QRCode  = await import('qrcode');
+    const qrData  = `INCENTIVE|${result.id}|${result.employee_name}|${result.total_incentive}`;
+    const qrUrl   = await QRCode.default.toDataURL(qrData, { width: 60, margin: 0, color: { dark:'#1e3a8a', light:'#ffffff' } });
+    doc.addImage(qrUrl, 'PNG', W - PAD - 16, H - 22, 14, 14);
+    doc.setTextColor(...C.gray);
     doc.setFontSize(5);
-    doc.text('Scan untuk verifikasi', W - 13, H - 6, { align: 'center' });
+    doc.text('Scan verifikasi', W - PAD - 9, H - 6, { align: 'center' });
   } catch { /* QR optional */ }
 
-  // Save
-  const filename = `slip_insentif_${(result.employee_name || 'karyawan').replace(/\s+/g, '_')}_${period?.month}_${period?.year}.pdf`;
+  // Bottom red bar
+  doc.setFillColor(...C.red);
+  doc.rect(0, H - 3, W, 3, 'F');
+
+  const filename = `slip_insentif_${(result.employee_name || 'karyawan').replace(/\s+/g,'_')}_${period?.month}_${period?.year}.pdf`;
   doc.save(filename);
   return filename;
 };
 
 // ════════════════════════════════════════════════════════════════
-// EXPORT ALL SLIPS — Bulk PDF (one page per employee)
+// BULK PDF — Semua karyawan, satu page per orang
 // ════════════════════════════════════════════════════════════════
-export const exportBulkPDF = async (results, period, companyName = 'HRD Lite', onProgress) => {
+export const exportBulkPDF = async (results, period, companyName = 'GPDISTRO HR Pro', onProgress) => {
   const jsPDF = await loadJsPDF();
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
-  const W   = doc.internal.pageSize.getWidth();
-
-  const purple  = [103,  58, 183];
-  const emerald = [ 16, 185, 129];
-  const gray    = [100, 116, 139];
-  const dark    = [ 15,  23,  42];
-  const light   = [248, 248, 252];
+  const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+  const W     = doc.internal.pageSize.getWidth();
+  const H     = doc.internal.pageSize.getHeight();
+  const PAD   = 8;
 
   for (let idx = 0; idx < results.length; idx++) {
     if (idx > 0) doc.addPage();
     onProgress?.(idx + 1, results.length);
-
-    const result = results[idx];
-    const d      = result.details_json || {};
-    let y        = 0;
+    const r = results[idx];
+    const d = r.details_json || {};
+    let y   = 0;
 
     // Header
-    doc.setFillColor(...purple);
-    doc.rect(0, 0, W, 38, 'F');
-    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(...C.red);
+    doc.rect(0, 0, W, 42, 'F');
+    doc.setFillColor(...C.redDark);
+    doc.circle(W + 2, -2, 18, 'F');
+
+    doc.setTextColor(...C.white);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyName.toUpperCase(), W / 2, 9, { align: 'center' });
+    doc.setFontSize(15);
+    doc.text('SLIP INSENTIF', W / 2, 19, { align: 'center' });
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(companyName.toUpperCase(), W/2, 9, { align: 'center' });
-    doc.setFontSize(13);
+    doc.text(period?.name || '', W / 2, 26, { align: 'center' });
+    doc.setFontSize(6.5);
+    doc.text(`${idx + 1} / ${results.length}`, W / 2, 33, { align: 'center' });
+
+    y = 48;
+
+    // Employee card
+    rRect(doc, PAD, y, W - PAD*2, 26, 3, C.grayL);
+    doc.setFillColor(...C.red);
+    doc.circle(PAD + 11, y + 13, 8, 'F');
+    doc.setTextColor(...C.white);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('SLIP INSENTIF', W/2, 18, { align: 'center' });
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(period?.name || '', W/2, 26, { align: 'center' });
+    doc.text((r.employee_name||'?')[0].toUpperCase(), PAD + 11, y + 16.5, { align:'center' });
 
-    y = 44;
-
-    // Employee info
-    doc.setFillColor(...light);
-    doc.roundedRect(6, y, W-12, 22, 3, 3, 'F');
-    doc.setFillColor(...purple);
-    doc.circle(16, y+11, 7, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(10);
-    doc.setFont('helvetica','bold');
-    doc.text((result.employee_name||'?')[0].toUpperCase(), 16, y+14.5, { align:'center' });
-    doc.setTextColor(...dark);
+    doc.setTextColor(...C.dark);
     doc.setFontSize(9.5);
-    doc.setFont('helvetica','bold');
-    doc.text(result.employee_name||'', 27, y+8);
+    doc.setFont('helvetica', 'bold');
+    doc.text(r.employee_name || '', PAD + 23, y + 9);
     doc.setFontSize(7);
-    doc.setFont('helvetica','normal');
-    doc.setTextColor(...gray);
-    doc.text(`${result.position_name||'-'} · ${result.branch_name||'-'}`, 27, y+14);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.gray);
+    doc.text(`${r.position_name || '-'} | ${r.branch_name || '-'}`, PAD + 23, y + 15);
 
-    y += 28;
+    y += 32;
 
     // Total
-    doc.setFillColor(...emerald);
-    doc.roundedRect(6, y, W-12, 14, 3, 3, 'F');
-    doc.setTextColor(255,255,255);
+    rRect(doc, PAD, y, W - PAD*2, 14, 2, C.green);
+    doc.setTextColor(...C.white);
     doc.setFontSize(6.5);
-    doc.text('TOTAL INSENTIF', W/2, y+5.5, { align:'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('TOTAL INSENTIF', W / 2, y + 5.5, { align: 'center' });
     doc.setFontSize(13);
-    doc.setFont('helvetica','bold');
-    doc.text(toRp(result.total_incentive), W/2, y+12, { align:'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.text(fmt(r.total_incentive), W / 2, y + 12, { align: 'center' });
+    y += 19;
 
-    y += 20;
-
-    // Rows helper
-    const row = (label, val, color=dark) => {
-      doc.setTextColor(...dark);
-      doc.setFontSize(7);
-      doc.setFont('helvetica','normal');
-      doc.text(label, 10, y+4);
+    // Section header helper
+    const sh = (title, color = C.navy) => {
+      doc.setFillColor(...C.grayL);
+      doc.rect(PAD, y, W - PAD*2, 6, 'F');
+      doc.setFillColor(...color);
+      doc.rect(PAD, y, 2, 6, 'F');
       doc.setTextColor(...color);
-      doc.setFont('helvetica','bold');
-      doc.text(val, W-8, y+4, { align:'right' });
-      doc.setDrawColor(230,230,240);
-      doc.line(6, y+6.5, W-6, y+6.5);
-      y += 7.5;
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title.toUpperCase(), PAD + 4, y + 4.3);
+      y += 8;
     };
 
-    // Performance
-    doc.setFillColor(240,240,248);
-    doc.rect(6,y,W-12,6.5,'F');
-    doc.setTextColor(...gray);
-    doc.setFontSize(6.5);
-    doc.setFont('helvetica','bold');
-    doc.text('INSENTIF', 10, y+4.5);
-    y += 8;
+    // Row helper
+    const rw = (label, val, col = C.dark) => {
+      doc.setTextColor(...C.dark);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(label, PAD + 3, y + 3.5);
+      doc.setTextColor(...col);
+      doc.setFont('helvetica', 'bold');
+      doc.text(fmt(val), W - PAD, y + 3.5, { align:'right' });
+      doc.setDrawColor(...C.line); doc.setLineWidth(0.15);
+      doc.line(PAD, y + 6, W - PAD, y + 6);
+      y += 7;
+    };
 
-    if (parseFloat(result.wa_incentive)>0)           row(`WA (${parseFloat(d.wa?.channel_pct||0)}%)`,           toRp(result.wa_incentive),          emerald);
-    if (parseFloat(result.marketplace_incentive)>0)  row(`Marketplace (${parseFloat(d.marketplace?.channel_pct||0)}%)`, toRp(result.marketplace_incentive), emerald);
-    if (parseFloat(result.web_incentive)>0)          row(`Web (${parseFloat(d.web?.channel_pct||0)}%)`,          toRp(result.web_incentive),          emerald);
-    if (parseFloat(result.activity_incentive)>0)     row('Aktivitas',                                            toRp(result.activity_incentive),     [147,51,234]);
-    if (parseFloat(result.bonus_target)>0)           row('Bonus Target',                                         toRp(result.bonus_target),           [217,119,6]);
+    // Incentive breakdown
+    sh('Rincian Insentif', C.green);
+    const pct = n => parseFloat(n || 0);
+    if (parseFloat(r.wa_incentive)          > 0) rw(`WhatsApp (${pct(d.wa?.channel_pct)}%)`,           r.wa_incentive,          C.green);
+    if (parseFloat(r.marketplace_incentive) > 0) rw(`Marketplace (${pct(d.marketplace?.channel_pct)}%)`,r.marketplace_incentive, C.green);
+    if (parseFloat(r.web_incentive)         > 0) rw(`Website (${pct(d.web?.channel_pct)}%)`,            r.web_incentive,         C.green);
+    if (parseFloat(r.activity_incentive)    > 0) rw('Aktivitas',                                         r.activity_incentive,    C.navy);
+    if (parseFloat(r.bonus_target)          > 0) rw('Bonus Target',                                      r.bonus_target,          C.redDark);
+
+    y += 1;
+    // Total row
+    rRect(doc, PAD, y, W - PAD*2, 10, 2, C.green);
+    doc.setTextColor(...C.white);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL', PAD + 4, y + 7);
+    doc.text(fmt(r.total_incentive), W - PAD, y + 7, { align:'right' });
+    y += 15;
 
     // Footer
-    y += 2;
-    doc.setTextColor(...gray);
+    doc.setDrawColor(...C.line); doc.setLineWidth(0.3);
+    doc.line(PAD, y, W - PAD, y);
+    doc.setTextColor(...C.gray);
     doc.setFontSize(6);
-    doc.setFont('helvetica','normal');
-    doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID')} · ${idx+1}/${results.length}`, W/2, y+4, { align:'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Dicetak: ${new Date().toLocaleDateString('id-ID')}`, PAD, y + 4);
+
+    // Bottom bar
+    doc.setFillColor(...C.red);
+    doc.rect(0, H - 3, W, 3, 'F');
   }
 
   const filename = `slip_insentif_bulk_${period?.month}_${period?.year}.pdf`;
@@ -356,89 +425,52 @@ export const exportBulkPDF = async (results, period, companyName = 'HRD Lite', o
 };
 
 // ════════════════════════════════════════════════════════════════
-// EXPORT EXCEL — Rekap semua karyawan
+// EXPORT EXCEL
 // ════════════════════════════════════════════════════════════════
 export const exportExcel = async (results, period) => {
-  // Dynamic import XLSX
   const XLSX = await import('xlsx');
-
   const rows = results.map((r, i) => ({
     'No':                       i + 1,
     'Nama Karyawan':            r.employee_name || '',
-    'Cabang':                   r.branch_name || '',
+    'Cabang':                   r.branch_name   || '',
     'Jabatan':                  r.position_name || '',
-    'Penjualan WA':             parseFloat(r.wa_sales_amount) || 0,
-    'Performance Marketplace':  parseFloat(r.marketplace_performance) || 0,
-    'Performance Web':          parseFloat(r.web_performance) || 0,
-    'Insentif WA':              parseFloat(r.wa_incentive) || 0,
-    'Insentif Marketplace':     parseFloat(r.marketplace_incentive) || 0,
-    'Insentif Web':             parseFloat(r.web_incentive) || 0,
-    'Insentif Aktivitas':       parseFloat(r.activity_incentive) || 0,
-    'Bonus Target':             parseFloat(r.bonus_target) || 0,
-    'TOTAL INSENTIF':           parseFloat(r.total_incentive) || 0,
+    'Penjualan WA':             parseFloat(r.wa_sales_amount)           || 0,
+    'Performance Marketplace':  parseFloat(r.marketplace_performance)   || 0,
+    'Performance Web':          parseFloat(r.web_performance)           || 0,
+    'Insentif WA':              parseFloat(r.wa_incentive)              || 0,
+    'Insentif Marketplace':     parseFloat(r.marketplace_incentive)     || 0,
+    'Insentif Web':             parseFloat(r.web_incentive)             || 0,
+    'Insentif Aktivitas':       parseFloat(r.activity_incentive)        || 0,
+    'Bonus Target':             parseFloat(r.bonus_target)              || 0,
+    'TOTAL INSENTIF':           parseFloat(r.total_incentive)           || 0,
     'Status':                   r.status || '',
   }));
 
-  // Totals row
+  // Totals
   rows.push({
-    'No': '',
-    'Nama Karyawan': 'TOTAL',
-    'Cabang': '', 'Jabatan': '',
-    'Penjualan WA':            results.reduce((s,r) => s + (parseFloat(r.wa_sales_amount)||0), 0),
-    'Performance Marketplace': results.reduce((s,r) => s + (parseFloat(r.marketplace_performance)||0), 0),
-    'Performance Web':         results.reduce((s,r) => s + (parseFloat(r.web_performance)||0), 0),
-    'Insentif WA':             results.reduce((s,r) => s + (parseFloat(r.wa_incentive)||0), 0),
-    'Insentif Marketplace':    results.reduce((s,r) => s + (parseFloat(r.marketplace_incentive)||0), 0),
-    'Insentif Web':            results.reduce((s,r) => s + (parseFloat(r.web_incentive)||0), 0),
-    'Insentif Aktivitas':      results.reduce((s,r) => s + (parseFloat(r.activity_incentive)||0), 0),
-    'Bonus Target':            results.reduce((s,r) => s + (parseFloat(r.bonus_target)||0), 0),
-    'TOTAL INSENTIF':          results.reduce((s,r) => s + (parseFloat(r.total_incentive)||0), 0),
+    'No': '', 'Nama Karyawan': 'TOTAL', 'Cabang': '', 'Jabatan': '',
+    'Penjualan WA':            results.reduce((s,r) => s+(parseFloat(r.wa_sales_amount)||0),          0),
+    'Performance Marketplace': results.reduce((s,r) => s+(parseFloat(r.marketplace_performance)||0),  0),
+    'Performance Web':         results.reduce((s,r) => s+(parseFloat(r.web_performance)||0),          0),
+    'Insentif WA':             results.reduce((s,r) => s+(parseFloat(r.wa_incentive)||0),             0),
+    'Insentif Marketplace':    results.reduce((s,r) => s+(parseFloat(r.marketplace_incentive)||0),    0),
+    'Insentif Web':            results.reduce((s,r) => s+(parseFloat(r.web_incentive)||0),            0),
+    'Insentif Aktivitas':      results.reduce((s,r) => s+(parseFloat(r.activity_incentive)||0),       0),
+    'Bonus Target':            results.reduce((s,r) => s+(parseFloat(r.bonus_target)||0),             0),
+    'TOTAL INSENTIF':          results.reduce((s,r) => s+(parseFloat(r.total_incentive)||0),          0),
     'Status': '',
   });
 
   const ws = XLSX.utils.json_to_sheet(rows);
-
-  // Column widths
   ws['!cols'] = [
-    {wch:4}, {wch:22}, {wch:16}, {wch:18},
+    {wch:4},{wch:22},{wch:16},{wch:18},
     {wch:16},{wch:20},{wch:16},
     {wch:14},{wch:18},{wch:14},{wch:18},{wch:14},
     {wch:18},{wch:12},
   ];
-
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, period?.name || 'Insentif');
-
   const filename = `rekap_insentif_${period?.month}_${period?.year}.xlsx`;
-  XLSX.writeFile(wb, filename);
-  return filename;
-};
-
-// ════════════════════════════════════════════════════════════════
-// EXPORT WA SALES EXCEL
-// ════════════════════════════════════════════════════════════════
-export const exportWaSalesExcel = async (sales, periodName) => {
-  const XLSX = await import('xlsx');
-
-  const rows = sales.map((s, i) => ({
-    'No':             i + 1,
-    'Tanggal':        s.date,
-    'Karyawan':       s.employee?.name || '',
-    'Cabang':         s.branch?.name || '',
-    'Customer':       s.customer_name || '',
-    'Nominal':        parseFloat(s.sale_amount) || 0,
-    'Insentif (%)':   parseFloat(s.channel_pct) || 0,
-    'Insentif (Rp)':  parseFloat(s.incentive_amount) || 0,
-    'Keterangan':     s.notes || '',
-  }));
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{wch:4},{wch:12},{wch:20},{wch:14},{wch:20},{wch:16},{wch:12},{wch:16},{wch:20}];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'WA Sales');
-
-  const filename = `wa_sales_${periodName?.replace(/\s+/g,'_') || 'export'}.xlsx`;
   XLSX.writeFile(wb, filename);
   return filename;
 };
