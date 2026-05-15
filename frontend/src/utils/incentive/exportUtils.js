@@ -231,6 +231,19 @@ export const exportSlipPDF = async (result, period, companyName = 'GPDISTRO HR P
   // DETAIL AKTIVITAS (jika ada)
   // ══════════════════════════════════════════════
   if (d.activities?.details?.length > 0) {
+    // Check if we need a new page
+    if (y > H - 60) {
+      doc.addPage();
+      y = 10;
+      // Mini header on new page
+      doc.setFillColor(...C.red);
+      doc.rect(0, 0, W, 8, 'F');
+      doc.setTextColor(...C.white);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${result.employee_name} — ${period?.name} (lanjutan)`, W/2, 5.5, { align:'center' });
+      y = 14;
+    }
     secHead('Detail Aktivitas', C.navy);
     d.activities.details.forEach((a, i, arr) => {
       doc.setTextColor(...C.dark);
@@ -256,6 +269,19 @@ export const exportSlipPDF = async (result, period, companyName = 'GPDISTRO HR P
   // ══════════════════════════════════════════════
   // FOOTER
   // ══════════════════════════════════════════════
+  // Ensure footer doesn't overlap content
+  if (y > H - 30) {
+    doc.addPage();
+    y = 10;
+    doc.setFillColor(...C.red);
+    doc.rect(0, 0, W, 8, 'F');
+    doc.setTextColor(...C.white);
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${result.employee_name} — ${period?.name}`, W/2, 5.5, { align:'center' });
+    y = 14;
+  }
+
   // Line
   doc.setDrawColor(...C.line);
   doc.setLineWidth(0.4);
@@ -269,21 +295,22 @@ export const exportSlipPDF = async (result, period, companyName = 'GPDISTRO HR P
   const printDate = new Date().toLocaleDateString('id-ID', {
     day: 'numeric', month: 'long', year: 'numeric'
   });
-  doc.text(`Dicetak: ${printDate}`, PAD, y + 3);
-  doc.text('Dokumen digenerate otomatis oleh sistem', W - PAD, y + 3, { align: 'right' });
+  // QR on left side, text on right
+  doc.text(`Dicetak: ${printDate}`, PAD + 16, y + 3);
+  doc.text('Digenerate otomatis oleh sistem', W - PAD, y + 3, { align: 'right' });
 
-  // QR Code
+  // ── QR Code — di sebelah kiri footer, tidak menimpa konten ──
   try {
-    const QRCode  = await import('qrcode');
-    const qrData  = `INCENTIVE|${result.id}|${result.employee_name}|${result.total_incentive}`;
-    const qrUrl   = await QRCode.default.toDataURL(qrData, { width: 60, margin: 0, color: { dark:'#1e3a8a', light:'#ffffff' } });
-    doc.addImage(qrUrl, 'PNG', W - PAD - 16, H - 22, 14, 14);
+    const QRCode = await import('qrcode');
+    const qrData = `INCENTIVE|${result.id}|${result.employee_name}|${result.total_incentive}`;
+    const qrUrl  = await QRCode.default.toDataURL(qrData, { width: 60, margin: 0, color: { dark:'#1e3a8a', light:'#ffffff' } });
+    doc.addImage(qrUrl, 'PNG', PAD, y + 1, 12, 12);
     doc.setTextColor(...C.gray);
     doc.setFontSize(5);
-    doc.text('Scan verifikasi', W - PAD - 9, H - 6, { align: 'center' });
+    doc.text('Scan verifikasi', PAD + 6, y + 15, { align: 'center' });
   } catch { /* QR optional */ }
 
-  // Bottom red bar
+  // Bottom red bar — always at very bottom of page
   doc.setFillColor(...C.red);
   doc.rect(0, H - 3, W, 3, 'F');
 
