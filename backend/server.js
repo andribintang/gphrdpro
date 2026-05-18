@@ -16,6 +16,7 @@ const reportsRoutes      = require('./routes/reports');
 const payrollEngineRoutes = require('./routes/payrollEngine');
 const incentiveRoutes      = require('./routes/incentive');
 const companyRoutes        = require('./routes/company');
+const erpRoutes            = require('./routes/erp');
 
 const app  = express();
 // ── Railway requires PORT from env, bound to 0.0.0.0 ──
@@ -333,6 +334,7 @@ app.use('/api/reports',       reportsRoutes);
 app.use('/api/payroll-engine', payrollEngineRoutes);
 app.use('/api/incentive',      incentiveRoutes);
 app.use('/api/company',        companyRoutes);
+app.use('/api/erp',            erpRoutes);
 
 // ── 404 + Error ───────────────────────────────────────────────
 app.use(notFound);
