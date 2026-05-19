@@ -162,6 +162,16 @@ app.post('/run-alter', async (req, res) => {
       }
     }
 
+    // Add admin_fee column to erp_orders if missing
+    try {
+      await sequelize.query('ALTER TABLE `erp_orders` ADD COLUMN `admin_fee` DECIMAL(15,2) NOT NULL DEFAULT 0');
+      results.push('OK: erp_orders.admin_fee added');
+    } catch(e) {
+      if (e.message.includes('Duplicate column') || e.message.includes('already exists')) {
+        results.push('SKIP: erp_orders.admin_fee already exists');
+      } else { errors.push('ERR admin_fee: ' + e.message.substring(0,80)); }
+    }
+
     // Set defaults for eligible_statuses
     await sequelize.query(
       `UPDATE inc_bonus_targets SET eligible_statuses = '["kontrak","tetap"]' WHERE eligible_statuses IS NULL`
