@@ -61,7 +61,7 @@ const PaymentModal = ({ orderId, totalAmount, onClose, onSuccess }) => {
               className="input-base text-sm" />
           </div>
           <div className="flex items-center justify-between py-2 border-t border-[var(--border)]">
-            <span className="text-sm text-[var(--text-secondary)]">Jumlah</span>
+            <span className="body-sm text-[var(--text-secondary)]">Jumlah</span>
             <span className="text-base font-black text-[var(--text-primary)]">{toRp(totalAmount)}</span>
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function OrderDetailPage() {
   const profit = order.items?.reduce((s,i) => s + parseFloat(i.profit||0), 0) || 0;
 
   return (
-    <div className="w-full">
+    <div className="section animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/erp/orders')}
@@ -244,7 +244,7 @@ export default function OrderDetailPage() {
         <div className="lg:col-span-3 space-y-4">
 
           {/* Order items */}
-          <div className="card overflow-hidden">
+          <div className="table-wrapper">
             <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
               <p className="text-xs font-bold text-[var(--text-primary)]">Produk ({order.items?.length})</p>
             </div>
@@ -292,7 +292,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Shipment */}
-          <div className="card overflow-hidden">
+          <div className="table-wrapper">
             <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center justify-between">
               <p className="text-xs font-bold text-[var(--text-primary)]">Pengiriman</p>
               {!order.shipment && ['confirmed','processing'].includes(order.status) && (
@@ -349,7 +349,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Payments */}
-          <div className="card overflow-hidden">
+          <div className="table-wrapper">
             <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center justify-between">
               <p className="text-xs font-bold text-[var(--text-primary)]">Pembayaran</p>
               {order.status !== 'cancelled' && (
@@ -393,7 +393,7 @@ export default function OrderDetailPage() {
         {/* RIGHT — sidebar */}
         <div className="lg:col-span-2 space-y-4">
           {/* Actions */}
-          <div className="card p-4 space-y-2">
+          <div className="card-sm space-y-2">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Aksi</p>
             {order.status === 'draft' && (
               <button onClick={() => doAction('confirm','Dikonfirmasi')} disabled={acting}
@@ -417,7 +417,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Customer info */}
-          <div className="card p-4">
+          <div className="card-sm">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Pelanggan</p>
             {order.customer_name ? (
               <div className="space-y-2">
@@ -438,7 +438,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Order info */}
-          <div className="card p-4 space-y-2">
+          <div className="card-sm space-y-2">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Info Order</p>
             {[
               { l:'No. Order',    v: order.order_no },
@@ -455,7 +455,7 @@ export default function OrderDetailPage() {
           </div>
 
           {order.notes && (
-            <div className="card p-4">
+            <div className="card-sm">
               <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Catatan</p>
               <p className="text-sm text-[var(--text-primary)]">{order.notes}</p>
             </div>

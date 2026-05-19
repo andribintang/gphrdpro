@@ -38,17 +38,17 @@ export default function OrdersPage() {
   useEffect(() => { fetch(); }, [fetch]);
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Penjualan</h1>
-          <p className="text-sm text-[var(--text-secondary)]">{total} total order</p>
+          <h1 className="page-title">Penjualan</h1>
+          <p className="body-sm text-[var(--text-secondary)]">{total} total order</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => navigate('/erp/orders/new')} className="btn-primary h-9 px-3 text-sm">
+          <button onClick={() => navigate('/erp/orders/new')} className="btn-primary">
             <Plus className="w-4 h-4" /> Buat Order
           </button>
         </div>
@@ -95,16 +95,16 @@ export default function OrdersPage() {
 
       {/* List */}
       {loading ? (
-        <div className="space-y-2">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
+        <div className="space-y-2">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
       ) : orders.length === 0 ? (
         <div className="text-center py-14">
           <ShoppingCart className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
           <p className="text-sm text-[var(--text-muted)]">Tidak ada order</p>
-          <button onClick={() => navigate('/erp/orders/new')} className="btn-primary mt-4 px-6 text-sm">Buat Order Baru</button>
+          <button onClick={() => navigate('/erp/orders/new')} className="btn-primary mt-4">Buat Order Baru</button>
         </div>
       ) : (
         <>
-          <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+          <div className="table-wrapper">
             {orders.map(o => {
               const st = ORDER_STATUS[o.status] || ORDER_STATUS.draft;
               const ch = CHANNELS[o.channel]   || CHANNELS.direct;

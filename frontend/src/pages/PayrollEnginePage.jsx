@@ -252,7 +252,7 @@ const RunsTab = () => {
       ) : (
         <div className="space-y-2">
           {runs.map(run => (
-            <div key={run.id} className="card overflow-hidden">
+            <div key={run.id} className="table-wrapper">
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div>
@@ -482,7 +482,7 @@ const MySlipTab = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="card p-4">
+      <div className="card-sm">
         <p className="text-xs text-[var(--text-muted)] font-medium">Total Penghasilan {currentYear()}</p>
         <p className="text-2xl font-black text-brand-600 dark:text-brand-400 mt-1">{toRupiahShort(yearTotal)}</p>
       </div>
@@ -502,7 +502,7 @@ const MySlipTab = () => {
       ) : items.length === 0 ? (
         <div className="text-center py-12"><FileText className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" /><p className="text-sm text-[var(--text-muted)]">Belum ada slip gaji</p></div>
       ) : (
-        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <div className="table-wrapper">
           {items.map(item => {
             const rt = RUN_TYPES[item.run?.type] || RUN_TYPES.monthly;
             return (
@@ -596,7 +596,7 @@ const ComponentsTab = () => {
           {(!filterType || filterType === 'income') && incomes.length > 0 && (
             <div>
               <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">💚 Komponen Pendapatan</p>
-              <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+              <div className="table-wrapper">
                 {incomes.map(c => (
                   <div key={c.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
@@ -623,7 +623,7 @@ const ComponentsTab = () => {
           {(!filterType || filterType === 'deduction') && deductions.length > 0 && (
             <div>
               <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">❤️ Komponen Potongan</p>
-              <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+              <div className="table-wrapper">
                 {deductions.map(c => (
                   <div key={c.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
@@ -931,9 +931,9 @@ export default function PayrollEnginePage() {
 
   return (
     <div className="max-w-lg lg:max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Penggajian Pro</h1>
+          <h1 className="page-title">Penggajian Pro</h1>
           <p className="text-sm text-[var(--text-secondary)]">Gaji · THR · Bonus · Kasbon</p>
         </div>
         <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center">

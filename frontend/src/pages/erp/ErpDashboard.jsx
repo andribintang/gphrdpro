@@ -57,8 +57,8 @@ export default function ErpDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl lg:text-2xl font-bold text-[var(--text-primary)]">Dashboard ERP</h1>
-          <p className="text-sm text-[var(--text-secondary)]">GPDISTRO Racing ID</p>
+          <h1 className="page-title">Dashboard ERP</h1>
+          <p className="body-sm text-[var(--text-secondary)]">GPDISTRO Racing ID</p>
         </div>
         <div className="flex items-center gap-2">
           <select value={branchFilter} onChange={e => setBF(e.target.value)}
@@ -71,7 +71,7 @@ export default function ErpDashboard() {
             className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => navigate('/erp/orders/new')} className="btn-primary h-9 px-3 text-sm">
+          <button onClick={() => navigate('/erp/orders/new')} className="btn-primary">
             <Plus className="w-4 h-4" /> Order Baru
           </button>
         </div>
@@ -125,17 +125,17 @@ export default function ErpDashboard() {
         </div>
 
         {loading ? (
-          <div className="space-y-2">{[...Array(4)].map((_,i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
+          <div className="space-y-2">{[...Array(4)].map((_,i) => <div key={i} className="skeleton h-16" />)}</div>
         ) : orders.length === 0 ? (
           <div className="card p-8 text-center">
             <ShoppingCart className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
             <p className="text-sm text-[var(--text-muted)]">Belum ada order</p>
-            <button onClick={() => navigate('/erp/orders/new')} className="btn-primary mt-4 px-6 text-sm">
+            <button onClick={() => navigate('/erp/orders/new')} className="btn-primary mt-4">
               Buat Order Pertama
             </button>
           </div>
         ) : (
-          <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+          <div className="table-wrapper">
             {orders.map(o => {
               const st = ORDER_STATUS[o.status] || ORDER_STATUS.draft;
               const ch = CHANNELS[o.channel]   || CHANNELS.direct;

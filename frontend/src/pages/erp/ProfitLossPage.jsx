@@ -44,7 +44,7 @@ export default function ProfitLossPage() {
   const setThisYear   = () => { const n=new Date(); setDate({ from: `${n.getFullYear()}-01-01`, to: n.toISOString().split('T')[0] }); };
 
   if (loading) return (
-    <div className="space-y-3">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
+    <div className="space-y-3">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
   );
 
   const income   = data?.income   || {};
@@ -52,11 +52,11 @@ export default function ProfitLossPage() {
   const netProfit = data?.net_profit || 0;
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Laporan Laba Rugi</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Profit & Loss Statement</p>
+          <h1 className="page-title">Laporan Laba Rugi</h1>
+          <p className="body-sm text-[var(--text-secondary)]">Profit & Loss Statement</p>
         </div>
         <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><RefreshCw className="w-4 h-4" /></button>
       </div>
@@ -95,7 +95,7 @@ export default function ProfitLossPage() {
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-5 space-y-4 lg:space-y-0">
         {/* Income Statement */}
-        <div className="card overflow-hidden">
+        <div className="table-wrapper">
           <div className="px-4 py-3 bg-emerald-50 dark:bg-emerald-950 border-b border-[var(--border)]">
             <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Pendapatan</p>
           </div>
@@ -122,7 +122,7 @@ export default function ProfitLossPage() {
         </div>
 
         {/* Expense breakdown */}
-        <div className="card overflow-hidden">
+        <div className="table-wrapper">
           <div className="px-4 py-3 bg-red-50 dark:bg-red-950 border-b border-[var(--border)]">
             <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wider">Pengeluaran</p>
           </div>

@@ -170,8 +170,8 @@ const ProductModal = ({ product, branches, categories, onClose, onSuccess }) => 
         </div>
 
         <div className="px-5 py-4 border-t border-[var(--border)] flex gap-2 flex-shrink-0">
-          <button onClick={onClose} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-11 text-sm">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {isEdit ? 'Simpan' : 'Tambah Produk'}
           </button>
@@ -290,18 +290,18 @@ export default function ProductsPage() {
   const lowStockCount = products.filter(p => (p.stock?.qty||0) <= p.stock_min).length;
 
   return (
-    <div className="w-full">
+    <div className="section animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Produk</h1>
-          <p className="text-sm text-[var(--text-secondary)]">{products.length} produk aktif</p>
+          <h1 className="page-title">Produk</h1>
+          <p className="body-sm text-[var(--text-secondary)]">{products.length} produk aktif</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowAdd(true)} className="btn-primary h-9 px-3 text-sm">
+          <button onClick={() => setShowAdd(true)} className="btn-primary">
             <Plus className="w-4 h-4" /> Tambah
           </button>
         </div>
@@ -338,15 +338,15 @@ export default function ProductsPage() {
 
       {/* Product list */}
       {loading ? (
-        <div className="space-y-2">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
+        <div className="space-y-2">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
       ) : products.length === 0 ? (
         <div className="text-center py-14">
           <Package className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
           <p className="text-sm text-[var(--text-muted)]">Belum ada produk</p>
-          <button onClick={() => setShowAdd(true)} className="btn-primary mt-4 px-6 text-sm">Tambah Produk</button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary mt-4">Tambah Produk</button>
         </div>
       ) : (
-        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <div className="table-wrapper">
           {products.map(p => {
             const qty    = p.stock?.qty || 0;
             const isLow  = qty <= p.stock_min;

@@ -18,7 +18,7 @@ const ROLE_LABEL = {
 const Section = ({ title, children }) => (
   <div className="space-y-2">
     <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider px-1">{title}</h3>
-    <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+    <div className="table-wrapper">
       {children}
     </div>
   </div>
@@ -119,7 +119,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg lg:max-w-3xl mx-auto space-y-5 animate-slide-up">
       {/* Profile card */}
-      <div className="card p-5">
+      <div className="card-padded">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600
             flex items-center justify-center shadow-glow flex-shrink-0">

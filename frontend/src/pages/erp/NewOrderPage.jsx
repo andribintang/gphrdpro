@@ -135,7 +135,7 @@ export default function NewOrderPage() {
   };
 
   return (
-    <div className="w-full">
+    <div className="section animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/erp/orders')}
@@ -152,7 +152,7 @@ export default function NewOrderPage() {
         {/* LEFT — order details */}
         <div className="lg:col-span-3 space-y-4">
           {/* Branch + Channel */}
-          <div className="card p-4 space-y-3">
+          <div className="card-sm space-y-3">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Cabang & Channel</p>
             <div className="grid grid-cols-2 gap-2">
               {BRANCHES.map(b => (
@@ -180,7 +180,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Customer */}
-          <div className="card p-4 space-y-3">
+          <div className="card-sm space-y-3">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Pelanggan</p>
             {customer ? (
               <div className="flex items-center gap-3">
@@ -234,7 +234,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Products */}
-          <div className="card p-4 space-y-3">
+          <div className="card-sm space-y-3">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Produk</p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -308,7 +308,7 @@ export default function NewOrderPage() {
         {/* RIGHT — summary */}
         <div className="lg:col-span-2 space-y-4">
           {/* Summary */}
-          <div className="card p-4 space-y-3">
+          <div className="card-sm space-y-3">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Ringkasan</p>
 
             <div className="space-y-2 text-sm">
@@ -344,7 +344,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Payment */}
-          <div className="card p-4 space-y-3">
+          <div className="card-sm space-y-3">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Pembayaran</p>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(PAYMENT_METHODS).map(([k,v]) => (
@@ -357,7 +357,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Notes */}
-          <div className="card p-4">
+          <div className="card-sm">
             <label className="field-label">Catatan Order</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
               rows={2} placeholder="Catatan tambahan..."

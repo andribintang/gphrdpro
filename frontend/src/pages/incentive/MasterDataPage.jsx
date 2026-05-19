@@ -213,7 +213,7 @@ const PositionsTab = () => {
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5" /> {branchName} ({posts.length})
             </p>
-            <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+            <div className="table-wrapper">
               {posts.map(pos => (
                 <div key={pos.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-8 h-8 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
@@ -382,7 +382,7 @@ const EmployeesTab = () => {
       {loading ? <div className="space-y-2">{[...Array(4)].map((_,i)=><div key={i} className="skeleton h-16 rounded-xl"/>)}</div>
       : employees.length === 0 ? <div className="text-center py-10 text-sm text-[var(--text-muted)]">Belum ada karyawan</div>
       : (
-        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <div className="table-wrapper">
           {employees.map(e => (
             <div key={e.id} className="flex items-center gap-3 px-4 py-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
@@ -539,7 +539,7 @@ const ChannelsTab = () => {
         <div className="space-y-3">{[...Array(3)].map((_,i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}</div>
       ) : (
         matrix.map(({ channel, branches: branchRates }) => (
-          <div key={channel.id} className="card overflow-hidden">
+          <div key={channel.id} className="table-wrapper">
             {/* Channel header */}
             <div className="flex items-center gap-3 px-4 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
               <span className="text-2xl">{ICONS[channel.code] || '📊'}</span>
@@ -795,7 +795,7 @@ const BonusTargetsTab = () => {
       {loading ? <div className="space-y-2">{[...Array(3)].map((_,i)=><div key={i} className="skeleton h-16 rounded-xl"/>)}</div>
       : targets.length === 0 ? <div className="text-center py-10 text-sm text-[var(--text-muted)]">Belum ada target bonus</div>
       : targets.map((t, i) => (
-        <div key={t.id} className="card p-4">
+        <div key={t.id} className="card-sm">
           <div className="flex items-start justify-between mb-2">
             <div>
               <div className="flex items-center gap-2">
@@ -910,7 +910,7 @@ export default function MasterDataPage() {
   return (
     <div className="max-w-lg lg:max-w-4xl mx-auto">
       <div className="mb-5">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Master Data</h1>
+        <h1 className="page-title">Master Data</h1>
         <p className="text-sm text-[var(--text-secondary)]">Cabang · Karyawan · Jalur Penjualan · Aktivitas · Target</p>
       </div>
 

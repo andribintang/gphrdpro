@@ -67,8 +67,8 @@ const CustomerModal = ({ customer, onClose, onSuccess }) => {
           </div>
         </div>
         <div className="px-5 py-4 border-t border-[var(--border)] flex gap-2 flex-shrink-0">
-          <button onClick={onClose} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
-          <button onClick={handle} disabled={saving} className="btn-primary flex-1 h-11 text-sm">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handle} disabled={saving} className="btn-primary flex-1">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {isEdit ? 'Simpan' : 'Tambah'}
           </button>
@@ -99,17 +99,17 @@ export default function CustomersPage() {
   useEffect(() => { fetch(); }, [fetch]);
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Pelanggan</h1>
-          <p className="text-sm text-[var(--text-secondary)]">{total} pelanggan terdaftar</p>
+          <h1 className="page-title">Pelanggan</h1>
+          <p className="body-sm text-[var(--text-secondary)]">{total} pelanggan terdaftar</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowAdd(true)} className="btn-primary h-9 px-3 text-sm">
+          <button onClick={() => setShowAdd(true)} className="btn-primary">
             <Plus className="w-4 h-4" /> Tambah
           </button>
         </div>
@@ -123,15 +123,15 @@ export default function CustomersPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
+        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-16" />)}</div>
       ) : customers.length === 0 ? (
         <div className="text-center py-14">
           <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
           <p className="text-sm text-[var(--text-muted)]">Belum ada pelanggan</p>
-          <button onClick={() => setShowAdd(true)} className="btn-primary mt-4 px-6 text-sm">Tambah Pelanggan</button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary mt-4">Tambah Pelanggan</button>
         </div>
       ) : (
-        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <div className="table-wrapper">
           {customers.map(c => (
             <div key={c.id} className="flex items-center gap-3 px-4 py-3.5">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">

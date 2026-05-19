@@ -67,11 +67,11 @@ export default function SalesReportPage() {
   const maxRevenue = Math.max(...Object.values(byChannel).map(c => c.revenue||0), 1);
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Laporan Penjualan</h1>
-          <p className="text-sm text-[var(--text-secondary)]">GPDISTRO Racing ID</p>
+          <h1 className="page-title">Laporan Penjualan</h1>
+          <p className="body-sm text-[var(--text-secondary)]">GPDISTRO Racing ID</p>
         </div>
         <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
           <RefreshCw className="w-4 h-4" />
@@ -117,7 +117,7 @@ export default function SalesReportPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">{[...Array(4)].map((_,i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}</div>
+        <div className="space-y-3">{[...Array(4)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
       ) : tab === 'sales' ? (
         <div className="space-y-4">
           {/* Summary cards */}
@@ -132,7 +132,7 @@ export default function SalesReportPage() {
                   : '0%',
                 color:'text-purple-600 dark:text-purple-400', bg:'bg-purple-100 dark:bg-purple-950' },
             ].map((s,i) => (
-              <div key={i} className="card p-4">
+              <div key={i} className="card-sm">
                 <div className={`w-8 h-8 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
                   <s.icon className={`w-4 h-4 ${s.color}`} size={16} />
                 </div>
@@ -143,7 +143,7 @@ export default function SalesReportPage() {
           </div>
 
           {/* By channel */}
-          <div className="card p-4">
+          <div className="card-sm">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-4">Omzet per Channel</p>
             <div className="space-y-4">
               {Object.entries(byChannel).map(([k,v]) => {
@@ -168,7 +168,7 @@ export default function SalesReportPage() {
 
           {/* Order list */}
           {report?.orders?.length > 0 && (
-            <div className="card overflow-hidden">
+            <div className="table-wrapper">
               <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
                 <p className="text-xs font-bold text-[var(--text-primary)]">Daftar Order ({report.orders.length})</p>
               </div>
@@ -195,7 +195,7 @@ export default function SalesReportPage() {
         </div>
       ) : (
         // Shipments tab
-        <div className="card overflow-hidden">
+        <div className="table-wrapper">
           <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center justify-between">
             <p className="text-xs font-bold text-[var(--text-primary)]">Resi Pengiriman ({shipments.length})</p>
           </div>

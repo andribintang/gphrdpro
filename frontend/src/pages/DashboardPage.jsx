@@ -145,7 +145,7 @@ export default function DashboardPage() {
   const checkedOut = !!todayAtt?.attendance?.check_out_time;
 
   return (
-    <div className="space-y-5 animate-slide-up">
+    <div className="section animate-fade-in">
       {/* ── Header ────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
         <div>
@@ -344,7 +344,7 @@ export default function DashboardPage() {
               Lihat semua <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+          <div className="table-wrapper">
             {loading ? (
               [...Array(4)].map((_,i) => <div key={i} className="skeleton h-14 rounded-none" />)
             ) : recentAtt.length === 0 ? (
@@ -367,7 +367,7 @@ export default function DashboardPage() {
       {!isHRAdmin && (
         <div>
           <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Absensi Minggu Ini</h3>
-          <div className="card p-4">
+          <div className="card-sm">
             {loading ? (
               <div className="skeleton h-16 rounded-xl" />
             ) : todayAtt?.recent?.length > 0 ? (

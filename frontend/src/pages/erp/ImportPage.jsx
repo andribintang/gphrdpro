@@ -78,11 +78,11 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Import Data</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Migrasi dari Excel / CSV</p>
+          <h1 className="page-title">Import Data</h1>
+          <p className="body-sm text-[var(--text-secondary)]">Migrasi dari Excel / CSV</p>
         </div>
         <button onClick={downloadTemplate}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">

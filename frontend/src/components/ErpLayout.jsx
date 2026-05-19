@@ -1,188 +1,149 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useState } from 'react';
 import {
   ShoppingCart, Package, Users, BarChart3,
   ShoppingBag, Wallet, ClipboardList, Upload,
-  TrendingUp, Home, ChevronRight, LayoutGrid,
-  ChevronDown
+  TrendingUp, Home, ChevronRight, LayoutGrid
 } from 'lucide-react';
 
-// ── ERP Sub-navigation structure ─────────────────────────────
 const ERP_NAV = [
   {
-    group: 'PENJUALAN',
+    group: 'Penjualan',
     items: [
-      { to: '/erp',           icon: Home,         label: 'Dashboard',   exact: true },
-      { to: '/erp/orders',    icon: ShoppingCart, label: 'Order'        },
-      { to: '/erp/customers', icon: Users,        label: 'Pelanggan'    },
+      { to:'/erp',           icon:Home,         label:'Dashboard',   exact:true },
+      { to:'/erp/orders',    icon:ShoppingCart, label:'Order'        },
+      { to:'/erp/customers', icon:Users,        label:'Pelanggan'    },
     ],
   },
   {
-    group: 'INVENTORY',
+    group: 'Inventory',
     items: [
-      { to: '/erp/products',     icon: Package,      label: 'Produk'       },
-      { to: '/erp/purchases',    icon: ShoppingBag,  label: 'Pembelian'    },
-      { to: '/erp/stock-opname', icon: ClipboardList,label: 'Stok Opname'  },
-      { to: '/erp/import',       icon: Upload,       label: 'Import Data'  },
+      { to:'/erp/products',     icon:Package,       label:'Produk'       },
+      { to:'/erp/purchases',    icon:ShoppingBag,   label:'Pembelian'    },
+      { to:'/erp/stock-opname', icon:ClipboardList, label:'Stok Opname'  },
+      { to:'/erp/import',       icon:Upload,        label:'Import Data'  },
     ],
   },
   {
-    group: 'KEUANGAN',
+    group: 'Keuangan',
     items: [
-      { to: '/erp/expenses',    icon: Wallet,     label: 'Pengeluaran'  },
-      { to: '/erp/profit-loss', icon: TrendingUp, label: 'Laba Rugi'    },
-      { to: '/erp/reports',     icon: BarChart3,  label: 'Laporan Sales' },
+      { to:'/erp/expenses',    icon:Wallet,     label:'Pengeluaran'  },
+      { to:'/erp/profit-loss', icon:TrendingUp, label:'Laba Rugi'    },
+      { to:'/erp/reports',     icon:BarChart3,  label:'Laporan Sales' },
     ],
   },
 ];
 
-// ── Sub-nav item ──────────────────────────────────────────────
 const SubNavItem = ({ to, icon: Icon, label, exact }) => (
-  <NavLink
-    to={to}
-    end={exact}
-    className={({ isActive }) =>
-      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
-      ${isActive
-        ? 'bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 font-semibold'
-        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
-      }`
-    }>
+  <NavLink to={to} end={exact}
+    className={({ isActive }) => [
+      'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+      isActive
+        ? 'bg-[var(--sidebar-item-active-bg)] text-[var(--sidebar-item-active-text)] font-semibold'
+        : 'text-[var(--text-secondary)] hover:bg-[var(--sidebar-item-hover)] hover:text-[var(--text-primary)] font-medium',
+    ].join(' ')
+  }>
     {({ isActive }) => (
       <>
-        <Icon size={15} className={isActive ? 'text-brand-500' : 'text-[var(--text-muted)]'} />
-        <span>{label}</span>
-        {isActive && <ChevronRight size={12} className="ml-auto text-brand-400" />}
+        <Icon size={14} className={isActive ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'} />
+        <span className="flex-1">{label}</span>
+        {isActive && <ChevronRight size={12} className="text-[var(--brand-500)] opacity-60" />}
       </>
     )}
   </NavLink>
 );
 
-// ── Mobile sub-nav (top tabs) ─────────────────────────────────
-const MobileSubNav = () => {
-  const location = useLocation();
-  const allItems = ERP_NAV.flatMap(g => g.items);
-  const active = allItems.find(i => i.exact
-    ? location.pathname === i.to
-    : location.pathname.startsWith(i.to)
-  );
-
-  return (
-    <div className="flex gap-1 overflow-x-auto scrollbar-none pb-1">
-      {allItems.map(item => {
-        const isActive = item.exact
-          ? location.pathname === item.to
-          : location.pathname.startsWith(item.to);
-        return (
-          <NavLink key={item.to} to={item.to} end={item.exact}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all
-            ${isActive
-              ? 'bg-brand-500 text-white'
-              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border)]'}`}>
-            <item.icon size={12} />
-            {item.label}
-          </NavLink>
-        );
-      })}
-    </div>
-  );
-};
-
-// ════════════════════════════════════════════════════════════════
-// ERP LAYOUT
-// ════════════════════════════════════════════════════════════════
 export default function ErpLayout() {
   const location = useLocation();
 
-  // Get active page label for breadcrumb
-  const allItems = ERP_NAV.flatMap(g => g.items);
-  const active = allItems.find(i => i.exact
+  const allItems   = ERP_NAV.flatMap(g => g.items);
+  const activeItem = allItems.find(i => i.exact
     ? location.pathname === i.to
     : location.pathname === i.to || location.pathname.startsWith(i.to + '/')
   );
-  const activeGroup = ERP_NAV.find(g =>
-    g.items.some(i => i.exact
-      ? location.pathname === i.to
-      : location.pathname === i.to || location.pathname.startsWith(i.to + '/'))
-  );
+  const activeGroup = ERP_NAV.find(g => g.items.includes(activeItem));
 
   return (
-    <div className="flex gap-0 lg:gap-6 min-h-full -m-4 lg:-m-6">
+    <div className="flex gap-8 -mx-4 md:-mx-6 lg:-mx-8 min-h-full">
 
-      {/* ── ERP Secondary Sidebar ─────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-52 flex-shrink-0 min-h-full
+      {/* ERP Secondary Sidebar */}
+      <aside className="hidden lg:flex flex-col w-52 flex-shrink-0
         border-r border-[var(--border)] bg-[var(--bg-card)]
-        -ml-6 pt-6 pb-6">
+        min-h-full py-6 px-3">
 
-        {/* ERP Header */}
-        <div className="px-4 mb-5">
-          <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
-              <LayoutGrid size={14} className="text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-black text-[var(--text-primary)]">ERP</p>
-              <p className="text-[10px] text-[var(--text-muted)]">GPDISTRO Racing</p>
-            </div>
+        {/* Header */}
+        <div className="flex items-center gap-2.5 px-3 mb-6">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--brand-600)] to-[var(--brand-700)] flex items-center justify-center flex-shrink-0">
+            <LayoutGrid size={13} className="text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-[var(--text-primary)]">ERP System</p>
+            <p className="text-[10px] text-[var(--text-muted)]">GPDISTRO Racing</p>
           </div>
         </div>
 
-        {/* Nav groups */}
-        <nav className="flex-1 px-3 space-y-5 overflow-y-auto scrollbar-thin">
+        {/* Nav */}
+        <nav className="flex-1 space-y-5 overflow-y-auto scrollbar-thin">
           {ERP_NAV.map(group => (
             <div key={group.group}>
-              <p className="px-3 mb-1.5 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">
+              <p className="px-3 mb-2 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">
                 {group.group}
               </p>
               <div className="space-y-0.5">
-                {group.items.map(item => (
-                  <SubNavItem key={item.to} {...item} />
-                ))}
+                {group.items.map(item => <SubNavItem key={item.to} {...item} />)}
               </div>
             </div>
           ))}
         </nav>
 
-        {/* ERP Stats footer */}
-        <div className="px-4 pt-4 border-t border-[var(--border)] mt-4">
-          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Cabang</p>
+        {/* Branch tags */}
+        <div className="mt-6 pt-4 border-t border-[var(--border)]">
+          <p className="px-3 mb-2 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">Cabang</p>
           {[
-            { name:'GP Racing',  color:'bg-blue-500' },
-            { name:'GP Distro',  color:'bg-purple-500' },
+            { name:'GP Racing',  dot:'bg-blue-500'   },
+            { name:'GP Distro',  dot:'bg-purple-500' },
           ].map(b => (
-            <div key={b.name} className="flex items-center gap-2 mb-1.5">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${b.color}`} />
+            <div key={b.name} className="flex items-center gap-2 px-3 py-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${b.dot}`} />
               <span className="text-xs text-[var(--text-secondary)]">{b.name}</span>
             </div>
           ))}
         </div>
       </aside>
 
-      {/* ── Main Content Area ─────────────────────────── */}
-      <div className="flex-1 min-w-0 py-6 pr-0 lg:pr-6 pl-4 lg:pl-0">
+      {/* Content */}
+      <div className="flex-1 min-w-0 py-6 pr-4 md:pr-6 lg:pr-8">
 
         {/* Breadcrumb */}
-        {active && (
-          <div className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)]">
-            <LayoutGrid size={12} />
-            <span>ERP</span>
+        {activeItem && (
+          <nav className="flex items-center gap-1.5 mb-6 text-xs" aria-label="Breadcrumb">
+            <span className="text-[var(--text-muted)]">ERP</span>
             {activeGroup && (
               <>
-                <ChevronRight size={10} />
-                <span>{activeGroup.group.charAt(0) + activeGroup.group.slice(1).toLowerCase()}</span>
+                <ChevronRight size={10} className="text-[var(--text-muted)]" />
+                <span className="text-[var(--text-muted)]">{activeGroup.group}</span>
               </>
             )}
-            <ChevronRight size={10} />
-            <span className="text-[var(--text-primary)] font-semibold">{active.label}</span>
-          </div>
+            <ChevronRight size={10} className="text-[var(--text-muted)]" />
+            <span className="font-semibold text-[var(--text-primary)]">{activeItem.label}</span>
+          </nav>
         )}
 
         {/* Mobile sub-nav */}
-        <div className="lg:hidden mb-4">
-          <MobileSubNav />
+        <div className="lg:hidden mb-5 flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
+          {ERP_NAV.flatMap(g => g.items).map(item => (
+            <NavLink key={item.to} to={item.to} end={item.exact}
+              className={({ isActive }) =>
+                `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex-shrink-0 transition-all
+                ${isActive
+                  ? 'bg-[var(--brand-600)] text-white shadow-sm'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border)]'}`
+              }>
+              <item.icon size={11} />
+              {item.label}
+            </NavLink>
+          ))}
         </div>
 
-        {/* Page content */}
         <Outlet />
       </div>
     </div>

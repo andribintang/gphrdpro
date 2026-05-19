@@ -406,7 +406,7 @@ function MapCard({ lat, lng, officeLat, officeLng, distance, radius, title = 'Lo
   if (!lat || !lng) return null;
 
   return (
-    <div className="card overflow-hidden">
+    <div className="table-wrapper">
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
         <div className="flex items-center gap-2">
           <Map className="w-3.5 h-3.5 text-[var(--text-muted)]" />
@@ -725,7 +725,7 @@ function HistoryTab() {
       ) : records.length === 0 ? (
         <div className="text-center py-12"><Clock className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" /><p className="text-sm text-[var(--text-muted)]">Tidak ada data bulan ini</p></div>
       ) : (
-        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <div className="table-wrapper">
           {records.map((rec, i) => (
             <div key={rec.id || i} className="flex items-center gap-3 px-4 py-3.5">
               <div className="text-center w-10 flex-shrink-0">
@@ -808,7 +808,7 @@ function MonitoringTab() {
         />
       )}
 
-      <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+      <div className="table-wrapper">
         {report.map((emp, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-3.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
@@ -863,9 +863,9 @@ export default function AttendancePage() {
 
   return (
     <div className="max-w-lg lg:max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Absensi</h1>
+          <h1 className="page-title">Absensi</h1>
           <p className="text-sm text-[var(--text-secondary)]">Face Recognition + GPS</p>
         </div>
         <div className="flex items-center gap-2">

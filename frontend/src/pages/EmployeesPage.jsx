@@ -738,9 +738,9 @@ export default function EmployeesPage() {
 
   return (
     <div className="max-w-lg lg:max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Karyawan</h1>
+          <h1 className="page-title">Karyawan</h1>
           <p className="text-sm text-[var(--text-secondary)]">{employees.length} karyawan{deptFilter ? ` · ${deptFilter}` : ''}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -824,7 +824,7 @@ export default function EmployeesPage() {
           <p className="text-sm font-medium text-[var(--text-muted)]">Tidak ada karyawan ditemukan</p>
         </div>
       ) : (
-        <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <div className="table-wrapper">
           {employees.map(emp => (
             <button key={emp.id} onClick={() => setProfileId(emp.id)}
               className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors text-left">

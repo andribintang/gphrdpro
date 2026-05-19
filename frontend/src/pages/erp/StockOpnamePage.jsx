@@ -60,11 +60,11 @@ export default function StockOpnamePage() {
   }).length;
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Stok Opname</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Hitung & sesuaikan stok fisik</p>
+          <h1 className="page-title">Stok Opname</h1>
+          <p className="body-sm text-[var(--text-secondary)]">Hitung & sesuaikan stok fisik</p>
         </div>
         <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><RefreshCw className="w-4 h-4" /></button>
       </div>
@@ -96,7 +96,7 @@ export default function StockOpnamePage() {
 
       {/* Product list */}
       {loading ? (
-        <div className="space-y-2">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
+        <div className="space-y-2">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-16" />)}</div>
       ) : (
         <>
           <div className="card overflow-hidden mb-4">

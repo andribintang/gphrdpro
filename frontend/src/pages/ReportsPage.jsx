@@ -214,7 +214,7 @@ const OverviewTab = ({ month, onMonthChange }) => {
       </div>
 
       {/* Payroll status donut */}
-      <div className="card p-4">
+      <div className="card-sm">
         <SectionHeader title="Status Payroll" />
         <div className="flex items-center gap-4">
           <DonutChart segments={[
@@ -319,7 +319,7 @@ const AttendanceTab = ({ month, onMonthChange }) => {
 
       {/* Daily trend bar chart */}
       {data.daily_trend?.length > 0 && (
-        <div className="card p-4">
+        <div className="card-sm">
           <SectionHeader title="Tren Harian" />
           <BarChart
             data={data.daily_trend.slice(-14).map(d => ({
@@ -354,7 +354,7 @@ const AttendanceTab = ({ month, onMonthChange }) => {
 
       {/* Employee ranking */}
       {data.by_employee?.length > 0 && (
-        <div className="card overflow-hidden">
+        <div className="table-wrapper">
           <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
             <p className="text-xs font-bold text-[var(--text-primary)]">Peringkat Kehadiran</p>
           </div>
@@ -458,7 +458,7 @@ const PayrollTab = ({ year, onYearChange }) => {
       </div>
 
       {/* Monthly bar chart */}
-      <div className="card p-4">
+      <div className="card-sm">
         <SectionHeader title={`Tren Gaji ${year}`} />
         <BarChart
           data={data.monthly_totals.map(m => ({ ...m, label: monthShort(m.month) }))}
@@ -545,7 +545,7 @@ const LeaveTab = ({ year, onYearChange }) => {
       </div>
 
       {/* Monthly trend */}
-      <div className="card p-4">
+      <div className="card-sm">
         <SectionHeader title="Tren Pengajuan Cuti" />
         <BarChart
           data={data.monthly_trend.map(m => ({ ...m, label: monthShort(m.month) }))}
@@ -580,7 +580,7 @@ const LeaveTab = ({ year, onYearChange }) => {
 
       {/* Top users */}
       {data.top_leave_users?.length > 0 && (
-        <div className="card overflow-hidden">
+        <div className="table-wrapper">
           <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
             <p className="text-xs font-bold text-[var(--text-primary)]">Karyawan Paling Banyak Cuti</p>
           </div>
@@ -675,7 +675,7 @@ const EmployeeAnalyticsTab = ({ year, onYearChange }) => {
       </div>
 
       {/* Monthly joiners */}
-      <div className="card p-4">
+      <div className="card-sm">
         <SectionHeader title={`Karyawan Baru ${year}`} />
         <BarChart
           data={data.monthly_joiners.map(m => ({ ...m, label: monthShort(m.month) }))}
@@ -688,7 +688,7 @@ const EmployeeAnalyticsTab = ({ year, onYearChange }) => {
 
       {/* Tenure buckets donut */}
       {data.tenure_buckets?.length > 0 && (
-        <div className="card p-4">
+        <div className="card-sm">
           <SectionHeader title="Masa Kerja (Karyawan Aktif)" />
           <div className="flex items-center gap-4">
             <DonutChart
@@ -749,9 +749,9 @@ export default function ReportsPage() {
   return (
     <div className="max-w-lg lg:max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Laporan & Analitik</h1>
+          <h1 className="page-title">Laporan & Analitik</h1>
           <p className="text-sm text-[var(--text-secondary)]">Ringkasan data & export CSV</p>
         </div>
         <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center">

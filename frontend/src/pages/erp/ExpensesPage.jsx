@@ -110,8 +110,8 @@ const ExpenseModal = ({ expense, onClose, onSuccess }) => {
           </div>
         </div>
         <div className="px-5 py-4 border-t border-[var(--border)] flex gap-2 flex-shrink-0">
-          <button onClick={onClose} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
-          <button onClick={handle} disabled={saving} className="btn-primary flex-1 h-11 text-sm">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handle} disabled={saving} className="btn-primary flex-1">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {isEdit ? 'Simpan' : 'Catat'}
           </button>
@@ -169,15 +169,15 @@ export default function ExpensesPage() {
   const maxCat = Math.max(...Object.values(byCat), 1);
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-5">
+    <div className="section animate-fade-in">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Pengeluaran</h1>
-          <p className="text-sm text-[var(--text-secondary)]">{expenses.length} transaksi</p>
+          <h1 className="page-title">Pengeluaran</h1>
+          <p className="body-sm text-[var(--text-secondary)]">{expenses.length} transaksi</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={() => setShowAdd(true)} className="btn-primary h-9 px-3 text-sm"><Plus className="w-4 h-4" /> Catat</button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary"><Plus className="w-4 h-4" /> Catat</button>
         </div>
       </div>
 
@@ -223,14 +223,14 @@ export default function ExpensesPage() {
           </div>
 
           {loading ? (
-            <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
+            <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-16" />)}</div>
           ) : expenses.length === 0 ? (
             <div className="text-center py-10 card">
               <Wallet className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-2 opacity-30" />
               <p className="text-sm text-[var(--text-muted)]">Belum ada pengeluaran</p>
             </div>
           ) : (
-            <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
+            <div className="table-wrapper">
               {expenses.map(e => {
                 const cat = EXPENSE_CATEGORIES[e.category] || EXPENSE_CATEGORIES.lainnya;
                 return (
@@ -261,7 +261,7 @@ export default function ExpensesPage() {
 
         {/* Right — summary */}
         <div className="space-y-4">
-          <div className="card p-4">
+          <div className="card-sm">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-4">Per Kategori</p>
             <div className="space-y-3">
               {Object.entries(byCat).sort((a,b) => b[1]-a[1]).map(([k,v]) => {

@@ -89,9 +89,9 @@ export default function IncentiveDashboard() {
   return (
     <div className="animate-slide-up">
       {/* ── Page header ─────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl lg:text-2xl font-bold text-[var(--text-primary)]">Dashboard Insentif</h1>
+          <h1 className="page-title">Dashboard Insentif</h1>
           <p className="text-sm text-[var(--text-secondary)]">GP Racing & GP Distro</p>
         </div>
         <button onClick={fetch}
@@ -193,7 +193,7 @@ export default function IncentiveDashboard() {
 
           {/* Top performers */}
           {top_performers?.length > 0 && (
-            <div className="card overflow-hidden">
+            <div className="table-wrapper">
               <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between">
                 <p className="text-xs font-bold text-[var(--text-primary)]">🏆 Top Insentif — {summary.latest_period}</p>
                 <TrendingUp className="w-3.5 h-3.5 text-[var(--text-muted)]" />
@@ -220,7 +220,7 @@ export default function IncentiveDashboard() {
         </div>
 
         {/* ── RIGHT SIDEBAR (1/3 width on desktop) ──────── */}
-        <div className="space-y-5">
+        <div className="section">
 
           {/* Quick actions */}
           <div className="card p-4 space-y-2">
@@ -241,7 +241,7 @@ export default function IncentiveDashboard() {
 
           {/* Branch cards */}
           {branches?.length > 0 && (
-            <div className="card overflow-hidden">
+            <div className="table-wrapper">
               <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between">
                 <p className="text-xs font-bold text-[var(--text-primary)]">Cabang</p>
                 <button onClick={() => navigate('/incentive/master')}
