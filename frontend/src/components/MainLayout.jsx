@@ -6,6 +6,7 @@ import {
   Bell, ChevronRight, Settings, BarChart3,
   TrendingUp, Building2, SlidersHorizontal,
   ShoppingCart, Package, Users as UsersIcon, Upload,
+  ShoppingBag, Wallet, ClipboardList,
   Shield
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
