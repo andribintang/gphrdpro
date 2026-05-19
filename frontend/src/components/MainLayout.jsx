@@ -313,7 +313,7 @@ export default function MainLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto scrollbar-thin">
-          <div className="page-container py-6 lg:py-8 animate-fade-in">
+          <div className="animate-fade-in">
             <Outlet />
           </div>
         </main>

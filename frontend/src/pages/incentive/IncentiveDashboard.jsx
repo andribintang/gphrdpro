@@ -220,7 +220,7 @@ export default function IncentiveDashboard() {
         </div>
 
         {/* ── RIGHT SIDEBAR (1/3 width on desktop) ──────── */}
-        <div className="section">
+        <div className="page-container section">
 
           {/* Quick actions */}
           <div className="card p-4 space-y-2">

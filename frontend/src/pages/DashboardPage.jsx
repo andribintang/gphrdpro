@@ -145,7 +145,7 @@ export default function DashboardPage() {
   const checkedOut = !!todayAtt?.attendance?.check_out_time;
 
   return (
-    <div className="section animate-fade-in">
+    <div className="page-container section animate-fade-in">
       {/* ── Header ────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
         <div>
