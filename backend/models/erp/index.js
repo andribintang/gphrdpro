@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
-const { Purchase, PurchaseItem, Expense } = require('./Purchase');
 const { sequelize }  = require('../../config/database');
+const { Purchase, PurchaseItem, Expense } = require('./Purchase');
 
 // ── CATEGORY ─────────────────────────────────────────────────
 const Category = sequelize.define('ErpCategory', {
