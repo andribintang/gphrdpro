@@ -36,6 +36,13 @@ const ExpenseModal = ({ expense, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Keuangan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Pengeluaran</span>
+      </nav>
+
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}>

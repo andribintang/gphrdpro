@@ -54,6 +54,13 @@ export default function ErpDashboard() {
 
   return (
     <div className="space-y-5 animate-slide-up">
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Penjualan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Dashboard ERP</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

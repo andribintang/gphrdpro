@@ -39,6 +39,13 @@ export default function OrdersPage() {
 
   return (
     <div className="section animate-fade-in">
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Penjualan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Order</span>
+      </nav>
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Penjualan</h1>

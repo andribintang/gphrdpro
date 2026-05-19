@@ -10,6 +10,13 @@ const Bar = ({ data, max, color='bg-brand-500' }) => {
   const pct = max > 0 ? (data / max) * 100 : 0;
   return (
     <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Keuangan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Laporan Sales</span>
+      </nav>
+
       <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${Math.max(pct, data > 0 ? 2 : 0)}%` }} />
     </div>
   );

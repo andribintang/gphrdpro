@@ -33,6 +33,13 @@ const PaymentModal = ({ orderId, totalAmount, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Penjualan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Detail Order</span>
+      </nav>
+
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
         <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tambah Pembayaran</h3>

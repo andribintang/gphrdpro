@@ -44,7 +44,14 @@ export default function ProfitLossPage() {
   const setThisYear   = () => { const n=new Date(); setDate({ from: `${n.getFullYear()}-01-01`, to: n.toISOString().split('T')[0] }); };
 
   if (loading) return (
-    <div className="space-y-3">{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
+    <div className="space-y-3">
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Keuangan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Laba Rugi</span>
+      </nav>
+{[...Array(6)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
   );
 
   const income   = data?.income   || {};

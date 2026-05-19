@@ -99,21 +99,19 @@ export default function App() {
             </Route>
 
 
-            {/* ERP — ErpLayout provides secondary sidebar */}
-            <Route path="erp" element={<ErpLayout />}>
-              <Route index element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><ErpDashboard /></ProtectedRoute>} />
-              <Route path="products"     element={<ProtectedRoute roles={['admin','hr']}><ProductsPage /></ProtectedRoute>} />
-              <Route path="orders"       element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrdersPage /></ProtectedRoute>} />
-              <Route path="orders/new"   element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><NewOrderPage /></ProtectedRoute>} />
-              <Route path="orders/:id"   element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrderDetailPage /></ProtectedRoute>} />
-              <Route path="customers"    element={<ProtectedRoute roles={['admin','hr']}><CustomersPage /></ProtectedRoute>} />
-              <Route path="reports"      element={<ProtectedRoute roles={['admin','hr']}><SalesReportPage /></ProtectedRoute>} />
-              <Route path="import"       element={<ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>} />
-              <Route path="purchases"    element={<ProtectedRoute roles={['admin','hr']}><PurchasesPage /></ProtectedRoute>} />
-              <Route path="expenses"     element={<ProtectedRoute roles={['admin','hr']}><ExpensesPage /></ProtectedRoute>} />
-              <Route path="profit-loss"  element={<ProtectedRoute roles={['admin','hr']}><ProfitLossPage /></ProtectedRoute>} />
-              <Route path="stock-opname" element={<ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>} />
-            </Route>
+            {/* ERP — direct routes, sidebar via MainLayout */}
+              <Route path="erp"              element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><ErpDashboard /></ProtectedRoute>} />
+              <Route path="erp/products"     element={<ProtectedRoute roles={['admin','hr']}><ProductsPage /></ProtectedRoute>} />
+              <Route path="erp/orders"       element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrdersPage /></ProtectedRoute>} />
+              <Route path="erp/orders/new"   element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><NewOrderPage /></ProtectedRoute>} />
+              <Route path="erp/orders/:id"   element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrderDetailPage /></ProtectedRoute>} />
+              <Route path="erp/customers"    element={<ProtectedRoute roles={['admin','hr']}><CustomersPage /></ProtectedRoute>} />
+              <Route path="erp/reports"      element={<ProtectedRoute roles={['admin','hr']}><SalesReportPage /></ProtectedRoute>} />
+              <Route path="erp/import"       element={<ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>} />
+              <Route path="erp/purchases"    element={<ProtectedRoute roles={['admin','hr']}><PurchasesPage /></ProtectedRoute>} />
+              <Route path="erp/expenses"     element={<ProtectedRoute roles={['admin','hr']}><ExpensesPage /></ProtectedRoute>} />
+              <Route path="erp/profit-loss"  element={<ProtectedRoute roles={['admin','hr']}><ProfitLossPage /></ProtectedRoute>} />
+              <Route path="erp/stock-opname" element={<ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>} />
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

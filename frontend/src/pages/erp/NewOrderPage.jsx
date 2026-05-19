@@ -136,6 +136,13 @@ export default function NewOrderPage() {
 
   return (
     <div className="section animate-fade-in">
+      {/* ERP Breadcrumb */}
+      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
+        <span>ERP</span><span>›</span>
+        <span>Penjualan</span><span>›</span>
+        <span className="font-semibold text-[var(--text-primary)]">Buat Order</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/erp/orders')}
