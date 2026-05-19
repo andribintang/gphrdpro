@@ -68,7 +68,7 @@ router.get   ('/stock-opname',                 authenticate, hrAdmin,  purchase.
 router.post  ('/stock-opname',                 authenticate, hrAdmin,  purchase.submitStockOpname);
 
 // ── Reports ──────────────────────────────────────────────────
-router.get   ('/reports/sales',     authenticate, hrAdmin, order.getSalesReport);
-router.get   ('/reports/shipments', authenticate, hrAdmin, order.getShipmentReport);
+router.get   ('/reports/sales',     authenticate, allRoles, order.getSalesReport);
+router.get   ('/reports/shipments', authenticate, allRoles, order.getShipmentReport);
 
 module.exports = router;
