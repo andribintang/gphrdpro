@@ -255,6 +255,19 @@ app.post('/run-migrate', async (req, res) => {
     await syncIfNew(EmployeeAllowance); await syncIfNew(PayrollRun);
     await syncIfNew(PayrollItem);       await syncIfNew(LoanManagement);
     await syncIfNew(IncentiveParameter);await syncIfNew(IncentiveEmployeeRate);
+    // ERP tables
+    const erpModels = require('./models/erp');
+    await syncIfNew(erpModels.Category);
+    await syncIfNew(erpModels.Product);
+    await syncIfNew(erpModels.Stock);
+    await syncIfNew(erpModels.StockMovement);
+    await syncIfNew(erpModels.Customer);
+    await syncIfNew(erpModels.Order);
+    await syncIfNew(erpModels.OrderItem);
+    await syncIfNew(erpModels.Payment);
+    await syncIfNew(erpModels.Shipment);
+    await syncIfNew(erpModels.ImportLog);
+
     // Incentive system
     await syncIfNew(Branch);       await syncIfNew(Position);
     await syncIfNew(IncEmployee);  await syncIfNew(SalesChannel);
