@@ -5,6 +5,7 @@ import {
   DollarSign, Menu, X, Sun, Moon, LogOut,
   Bell, ChevronRight, Settings, BarChart3,
   TrendingUp, Building2, SlidersHorizontal,
+  ShoppingCart, Package, Users as UsersIcon, Upload,
   Shield
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +21,7 @@ const NAV_ITEMS = [
   { to: '/incentive',   icon: TrendingUp,      label: 'Insentif', roles: ['admin','hr'] },
   { to: '/erp',          icon: ShoppingCart,    label: 'Penjualan',  roles: ['admin','hr','supervisor','employee'] },
   { to: '/erp/orders',   icon: ShoppingCart,    label: 'Semua Order', roles: ['admin','hr'] },
-  { to: '/employees',   icon: Users,           label: 'Karyawan', roles: ['admin','hr','supervisor'] },
+  { to: '/employees',   icon: UsersIcon,       label: 'Karyawan', roles: ['admin','hr','supervisor'] },
 ];
 
 const ROLE_COLORS = { admin:'badge-info', hr:'badge-success', supervisor:'badge-warning', employee:'badge-neutral' };
@@ -99,7 +100,7 @@ export default function MainLayout() {
                 <SidebarLink to="/reports"    icon={BarChart3}          label="Laporan" />
                 <SidebarLink to="/payroll-components" icon={SlidersHorizontal} label="Komponen Gaji" />
                 <SidebarLink to="/erp/products"   icon={Package}          label="Produk" />
-                <SidebarLink to="/erp/customers"  icon={Users}            label="Pelanggan" />
+                <SidebarLink to="/erp/customers"  icon={UsersIcon}        label="Pelanggan" />
                 <SidebarLink to="/erp/reports"    icon={BarChart3}        label="Laporan Sales" />
                 <SidebarLink to="/erp/import"     icon={Upload}           label="Import Data" />
                 {user?.role === 'admin' && (
