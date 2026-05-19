@@ -196,11 +196,11 @@
 
   .card-hover {
     @apply card transition-all duration-200 cursor-pointer;
-    &:hover {
-      box-shadow: var(--shadow-md);
-      border-color: var(--border2);
-      transform: translateY(-1px);
-    }
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--border2);
+    transform: translateY(-1px);
   }
 
   /* Stat cards */
@@ -224,14 +224,14 @@
     border-color: var(--border);
     color: var(--text-primary);
     box-shadow: var(--shadow-xs);
-    &::placeholder { color: var(--text-muted); font-weight: 400; }
-    &:hover:not(:disabled) { border-color: var(--border2); }
-    &:focus {
-      border-color: var(--brand-600);
-      box-shadow: 0 0 0 3px rgb(225 29 72 / 0.12);
-    }
-    &:disabled { opacity: 0.5; cursor: not-allowed; background: var(--bg-secondary); }
   }
+  .input-base::placeholder { color: var(--text-muted); font-weight: 400; }
+  .input-base:hover:not(:disabled) { border-color: var(--border2); }
+  .input-base:focus {
+    border-color: var(--brand-600);
+    box-shadow: 0 0 0 3px rgb(225 29 72 / 0.12);
+  }
+  .input-base:disabled { opacity: 0.5; cursor: not-allowed; background: var(--bg-secondary); }
 
   .input-lg {
     @apply input-base px-4 py-3 text-base;
@@ -257,11 +257,11 @@
     background: var(--brand-600);
     color: #fff;
     box-shadow: 0 1px 3px rgb(225 29 72 / 0.3), 0 1px 2px rgb(225 29 72 / 0.2);
-    &:hover:not(:disabled) {
-      background: var(--brand-700);
-      box-shadow: 0 4px 12px rgb(225 29 72 / 0.35);
-      transform: translateY(-0.5px);
-    }
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--brand-700);
+    box-shadow: 0 4px 12px rgb(225 29 72 / 0.35);
+    transform: translateY(-0.5px);
   }
 
   .btn-secondary {
@@ -270,41 +270,41 @@
     color: var(--text-secondary);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-xs);
-    &:hover:not(:disabled) {
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-      border-color: var(--border2);
-    }
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border2);
   }
 
   .btn-ghost {
     @apply btn-md;
     color: var(--text-secondary);
     background: transparent;
-    &:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
   }
+  .btn-ghost:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
 
   .btn-danger {
     @apply btn-md;
     background: var(--danger-bg);
     color: var(--danger);
     border: 1px solid var(--danger-border);
-    &:hover:not(:disabled) { background: var(--danger); color: #fff; }
   }
+  .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
 
   .btn-icon {
     @apply btn w-9 h-9 p-0 rounded-xl;
     color: var(--text-secondary);
     background: transparent;
-    &:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
   }
+  .btn-icon:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
 
   .btn-icon-sm {
     @apply btn w-7 h-7 p-0 rounded-lg;
     color: var(--text-muted);
     background: transparent;
-    &:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
   }
+  .btn-icon-sm:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--text-primary); }
 
   /* ══════════════════════════════════════════════════════
      BADGES & TAGS
@@ -346,9 +346,9 @@
   .table-base tbody tr {
     border-bottom: 1px solid var(--border-subtle);
     transition: background 0.1s;
-    &:last-child { border-bottom: none; }
-    &:hover { background: var(--bg-secondary); }
   }
+  .table-base tbody tr:last-child { border-bottom: none; }
+  .table-base tbody tr:hover { background: var(--bg-secondary); }
 
   .table-base tbody td {
     @apply px-5 py-4;
@@ -411,7 +411,9 @@
   }
 
   .modal-body {
-    @apply flex-1 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin;
+    @apply flex-1 overflow-y-auto px-6 py-5 space-y-5;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
   }
 
   .modal-footer {
@@ -424,14 +426,12 @@
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: var(--border2) transparent;
-    &::-webkit-scrollbar { width: 5px; height: 5px; }
-    &::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
   }
+  .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
 
-  .scrollbar-none {
-    scrollbar-width: none;
-    &::-webkit-scrollbar { display: none; }
-  }
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
 }
 
 @layer utilities {
@@ -480,15 +480,13 @@
   /* Hover lift */
   .hover-lift {
     @apply transition-all duration-200;
-    &:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
   }
+  .hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
   /* Focus ring */
-  .focus-ring {
-    &:focus-visible {
-      outline: 2px solid var(--brand-600);
-      outline-offset: 2px;
-    }
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--brand-600);
+    outline-offset: 2px;
   }
 
   /* Truncate lines */
