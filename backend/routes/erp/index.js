@@ -2,7 +2,8 @@ const express = require('express');
 const router  = express.Router();
 const { authenticate, authorize } = require('../../middleware/auth');
 const master = require('../../controllers/erp/masterController');
-const order  = require('../../controllers/erp/orderController');
+const order    = require('../../controllers/erp/orderController');
+const purchase = require('../../controllers/erp/purchaseController');
 
 const hrAdmin  = authorize('admin','hr');
 const allRoles = authorize('admin','hr','supervisor','employee');
@@ -45,6 +46,26 @@ router.post  ('/orders/:id/payments/:paymentId/verify',   authenticate, hrAdmin,
 // ── Shipments ────────────────────────────────────────────────
 router.post  ('/orders/:id/shipment',                         authenticate, hrAdmin, order.addShipment);
 router.put   ('/orders/:id/shipment/:shipmentId',             authenticate, hrAdmin, order.updateShipment);
+
+// ── Purchases ────────────────────────────────────────────────
+router.get   ('/purchases',                    authenticate, hrAdmin,  purchase.getPurchases);
+router.get   ('/purchases/:id',                authenticate, hrAdmin,  purchase.getPurchaseDetail);
+router.post  ('/purchases',                    authenticate, hrAdmin,  purchase.createPurchase);
+router.post  ('/purchases/:id/receive',        authenticate, hrAdmin,  purchase.receivePurchase);
+router.post  ('/purchases/:id/cancel',         authenticate, hrAdmin,  purchase.cancelPurchase);
+
+// ── Expenses ──────────────────────────────────────────────────
+router.get   ('/expenses',                     authenticate, hrAdmin,  purchase.getExpenses);
+router.post  ('/expenses',                     authenticate, hrAdmin,  purchase.createExpense);
+router.put   ('/expenses/:id',                 authenticate, hrAdmin,  purchase.updateExpense);
+router.delete('/expenses/:id',                 authenticate, hrAdmin,  purchase.deleteExpense);
+
+// ── Profit & Loss ─────────────────────────────────────────────
+router.get   ('/reports/profit-loss',          authenticate, hrAdmin,  purchase.getProfitLoss);
+
+// ── Stock Opname ──────────────────────────────────────────────
+router.get   ('/stock-opname',                 authenticate, hrAdmin,  purchase.getStockOpname);
+router.post  ('/stock-opname',                 authenticate, hrAdmin,  purchase.submitStockOpname);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',     authenticate, hrAdmin, order.getSalesReport);

@@ -267,6 +267,10 @@ app.post('/run-migrate', async (req, res) => {
     await syncIfNew(erpModels.Payment);
     await syncIfNew(erpModels.Shipment);
     await syncIfNew(erpModels.ImportLog);
+    const { Purchase, PurchaseItem, Expense } = require('./models/erp/Purchase');
+    await syncIfNew(Purchase);
+    await syncIfNew(PurchaseItem);
+    await syncIfNew(Expense);
 
     // Incentive system
     await syncIfNew(Branch);       await syncIfNew(Position);

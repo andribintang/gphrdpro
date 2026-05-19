@@ -20,7 +20,9 @@ const NAV_ITEMS = [
   { to: '/payroll-pro', icon: DollarSign,      label: 'Gaji',     roles: ['admin','hr','supervisor','employee'] },
   { to: '/incentive',   icon: TrendingUp,      label: 'Insentif', roles: ['admin','hr'] },
   { to: '/erp',          icon: ShoppingCart,    label: 'Penjualan',  roles: ['admin','hr','supervisor','employee'] },
-  { to: '/erp/orders',   icon: ShoppingCart,    label: 'Semua Order', roles: ['admin','hr'] },
+  { to: '/erp/orders',    icon: ShoppingCart,   label: 'Semua Order',  roles: ['admin','hr'] },
+  { to: '/erp/purchases', icon: ShoppingBag,    label: 'Pembelian',    roles: ['admin','hr'] },
+  { to: '/erp/expenses',  icon: Wallet,         label: 'Pengeluaran',  roles: ['admin','hr'] },
   { to: '/employees',   icon: UsersIcon,       label: 'Karyawan', roles: ['admin','hr','supervisor'] },
 ];
 
@@ -102,7 +104,11 @@ export default function MainLayout() {
                 <SidebarLink to="/erp/products"   icon={Package}          label="Produk" />
                 <SidebarLink to="/erp/customers"  icon={UsersIcon}        label="Pelanggan" />
                 <SidebarLink to="/erp/reports"    icon={BarChart3}        label="Laporan Sales" />
-                <SidebarLink to="/erp/import"     icon={Upload}           label="Import Data" />
+                <SidebarLink to="/erp/import"       icon={Upload}         label="Import Data" />
+                <SidebarLink to="/erp/purchases"    icon={ShoppingBag}    label="Pembelian" />
+                <SidebarLink to="/erp/expenses"     icon={Wallet}         label="Pengeluaran" />
+                <SidebarLink to="/erp/profit-loss"  icon={BarChart3}      label="Laba Rugi" />
+                <SidebarLink to="/erp/stock-opname" icon={ClipboardList}  label="Stok Opname" />
                 {user?.role === 'admin' && (
                   <SidebarLink to="/company-settings" icon={Building2} label="Pengaturan Perusahaan" />
                 )}

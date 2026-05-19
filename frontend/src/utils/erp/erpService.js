@@ -28,8 +28,23 @@ export const erpService = {
   verifyPayment:   (id, pid)=> api.post(`${BASE}/orders/${id}/payments/${pid}/verify`),
   addShipment:     (id, d)  => api.post(`${BASE}/orders/${id}/shipment`, d),
   updateShipment:  (id, sid, d) => api.put(`${BASE}/orders/${id}/shipment/${sid}`, d),
-  getSalesReport:  (p)      => api.get(`${BASE}/reports/sales`, { params: p }),
+  getSalesReport:   (p)     => api.get(`${BASE}/reports/sales`, { params: p }),
   getShipmentReport:(p)     => api.get(`${BASE}/reports/shipments`, { params: p }),
+  getProfitLoss:    (p)     => api.get(`${BASE}/reports/profit-loss`, { params: p }),
+
+  getPurchases:     (p)     => api.get(`${BASE}/purchases`, { params: p }),
+  getPurchase:      (id)    => api.get(`${BASE}/purchases/${id}`),
+  createPurchase:   (d)     => api.post(`${BASE}/purchases`, d),
+  receivePurchase:  (id, d) => api.post(`${BASE}/purchases/${id}/receive`, d),
+  cancelPurchase:   (id)    => api.post(`${BASE}/purchases/${id}/cancel`),
+
+  getExpenses:      (p)     => api.get(`${BASE}/expenses`, { params: p }),
+  createExpense:    (d)     => api.post(`${BASE}/expenses`, d),
+  updateExpense:    (id, d) => api.put(`${BASE}/expenses/${id}`, d),
+  deleteExpense:    (id)    => api.delete(`${BASE}/expenses/${id}`),
+
+  getStockOpname:   (p)     => api.get(`${BASE}/stock-opname`, { params: p }),
+  submitStockOpname:(d)     => api.post(`${BASE}/stock-opname`, d),
 };
 
 export const toRp = (n) => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
@@ -64,3 +79,24 @@ export const PAYMENT_METHODS = {
 };
 
 export const COURIERS = ['JNE','JNT','Sicepat','Anteraja','Ninja Express','Pos Indonesia','Tiki','GoSend','GrabExpress','Wahana'];
+
+export const EXPENSE_CATEGORIES = {
+  operasional: { label:'Operasional',  color:'text-blue-600',    bg:'bg-blue-100 dark:bg-blue-950' },
+  gaji:        { label:'Gaji',         color:'text-purple-600',  bg:'bg-purple-100 dark:bg-purple-950' },
+  sewa:        { label:'Sewa',         color:'text-orange-600',  bg:'bg-orange-100 dark:bg-orange-950' },
+  listrik:     { label:'Listrik',      color:'text-amber-600',   bg:'bg-amber-100 dark:bg-amber-950' },
+  air:         { label:'Air',          color:'text-cyan-600',    bg:'bg-cyan-100 dark:bg-cyan-950' },
+  internet:    { label:'Internet',     color:'text-indigo-600',  bg:'bg-indigo-100 dark:bg-indigo-950' },
+  transport:   { label:'Transport',    color:'text-teal-600',    bg:'bg-teal-100 dark:bg-teal-950' },
+  pembelian:   { label:'Pembelian',    color:'text-emerald-600', bg:'bg-emerald-100 dark:bg-emerald-950' },
+  marketing:   { label:'Marketing',   color:'text-pink-600',    bg:'bg-pink-100 dark:bg-pink-950' },
+  lainnya:     { label:'Lainnya',      color:'text-slate-600',   bg:'bg-slate-100 dark:bg-slate-800' },
+};
+
+export const PURCHASE_STATUS = {
+  draft:    { label:'Draft',     color:'text-slate-500',   bg:'bg-slate-100 dark:bg-slate-800' },
+  ordered:  { label:'Dipesan',   color:'text-blue-600',    bg:'bg-blue-100 dark:bg-blue-950' },
+  partial:  { label:'Sebagian',  color:'text-amber-600',   bg:'bg-amber-100 dark:bg-amber-950' },
+  received: { label:'Diterima',  color:'text-emerald-600', bg:'bg-emerald-100 dark:bg-emerald-950' },
+  cancelled:{ label:'Dibatalkan',color:'text-red-600',     bg:'bg-red-100 dark:bg-red-950' },
+};

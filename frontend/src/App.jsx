@@ -21,7 +21,11 @@ import NewOrderPage    from './pages/erp/NewOrderPage';
 import OrderDetailPage from './pages/erp/OrderDetailPage';
 import CustomersPage   from './pages/erp/CustomersPage';
 import SalesReportPage from './pages/erp/SalesReportPage';
-import ImportPage      from './pages/erp/ImportPage';
+import ImportPage        from './pages/erp/ImportPage';
+import PurchasesPage    from './pages/erp/PurchasesPage';
+import ExpensesPage     from './pages/erp/ExpensesPage';
+import ProfitLossPage   from './pages/erp/ProfitLossPage';
+import StockOpnamePage  from './pages/erp/StockOpnamePage';
 import PayrollComponentManager from './pages/PayrollComponentManager';
 import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
 import MasterDataPage from './pages/incentive/MasterDataPage';
@@ -101,7 +105,11 @@ export default function App() {
               <Route path="erp/orders/:id"  element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrderDetailPage /></ProtectedRoute>} />
               <Route path="erp/customers"   element={<ProtectedRoute roles={['admin','hr']}><CustomersPage /></ProtectedRoute>} />
               <Route path="erp/reports"     element={<ProtectedRoute roles={['admin','hr']}><SalesReportPage /></ProtectedRoute>} />
-              <Route path="erp/import"      element={<ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>} />
+              <Route path="erp/import"       element={<ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>} />
+              <Route path="erp/purchases"    element={<ProtectedRoute roles={['admin','hr']}><PurchasesPage /></ProtectedRoute>} />
+              <Route path="erp/expenses"     element={<ProtectedRoute roles={['admin','hr']}><ExpensesPage /></ProtectedRoute>} />
+              <Route path="erp/profit-loss"  element={<ProtectedRoute roles={['admin','hr']}><ProfitLossPage /></ProtectedRoute>} />
+              <Route path="erp/stock-opname" element={<ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>} />
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
