@@ -67,7 +67,11 @@
 
 @layer components {
   /* Input styles */
-  .input-base {
+  .field-label {
+  @apply block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5;
+}
+
+.input-base {
     @apply w-full rounded-xl border px-4 py-3 text-sm font-medium
     transition-all duration-200 outline-none
     bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--text-primary)]

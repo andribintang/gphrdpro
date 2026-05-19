@@ -18,7 +18,8 @@ const NAV_ITEMS = [
   { to: '/leaves',      icon: CalendarOff,     label: 'Cuti' },
   { to: '/payroll-pro', icon: DollarSign,      label: 'Gaji',     roles: ['admin','hr','supervisor','employee'] },
   { to: '/incentive',   icon: TrendingUp,      label: 'Insentif', roles: ['admin','hr'] },
-  { to: '/erp',          icon: ShoppingCart,    label: 'Penjualan', roles: ['admin','hr','supervisor','employee'] },
+  { to: '/erp',          icon: ShoppingCart,    label: 'Penjualan',  roles: ['admin','hr','supervisor','employee'] },
+  { to: '/erp/orders',   icon: ShoppingCart,    label: 'Semua Order', roles: ['admin','hr'] },
   { to: '/employees',   icon: Users,           label: 'Karyawan', roles: ['admin','hr','supervisor'] },
 ];
 
@@ -97,7 +98,10 @@ export default function MainLayout() {
                 <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 mb-2">Pengaturan</p>
                 <SidebarLink to="/reports"    icon={BarChart3}          label="Laporan" />
                 <SidebarLink to="/payroll-components" icon={SlidersHorizontal} label="Komponen Gaji" />
-                <SidebarLink to="/erp/products" icon={Package} label="Produk ERP" />
+                <SidebarLink to="/erp/products"   icon={Package}          label="Produk" />
+                <SidebarLink to="/erp/customers"  icon={Users}            label="Pelanggan" />
+                <SidebarLink to="/erp/reports"    icon={BarChart3}        label="Laporan Sales" />
+                <SidebarLink to="/erp/import"     icon={Upload}           label="Import Data" />
                 {user?.role === 'admin' && (
                   <SidebarLink to="/company-settings" icon={Building2} label="Pengaturan Perusahaan" />
                 )}

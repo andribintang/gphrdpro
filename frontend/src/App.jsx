@@ -17,7 +17,11 @@ import CompanySettingsPage from './pages/CompanySettingsPage';
 import ErpDashboard  from './pages/erp/ErpDashboard';
 import ProductsPage  from './pages/erp/ProductsPage';
 import OrdersPage    from './pages/erp/OrdersPage';
-import NewOrderPage  from './pages/erp/NewOrderPage';
+import NewOrderPage    from './pages/erp/NewOrderPage';
+import OrderDetailPage from './pages/erp/OrderDetailPage';
+import CustomersPage   from './pages/erp/CustomersPage';
+import SalesReportPage from './pages/erp/SalesReportPage';
+import ImportPage      from './pages/erp/ImportPage';
 import PayrollComponentManager from './pages/PayrollComponentManager';
 import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
 import MasterDataPage from './pages/incentive/MasterDataPage';
@@ -100,7 +104,7 @@ export default function App() {
               <Route path="erp" element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><ErpDashboard /></ProtectedRoute>} />
               <Route path="erp/products" element={<ProtectedRoute roles={['admin','hr']}><ProductsPage /></ProtectedRoute>} />
               <Route path="erp/orders" element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrdersPage /></ProtectedRoute>} />
-              <Route path="erp/orders/new" element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><NewOrderPage /></ProtectedRoute>} />
+              <Route path="erp/orders/new"  element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><NewOrderPage /></ProtectedRoute>} />
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
