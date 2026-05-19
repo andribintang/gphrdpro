@@ -218,9 +218,6 @@ Shipment.belongsTo(Order,    { foreignKey: 'order_id', as: 'order' });
 Order.belongsTo(Customer,    { foreignKey: 'customer_id', as: 'customer' });
 Customer.hasMany(Order,      { foreignKey: 'customer_id', as: 'orders' });
 
-// Purchase associations
-Purchase.hasMany(PurchaseItem, { foreignKey: 'purchase_id', as: 'items' });
-
 module.exports = {
   Category, Product, Stock, StockMovement,
   Customer, Order, OrderItem, Payment, Shipment,
