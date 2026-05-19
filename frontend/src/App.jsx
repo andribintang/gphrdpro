@@ -98,6 +98,10 @@ export default function App() {
               <Route path="erp/products" element={<ProtectedRoute roles={['admin','hr']}><ProductsPage /></ProtectedRoute>} />
               <Route path="erp/orders" element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrdersPage /></ProtectedRoute>} />
               <Route path="erp/orders/new"  element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><NewOrderPage /></ProtectedRoute>} />
+              <Route path="erp/orders/:id"  element={<ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrderDetailPage /></ProtectedRoute>} />
+              <Route path="erp/customers"   element={<ProtectedRoute roles={['admin','hr']}><CustomersPage /></ProtectedRoute>} />
+              <Route path="erp/reports"     element={<ProtectedRoute roles={['admin','hr']}><SalesReportPage /></ProtectedRoute>} />
+              <Route path="erp/import"      element={<ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>} />
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
