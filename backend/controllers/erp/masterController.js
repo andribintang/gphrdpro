@@ -3,7 +3,7 @@ const { sequelize } = require('../../config/database');
 const {
   Category, Product, Stock, StockMovement,
   Customer, Order, OrderItem, Payment, Shipment, ImportLog,
-} = require('../models/erp');
+} = require('../../models/erp');
 
 const toNum = v => parseFloat(v) || 0;
 
