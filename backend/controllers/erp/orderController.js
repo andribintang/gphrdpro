@@ -87,6 +87,7 @@ const createOrder = async (req, res, next) => {
       items, // [{ product_id, qty, sell_price, discount_pct }]
       discount_amount = 0,
       shipping_cost = 0,
+      admin_fee = 0,
       notes,
       order_date,
       payment_method, // optional: langsung bayar saat buat order

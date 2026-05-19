@@ -125,6 +125,7 @@ const Order = sequelize.define('ErpOrder', {
   // Flags
   is_synced_incentive: { type: DataTypes.BOOLEAN, defaultValue: false, comment: 'Sudah di-sync ke sistem insentif?' },
   synced_at:       { type: DataTypes.DATE, allowNull: true },
+  admin_fee:       { type: DataTypes.DECIMAL(15,2), defaultValue: 0, comment: 'Biaya admin marketplace' },
   notes:           { type: DataTypes.TEXT, allowNull: true },
   created_by:      { type: DataTypes.INTEGER, allowNull: true },
 }, { tableName: 'erp_orders', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });

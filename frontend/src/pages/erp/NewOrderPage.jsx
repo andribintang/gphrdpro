@@ -24,6 +24,7 @@ export default function NewOrderPage() {
   const [prodResults, setProdResults] = useState([]);
   const [discount, setDiscount]   = useState(0);
   const [shippingCost, setShipping] = useState(0);
+  const [adminFee, setAdminFee]       = useState(0);
   const [payMethod, setPay]       = useState('cash');
   const [notes, setNotes]         = useState('');
   const [saving, setSaving]       = useState(false);
@@ -88,8 +89,9 @@ export default function NewOrderPage() {
 
   // ── Calculations ──────────────────────────────────────────
   const subtotal    = items.reduce((s, i) => s + (i.sell_price * i.qty * (1 - i.discount_pct/100)), 0);
-  const totalAmount = subtotal - parseFloat(discount||0) + parseFloat(shippingCost||0);
-  const totalProfit = items.reduce((s,i) => s + ((i.sell_price - i.buy_price) * i.qty), 0) - parseFloat(discount||0);
+  const adminFeeAmt = channel === 'marketplace' ? parseFloat(adminFee||0) : 0;
+  const totalAmount = subtotal - parseFloat(discount||0) + parseFloat(shippingCost||0) + adminFeeAmt;
+  const totalProfit = items.reduce((s,i) => s + ((i.sell_price - i.buy_price) * i.qty), 0) - parseFloat(discount||0) - adminFeeAmt;
 
   // ── Submit ────────────────────────────────────────────────
   const handleSubmit = async (autoConfirm = false) => {
@@ -107,6 +109,7 @@ export default function NewOrderPage() {
         items:            items.map(i => ({ product_id: i.product_id, qty: i.qty, sell_price: i.sell_price, discount_pct: i.discount_pct })),
         discount_amount:  parseFloat(discount||0),
         shipping_cost:    parseFloat(shippingCost||0),
+        admin_fee:        channel === 'marketplace' ? parseFloat(adminFee||0) : 0,
         payment_method:   payMethod,
         notes,
         order_date:       new Date().toISOString().split('T')[0],
@@ -331,6 +334,19 @@ export default function NewOrderPage() {
                     className="input-base pl-7 text-xs h-7 w-full text-right" />
                 </div>
               </div>
+              {channel === 'marketplace' && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[var(--text-secondary)]">Biaya Admin</span>
+                    <p className="text-[10px] text-[var(--text-muted)]">Fee marketplace</p>
+                  </div>
+                  <div className="relative w-28">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">Rp</span>
+                    <input type="number" value={adminFee} onChange={e => setAdminFee(e.target.value)}
+                      placeholder="0" className="input-base pl-7 text-xs h-7 w-full text-right" />
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-[var(--text-secondary)]">Ongkir</span>
                 <div className="relative w-28">
