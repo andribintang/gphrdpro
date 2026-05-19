@@ -1,302 +1,395 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import {
-  LayoutDashboard, Users, Clock, CalendarOff,
-  DollarSign, Menu, X, Sun, Moon, LogOut,
-  Bell, ChevronRight, Settings, BarChart3,
-  TrendingUp, Building2, SlidersHorizontal,
-  ShoppingCart, Package, Users as UsersIcon, Upload,
-  ShoppingBag, Wallet, ClipboardList,
-  Shield
+  LayoutDashboard, Users, Clock, CalendarOff, DollarSign,
+  TrendingUp, Building2, SlidersHorizontal, Shield,
+  ShoppingCart, Package, Upload, ShoppingBag, Wallet,
+  ClipboardList, BarChart3, Settings, LogOut, Bell,
+  Sun, Moon, ChevronRight, Menu, X, Search,
+  Users as UsersIcon, FileText, Award, Target,
+  Layers, ChevronDown, Home, Zap, Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useCompany } from '../context/CompanyContext';
-import toast from 'react-hot-toast';
 
-const NAV_ITEMS = [
-  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/attendance',  icon: Clock,           label: 'Absensi' },
-  { to: '/leaves',      icon: CalendarOff,     label: 'Cuti' },
-  { to: '/payroll-pro', icon: DollarSign,      label: 'Gaji',     roles: ['admin','hr','supervisor','employee'] },
-  { to: '/incentive',   icon: TrendingUp,      label: 'Insentif', roles: ['admin','hr'] },
-  { to: '/erp',          icon: ShoppingCart,    label: 'Penjualan',  roles: ['admin','hr','supervisor','employee'] },
-  { to: '/erp/orders',    icon: ShoppingCart,   label: 'Semua Order',  roles: ['admin','hr'] },
-  { to: '/erp/purchases', icon: ShoppingBag,    label: 'Pembelian',    roles: ['admin','hr'] },
-  { to: '/erp/expenses',  icon: Wallet,         label: 'Pengeluaran',  roles: ['admin','hr'] },
-  { to: '/employees',   icon: UsersIcon,       label: 'Karyawan', roles: ['admin','hr','supervisor'] },
+// ── NAV STRUCTURE ─────────────────────────────────────────────
+const NAV = [
+  {
+    group: 'WORKSPACE',
+    items: [
+      { to: '/dashboard', icon: Home,           label: 'Dashboard',    roles: ['admin','hr','supervisor','employee'] },
+    ],
+  },
+  {
+    group: 'HRD',
+    items: [
+      { to: '/employees',  icon: Users,          label: 'Karyawan',     roles: ['admin','hr','supervisor'] },
+      { to: '/attendance', icon: Clock,          label: 'Absensi',      roles: ['admin','hr','supervisor','employee'] },
+      { to: '/leaves',     icon: CalendarOff,    label: 'Cuti',         roles: ['admin','hr','supervisor','employee'] },
+      { to: '/payroll-pro',icon: DollarSign,     label: 'Gaji',         roles: ['admin','hr'] },
+      { to: '/reports',    icon: BarChart3,      label: 'Laporan HRD',  roles: ['admin','hr'] },
+    ],
+  },
+  {
+    group: 'INSENTIF',
+    items: [
+      { to: '/incentive',        icon: TrendingUp,  label: 'Dashboard',    roles: ['admin','hr'] },
+      { to: '/incentive/master', icon: Layers,      label: 'Master Data',  roles: ['admin','hr'] },
+      { to: '/incentive/periods',icon: Target,      label: 'Periode',      roles: ['admin','hr'] },
+    ],
+  },
+  {
+    group: 'ERP',
+    collapse: true,
+    children: [
+      {
+        label: 'Penjualan',
+        icon: ShoppingCart,
+        key: 'sales',
+        items: [
+          { to: '/erp',           icon: Home,        label: 'Dashboard',    roles: ['admin','hr','supervisor','employee'] },
+          { to: '/erp/orders',    icon: ShoppingCart,label: 'Order',        roles: ['admin','hr','supervisor','employee'] },
+          { to: '/erp/customers', icon: UsersIcon,   label: 'Pelanggan',    roles: ['admin','hr'] },
+        ],
+      },
+      {
+        label: 'Inventory',
+        icon: Package,
+        key: 'inventory',
+        items: [
+          { to: '/erp/products',    icon: Package,     label: 'Produk',      roles: ['admin','hr'] },
+          { to: '/erp/purchases',   icon: ShoppingBag, label: 'Pembelian',   roles: ['admin','hr'] },
+          { to: '/erp/stock-opname',icon: ClipboardList,label:'Stok Opname', roles: ['admin','hr'] },
+          { to: '/erp/import',      icon: Upload,      label: 'Import Data', roles: ['admin','hr'] },
+        ],
+      },
+      {
+        label: 'Keuangan',
+        icon: Wallet,
+        key: 'finance',
+        items: [
+          { to: '/erp/expenses',   icon: Wallet,      label: 'Pengeluaran', roles: ['admin','hr'] },
+          { to: '/erp/profit-loss',icon: TrendingUp,  label: 'Laba Rugi',   roles: ['admin','hr'] },
+          { to: '/erp/reports',    icon: BarChart3,   label: 'Laporan',     roles: ['admin','hr'] },
+        ],
+      },
+    ],
+  },
+  {
+    group: 'PENGATURAN',
+    items: [
+      { to: '/company-settings',   icon: Building2,      label: 'Perusahaan',   roles: ['admin'] },
+      { to: '/payroll-components', icon: SlidersHorizontal,label:'Komponen Gaji',roles: ['admin','hr'] },
+      { to: '/settings',           icon: Settings,       label: 'Akun',         roles: ['admin','hr','supervisor','employee'] },
+    ],
+  },
 ];
 
-const ROLE_COLORS = { admin:'badge-info', hr:'badge-success', supervisor:'badge-warning', employee:'badge-neutral' };
-const ROLE_LABELS = { admin:'Admin', hr:'HR', supervisor:'Supervisor', employee:'Karyawan' };
+// ── Sidebar NavItem ───────────────────────────────────────────
+const NavItem = ({ to, icon: Icon, label, collapsed, onClick }) => (
+  <NavLink to={to} onClick={onClick}
+    className={({ isActive }) =>
+      `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 relative
+      ${isActive
+        ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
+        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
+      } ${collapsed ? 'justify-center px-2' : ''}`
+    }>
+    <Icon size={18} className="flex-shrink-0" />
+    {!collapsed && <span className="truncate">{label}</span>}
+    {collapsed && (
+      <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-900 dark:bg-gray-700 text-white text-xs font-semibold rounded-lg
+        opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-lg">
+        {label}
+        <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900 dark:border-r-gray-700" />
+      </div>
+    )}
+  </NavLink>
+);
 
-export default function MainLayout() {
-  const { user, logout }         = useAuth();
-  const { isDark, toggleTheme }  = useTheme();
-  const { settings }             = useCompany();
-  const navigate                 = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+// ── ERP Collapse Group ────────────────────────────────────────
+const ErpGroup = ({ group, collapsed, userRole, mobileClose }) => {
+  const location = useLocation();
+  const [openKeys, setOpenKeys] = useState(() => {
+    const active = {};
+    group.children.forEach(child => {
+      if (child.items.some(i => location.pathname === i.to || location.pathname.startsWith(i.to + '/'))) {
+        active[child.key] = true;
+      }
+    });
+    return active;
+  });
 
-  const visibleNav = NAV_ITEMS.filter(item =>
-    !item.roles || item.roles.includes(user?.role)
-  );
-  const isHRAdmin = ['admin','hr'].includes(user?.role);
+  const toggle = (key) => setOpenKeys(p => ({ ...p, [key]: !p[key] }));
 
-  const handleLogout = async () => {
-    setMobileMenuOpen(false);
-    await logout();
-    toast.success('Berhasil keluar');
-    navigate('/login');
-  };
-
-  // ── Sidebar link component ────────────────────────────────
-  const SidebarLink = ({ to, icon: Icon, label, onClick }) => (
-    <NavLink to={to} onClick={onClick}
-      className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group
-        ${isActive
-          ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold'
-          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'}`
-      }>
-      <Icon className="w-4.5 h-4.5 flex-shrink-0" size={18} />
-      <span className="text-sm font-medium">{label}</span>
-    </NavLink>
-  );
+  const isGroupActive = (child) =>
+    child.items.some(i => location.pathname === i.to || location.pathname.startsWith(i.to + '/'));
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    <div>
+      {!collapsed && (
+        <p className="px-3 mb-1 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">
+          {group.group}
+        </p>
+      )}
+      {group.children.map(child => {
+        const hasAccess = child.items.some(i =>
+          !i.roles || i.roles.includes(userRole)
+        );
+        if (!hasAccess) return null;
 
-      {/* ════════════════════════════════════════════════════
-          DESKTOP LAYOUT (lg+) — Sidebar kiri + konten kanan
-          ════════════════════════════════════════════════════ */}
-      <div className="hidden lg:flex h-screen overflow-hidden">
+        const isActive  = isGroupActive(child);
+        const isOpen    = openKeys[child.key];
+        const Icon      = child.icon;
+        const visItems  = child.items.filter(i => !i.roles || i.roles.includes(userRole));
 
-        {/* Sidebar kiri — fixed */}
-        <aside className="w-64 xl:w-72 flex-shrink-0 bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col h-full overflow-y-auto">
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-5 py-5 border-b border-[var(--border)]">
-            <div className="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-sm flex-shrink-0">
-              <img src={settings.logo_url || '/logo-gpdistro.png'} alt="Logo"
-                className="w-full h-full object-contain p-0.5"
-                onError={e => { e.target.style.display='none'; }} />
-            </div>
-            <div className="min-w-0">
-              <p className="font-black text-sm text-[var(--text-primary)] truncate leading-tight">
-                {settings.app_name || 'GPDISTRO HR Pro'}
-              </p>
-              <p className="text-[10px] text-[var(--text-muted)] truncate">HR Management System</p>
-            </div>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 mb-2">Menu Utama</p>
-            {visibleNav.map(item => (
-              <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label} />
-            ))}
-
-            {/* Extra admin/hr links */}
-            {['admin','hr'].includes(user?.role) && (
-              <>
-                <div className="my-3 border-t border-[var(--border)]" />
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 mb-2">Pengaturan</p>
-                <SidebarLink to="/reports"    icon={BarChart3}          label="Laporan" />
-                <SidebarLink to="/payroll-components" icon={SlidersHorizontal} label="Komponen Gaji" />
-                <SidebarLink to="/erp/products"   icon={Package}          label="Produk" />
-                <SidebarLink to="/erp/customers"  icon={UsersIcon}        label="Pelanggan" />
-                <SidebarLink to="/erp/reports"    icon={BarChart3}        label="Laporan Sales" />
-                <SidebarLink to="/erp/import"       icon={Upload}         label="Import Data" />
-                <SidebarLink to="/erp/purchases"    icon={ShoppingBag}    label="Pembelian" />
-                <SidebarLink to="/erp/expenses"     icon={Wallet}         label="Pengeluaran" />
-                <SidebarLink to="/erp/profit-loss"  icon={BarChart3}      label="Laba Rugi" />
-                <SidebarLink to="/erp/stock-opname" icon={ClipboardList}  label="Stok Opname" />
-                {user?.role === 'admin' && (
-                  <SidebarLink to="/company-settings" icon={Building2} label="Pengaturan Perusahaan" />
-                )}
-                <SidebarLink to="/settings"   icon={Settings}           label="Pengaturan Akun" />
-              </>
-            )}
-            {user?.role === 'employee' && (
-              <>
-                <div className="my-3 border-t border-[var(--border)]" />
-                <SidebarLink to="/settings" icon={Settings} label="Pengaturan" />
-              </>
-            )}
-          </nav>
-
-          {/* User profile di bawah */}
-          <div className="px-3 py-4 border-t border-[var(--border)]">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)]">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                {user?.name?.[0]?.toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-[var(--text-primary)] truncate">{user?.name}</p>
-                <p className="text-[10px] text-[var(--text-muted)] truncate">{ROLE_LABELS[user?.role]}</p>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={toggleTheme}
-                  className="w-7 h-7 rounded-lg hover:bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-muted)] transition-colors">
-                  {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                </button>
-                <button onClick={handleLogout}
-                  className="w-7 h-7 rounded-lg hover:bg-red-100 dark:hover:bg-red-950 flex items-center justify-center text-[var(--text-muted)] hover:text-red-500 transition-colors">
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main content area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Top bar desktop */}
-          <header className="flex-shrink-0 h-14 bg-[var(--bg-card)] border-b border-[var(--border)] flex items-center justify-between px-6">
-            <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)] capitalize">
-                {new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="relative w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-all">
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full" />
+        if (collapsed) {
+          return (
+            <div key={child.key} className="relative group">
+              <button className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all ${isActive ? 'bg-brand-500/10 text-brand-500' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}`}>
+                <Icon size={18} />
               </button>
-              <div className="h-6 w-px bg-[var(--border)]" />
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-xs">
-                  {user?.name?.[0]?.toUpperCase()}
-                </div>
-                <span className="font-medium text-[var(--text-primary)] hidden xl:block">{user?.name}</span>
+              {/* Hover flyout */}
+              <div className="absolute left-full top-0 ml-3 w-44 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl p-1.5 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto z-50 transition-opacity">
+                <p className="px-2 py-1 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{child.label}</p>
+                {visItems.map(item => (
+                  <NavLink key={item.to} to={item.to} onClick={mobileClose}
+                    className={({ isActive }) => `flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-all ${isActive ? 'bg-brand-500 text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'}`}>
+                    <item.icon size={14} />
+                    {item.label}
+                  </NavLink>
+                ))}
               </div>
             </div>
-          </header>
+          );
+        }
 
-          {/* Page content */}
-          <main className="flex-1 overflow-y-auto">
-            <div className="max-w-7xl mx-auto px-6 py-6">
-              <Outlet />
-            </div>
-          </main>
+        return (
+          <div key={child.key}>
+            <button onClick={() => toggle(child.key)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'}`}>
+              <Icon size={18} className="flex-shrink-0" />
+              <span className="flex-1 text-left">{child.label}</span>
+              <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+              <div className="ml-4 pl-3 border-l-2 border-[var(--border)] mt-0.5 mb-1 space-y-0.5">
+                {visItems.map(item => (
+                  <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} onClick={mobileClose} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── SIDEBAR CONTENT ───────────────────────────────────────────
+const SidebarContent = ({ collapsed, user, onToggle, onMobileClose }) => {
+  const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => { logout(); navigate('/login'); };
+  const role = user?.role;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className={`flex items-center gap-3 px-4 py-5 flex-shrink-0 ${collapsed ? 'justify-center px-2' : ''}`}>
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0 shadow-lg shadow-brand-500/30">
+          <Zap size={18} className="text-white" />
         </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <p className="text-sm font-black text-[var(--text-primary)] leading-tight truncate">GPDISTRO</p>
+            <p className="text-[10px] text-[var(--text-muted)] font-medium">HR Pro</p>
+          </div>
+        )}
       </div>
 
-      {/* ════════════════════════════════════════════════════
-          MOBILE LAYOUT (< lg) — Top header + bottom nav
-          ════════════════════════════════════════════════════ */}
-      <div className="lg:hidden flex flex-col min-h-screen">
-        {/* Mobile header */}
-        <header className="sticky top-0 z-40 safe-top glass border-b border-[var(--border)]">
-          <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shadow-sm flex items-center justify-center">
-                <img src={settings.logo_url || '/logo-gpdistro.png'} alt="Logo"
-                  className="w-full h-full object-contain"
-                  onError={e => { e.target.style.display='none'; }} />
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 space-y-4 pb-4 scrollbar-thin">
+        {NAV.map((section) => {
+          if (section.collapse) {
+            return (
+              <ErpGroup key={section.group} group={section} collapsed={collapsed}
+                userRole={role} mobileClose={onMobileClose} />
+            );
+          }
+
+          const visItems = section.items?.filter(i => !i.roles || i.roles.includes(role));
+          if (!visItems?.length) return null;
+
+          return (
+            <div key={section.group}>
+              {!collapsed && (
+                <p className="px-3 mb-1 text-[10px] font-bold tracking-widest text-[var(--text-muted)] uppercase">
+                  {section.group}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {visItems.map(item => (
+                  <NavItem key={item.to} to={item.to} icon={item.icon}
+                    label={item.label} collapsed={collapsed} onClick={onMobileClose} />
+                ))}
               </div>
-              <span className="font-bold text-[var(--text-primary)] tracking-tight text-sm">
-                {settings.app_name || 'GPDISTRO HR Pro'}
-              </span>
             </div>
+          );
+        })}
+      </nav>
+
+      {/* Bottom: user + controls */}
+      <div className={`flex-shrink-0 border-t border-[var(--border)] p-3 space-y-1`}>
+        {/* Theme toggle */}
+        <button onClick={toggleTheme}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-all ${collapsed ? 'justify-center' : ''}`}>
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          {!collapsed && <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
+        </button>
+
+        {/* User */}
+        <div className={`flex items-center gap-2.5 px-2 py-2 rounded-xl ${collapsed ? 'justify-center' : ''}`}>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            {user?.name?.[0]?.toUpperCase() || 'A'}
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-[var(--text-primary)] truncate">{user?.name}</p>
+              <p className="text-[10px] text-[var(--text-muted)] capitalize">{user?.role}</p>
+            </div>
+          )}
+          {!collapsed && (
+            <button onClick={handleLogout} title="Logout"
+              className="w-7 h-7 rounded-lg hover:bg-red-100 dark:hover:bg-red-950 flex items-center justify-center text-[var(--text-muted)] hover:text-red-500 transition-colors flex-shrink-0">
+              <LogOut size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Collapse toggle — desktop only */}
+        <button onClick={onToggle}
+          className="hidden lg:flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] transition-all">
+          <ChevronRight size={14} className={`transition-transform duration-300 ${collapsed ? '' : 'rotate-180'}`} />
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// MAIN LAYOUT
+// ════════════════════════════════════════════════════════════════
+export default function MainLayout() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const [collapsed,    setCollapsed]    = useState(false);
+  const [mobileOpen,   setMobileOpen]   = useState(false);
+  const [notifications, setNotifs]      = useState(2);
+
+  // Close mobile sidebar on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  // Get current page title from NAV
+  const getPageTitle = () => {
+    for (const section of NAV) {
+      if (section.collapse) {
+        for (const child of section.children) {
+          const found = child.items.find(i => location.pathname === i.to || location.pathname.startsWith(i.to + '/'));
+          if (found) return `${child.label} / ${found.label}`;
+        }
+      } else {
+        const found = section.items?.find(i => location.pathname === i.to || location.pathname.startsWith(i.to + '/'));
+        if (found) return found.label;
+      }
+    }
+    return 'GPDISTRO HR Pro';
+  };
+
+  const sidebarW = collapsed ? 'lg:w-[72px]' : 'lg:w-[240px]';
+
+  return (
+    <div className="flex h-screen bg-[var(--bg-primary)] overflow-hidden">
+
+      {/* ── MOBILE OVERLAY ──────────────────────────────────── */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        </div>
+      )}
+
+      {/* ── SIDEBAR ─────────────────────────────────────────── */}
+      <aside className={`
+        fixed lg:relative inset-y-0 left-0 z-50
+        flex flex-col
+        bg-[var(--bg-card)] border-r border-[var(--border)]
+        transition-all duration-300 ease-in-out
+        ${sidebarW}
+        w-[240px]
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        shadow-xl lg:shadow-none
+      `}>
+        <SidebarContent
+          collapsed={collapsed}
+          user={user}
+          onToggle={() => setCollapsed(v => !v)}
+          onMobileClose={() => setMobileOpen(false)}
+        />
+      </aside>
+
+      {/* ── MAIN AREA ────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* ── TOPBAR ────────────────────────────────────────── */}
+        <header className="flex-shrink-0 h-14 flex items-center gap-3 px-4 lg:px-6
+          bg-[var(--bg-card)] border-b border-[var(--border)] shadow-sm">
+
+          {/* Mobile hamburger */}
+          <button onClick={() => setMobileOpen(v => !v)}
+            className="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+            <Menu size={20} />
+          </button>
+
+          {/* Breadcrumb / page title */}
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <button className="relative w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full" />
-              </button>
-              <button onClick={toggleTheme}
-                className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
-                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-              <button onClick={() => setMobileMenuOpen(true)}
-                className="flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 rounded-xl border border-[var(--border)] hover:bg-[var(--bg-secondary)]">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">{user?.name?.[0]?.toUpperCase()}</span>
-                </div>
-                <Menu className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-              </button>
+              <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{getPageTitle()}</span>
+            </div>
+            <p className="text-[10px] text-[var(--text-muted)] hidden sm:block">
+              {new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+            </p>
+          </div>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-1.5">
+            {/* Notification */}
+            <button className="relative w-9 h-9 rounded-xl flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors">
+              <Bell size={18} />
+              {notifications > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-brand-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {notifications}
+                </span>
+              )}
+            </button>
+
+            {/* User avatar — mobile */}
+            <div className="lg:hidden w-8 h-8 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm">
+              {user?.name?.[0]?.toUpperCase() || 'A'}
             </div>
           </div>
         </header>
 
-        {/* Mobile menu overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setMobileMenuOpen(false)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
-            <aside className="relative w-72 h-full bg-[var(--bg-card)] border-l border-[var(--border)] animate-slide-down flex flex-col shadow-2xl"
-              onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm">
-                    {user?.name?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-[var(--text-primary)]">{user?.name}</p>
-                    <span className={`badge ${ROLE_COLORS[user?.role]}`}>{ROLE_LABELS[user?.role]}</span>
-                  </div>
-                </div>
-                <button onClick={() => setMobileMenuOpen(false)}
-                  className="w-8 h-8 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-                {visibleNav.map(item => (
-                  <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label}
-                    onClick={() => setMobileMenuOpen(false)} />
-                ))}
-                <div className="my-2 border-t border-[var(--border)]" />
-                {['admin','hr'].includes(user?.role) && (
-                  <>
-                    <SidebarLink to="/reports"    icon={BarChart3}          label="Laporan"                onClick={() => setMobileMenuOpen(false)} />
-                    <SidebarLink to="/payroll-components" icon={SlidersHorizontal} label="Komponen Gaji"  onClick={() => setMobileMenuOpen(false)} />
-                    {user?.role === 'admin' && (
-                      <SidebarLink to="/company-settings" icon={Building2} label="Pengaturan Perusahaan" onClick={() => setMobileMenuOpen(false)} />
-                    )}
-                  </>
-                )}
-                <SidebarLink to="/settings" icon={Settings} label="Pengaturan" onClick={() => setMobileMenuOpen(false)} />
-              </nav>
-              <div className="p-3 border-t border-[var(--border)]">
-                <button onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-all">
-                  <LogOut className="w-5 h-5" />
-                  <span className="text-sm font-medium">Keluar</span>
-                </button>
-              </div>
-            </aside>
+        {/* ── PAGE CONTENT ──────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 lg:p-6 max-w-screen-2xl mx-auto">
+            <Outlet />
           </div>
-        )}
-
-        {/* Mobile content */}
-        <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto">
-          <Outlet />
         </main>
-
-        {/* Bottom tab nav — mobile only */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-[var(--border)] safe-bottom lg:hidden">
-          <div className="flex items-center justify-around h-16 px-1 max-w-screen-xl mx-auto">
-            {visibleNav.slice(0, 5).map(item => (
-              <NavLink key={item.to} to={item.to}
-                className={({ isActive }) =>
-                  `flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all min-w-[52px]
-                  ${isActive ? 'text-brand-500 dark:text-brand-400' : 'text-[var(--text-muted)]'}`
-                }>
-                {({ isActive }) => (
-                  <>
-                    <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-brand-500/10' : ''}`}>
-                      <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.5} />
-                    </div>
-                    <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'} leading-none`}>
-                      {item.label}
-                    </span>
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </div>
-        </nav>
       </div>
-
     </div>
   );
 }
