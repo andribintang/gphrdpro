@@ -212,7 +212,7 @@ export default function OrderDetailPage() {
   const profit = order.items?.reduce((s,i) => s + parseFloat(i.profit||0), 0) || 0;
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/erp/orders')}

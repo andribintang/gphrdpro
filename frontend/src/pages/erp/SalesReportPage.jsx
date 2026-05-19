@@ -67,7 +67,7 @@ export default function SalesReportPage() {
   const maxRevenue = Math.max(...Object.values(byChannel).map(c => c.revenue||0), 1);
 
   return (
-    <div className="max-w-lg lg:max-w-5xl mx-auto">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Laporan Penjualan</h1>

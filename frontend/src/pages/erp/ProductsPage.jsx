@@ -290,7 +290,7 @@ export default function ProductsPage() {
   const lowStockCount = products.filter(p => (p.stock?.qty||0) <= p.stock_min).length;
 
   return (
-    <div className="max-w-lg lg:max-w-5xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>

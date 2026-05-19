@@ -135,7 +135,7 @@ export default function NewOrderPage() {
   };
 
   return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto">
+    <div className="w-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/erp/orders')}

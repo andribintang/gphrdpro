@@ -78,7 +78,7 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Import Data</h1>

@@ -169,7 +169,7 @@ export default function ExpensesPage() {
   const maxCat = Math.max(...Object.values(byCat), 1);
 
   return (
-    <div className="max-w-lg lg:max-w-5xl mx-auto">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Pengeluaran</h1>

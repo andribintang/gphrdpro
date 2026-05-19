@@ -52,7 +52,7 @@ export default function ProfitLossPage() {
   const netProfit = data?.net_profit || 0;
 
   return (
-    <div className="max-w-lg lg:max-w-5xl mx-auto">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Laporan Laba Rugi</h1>
