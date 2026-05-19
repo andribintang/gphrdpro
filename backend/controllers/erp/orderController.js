@@ -266,7 +266,7 @@ const syncOrderToIncentive = async (order) => {
     await WaSale.create({
       period_id:        period.id,
       employee_id:      employeeId,
-      branch_id:        order.branch_id, // inc_branches mapped by same branch_id
+      branch_id:        order.branch_id, // assumes erp branch_id matches inc branch_id
       sale_amount:      amount,
       channel_pct:      pct,
       incentive_amount: amount * pct / 100,

@@ -329,11 +329,14 @@ export default function OrderDetailPage() {
                 {order.shipment.status === 'shipped' && (
                   <button
                     onClick={async () => {
-                      await erpService.updateShipment(id, order.shipment.id, { status:'delivered', delivered_at: new Date().toISOString() });
-                      toast.success('Status: Terkirim'); fetch();
+                      try {
+                        await erpService.updateShipment(id, order.shipment.id, { status:'delivered', delivered_at: new Date().toISOString() });
+                        toast.success('Status: Terkirim ✓');
+                        fetch();
+                      } catch(e) { toast.error('Gagal update status'); }
                     }}
-                    className="w-full py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white">
-                    Tandai Terkirim
+                    className="w-full py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 transition-all">
+                    ✓ Tandai Terkirim
                   </button>
                 )}
               </div>

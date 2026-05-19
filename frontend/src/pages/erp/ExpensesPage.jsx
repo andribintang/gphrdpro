@@ -183,6 +183,15 @@ export default function ExpensesPage() {
 
       {/* Filters */}
       <div className="card p-4 mb-4 space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { l:'Hari Ini',   f:() => { const t=new Date().toISOString().split('T')[0]; setDate({from:t,to:t}); }},
+            { l:'Bulan Ini',  f:() => { const n=new Date(); setDate({from:new Date(n.getFullYear(),n.getMonth(),1).toISOString().split('T')[0],to:n.toISOString().split('T')[0]}); }},
+            { l:'Bulan Lalu', f:() => { const n=new Date(); setDate({from:new Date(n.getFullYear(),n.getMonth()-1,1).toISOString().split('T')[0],to:new Date(n.getFullYear(),n.getMonth(),0).toISOString().split('T')[0]}); }},
+          ].map(q => (
+            <button key={q.l} onClick={q.f} className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-brand-50 dark:hover:bg-brand-950 hover:text-brand-600 transition-all">{q.l}</button>
+          ))}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <input type="date" value={dateRange.from} onChange={e => setDate(r=>({...r,from:e.target.value}))} className="input-base text-sm h-9 flex-1 min-w-28" />
           <span className="text-xs text-[var(--text-muted)]">s/d</span>

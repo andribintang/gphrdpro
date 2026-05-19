@@ -27,7 +27,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color, bg, onClick }) => (
 export default function ErpDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [stats, setStats]     = useState(null);
+  const [stats, setStats]     = useState({ total_orders:0, total_revenue:0, total_profit:0, by_channel:{} });
   const [orders, setOrders]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [branchFilter, setBF] = useState('');
@@ -88,13 +88,13 @@ export default function ErpDashboard() {
             color="text-brand-600 dark:text-brand-400" bg="bg-brand-100 dark:bg-brand-950"
             onClick={() => navigate('/erp/orders')} />
           <StatCard icon={DollarSign} label="Total Omzet"
-            value={toRpShort(stats?.total_revenue)} sub="Revenue hari ini"
+            value={toRpShort(stats?.total_revenue || 0)} sub="Revenue hari ini"
             color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-100 dark:bg-emerald-950" />
           <StatCard icon={TrendingUp} label="Total Profit"
-            value={toRpShort(stats?.total_profit)} sub="Laba kotor hari ini"
+            value={toRpShort(stats?.total_profit || 0)} sub="Laba kotor hari ini"
             color="text-amber-600 dark:text-amber-400" bg="bg-amber-100 dark:bg-amber-950" />
           <StatCard icon={Package} label="By Channel"
-            value={stats ? `${stats.by_channel?.wa?.orders||0}W · ${stats.by_channel?.marketplace?.orders||0}M · ${stats.by_channel?.direct?.orders||0}L` : '—'}
+            value={`${stats?.by_channel?.wa?.orders||0}W · ${stats?.by_channel?.marketplace?.orders||0}M · ${stats?.by_channel?.direct?.orders||0}L`}
             sub="WA · Marketplace · Langsung"
             color="text-purple-600 dark:text-purple-400" bg="bg-purple-100 dark:bg-purple-950" />
         </div>

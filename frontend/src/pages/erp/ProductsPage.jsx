@@ -279,7 +279,7 @@ export default function ProductsPage() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const handleDelete = async (p) => {
-    if (!confirm(`Nonaktifkan produk "${p.name}"?`)) return;
+    if (!window.confirm(`Nonaktifkan produk "${p.name}"?`)) return;
     try {
       await erpService.deleteProduct(p.id);
       toast.success('Produk dinonaktifkan');

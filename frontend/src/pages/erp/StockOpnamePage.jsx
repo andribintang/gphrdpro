@@ -125,7 +125,7 @@ export default function StockOpnamePage() {
                     </div>
                     <div className="col-span-3 text-center">
                       <input type="number" value={opname[p.id] ?? systemQty} min={0}
-                        onChange={e => setOpname(o => ({...o,[p.id]: e.target.value}))}
+                        onChange={e => setOpname(o => ({...o,[p.id]: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value)||0)}))}
                         className={`input-base text-sm h-9 w-full text-center ${hasDiff ? 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950' : ''}`} />
                     </div>
                     <div className="col-span-2 text-center">

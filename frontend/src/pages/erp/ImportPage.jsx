@@ -63,8 +63,13 @@ export default function ImportPage() {
 
   const downloadTemplate = () => {
     const cfg = TYPES[type];
-    const data = [cfg.cols, ['(contoh)', 'ISI-KOLOM', '...']];
-    import('xlsx').then(XLSX => {
+    const data = [
+      cfg.cols,
+      type === 'products'
+        ? ['Kampas Rem Honda Beat', 'KR-001', '8991234567', 'Spare Part', 'pcs', 15000, 25000, 27000, 100, 50, 5]
+        : ['Budi Santoso', '08123456789', 'budi@email.com', 'Jl. Contoh No.1', 'Jakarta', 'DKI Jakarta', '12345', 'CUST-00001'],
+    ];
+    import('xlsx').then((XLSX) => {
       const ws = XLSX.utils.aoa_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Template');

@@ -18,7 +18,7 @@ const NewPoModal = ({ onClose, onSuccess }) => {
   const [shippingCost, setShipping] = useState(0);
   const [notes, setNotes]       = useState('');
   const [saving, setSaving]     = useState(false);
-  const searchRef = useState(null);
+
 
   useEffect(() => {
     if (!prodSearch.trim()) { setProdResults([]); return; }

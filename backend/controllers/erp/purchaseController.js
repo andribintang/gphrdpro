@@ -162,7 +162,7 @@ const getExpenses = async (req, res, next) => {
       where, order: [['expense_date','DESC'],['created_at','DESC']],
       limit: parseInt(limit), offset,
     });
-    const total = await Expense.sum('amount', { where });
+    const total = (await Expense.sum('amount', { where })) || 0;
     return res.json({ success: true, data: { expenses: rows, count, total_amount: total || 0 } });
   } catch (err) { next(err); }
 };
@@ -217,7 +217,7 @@ const getProfitLoss = async (req, res, next) => {
       include: [{ model: OrderItem, as: 'items', attributes: ['qty','sell_price','buy_price','subtotal','profit'] }],
     });
 
-    const revenue    = orders.reduce((s,o) => s + toNum(o.total_amount), 0);
+    const revenue    = orders.reduce((s,o) => s + toNum(o.subtotal) - toNum(o.discount_amount), 0);
     const hpp        = orders.reduce((s,o) => s + o.items.reduce((si,i) => si + (toNum(i.buy_price) * i.qty), 0), 0);
     const grossProfit = revenue - hpp;
 

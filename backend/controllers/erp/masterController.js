@@ -78,7 +78,7 @@ const getProducts = async (req, res, next) => {
 
     let products = rows;
     if (low_stock === 'true') {
-      products = rows.filter(p => (p.stock?.qty || 0) <= p.stock_min);
+      products = rows.filter(p => (p.stock?.qty || 0) <= (p.stock_min || 0));
     }
 
     return res.json({ success: true, data: { products, total: count, page: parseInt(page), limit: parseInt(limit) } });

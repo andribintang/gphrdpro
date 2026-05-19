@@ -29,7 +29,7 @@ export default function NewOrderPage() {
   const [saving, setSaving]       = useState(false);
   const [showCustForm, setShowCustForm] = useState(false);
   const [newCust, setNewCust]     = useState({ name:'', phone:'', city:'' });
-  const searchTimeout = useRef(null);
+  const searchTimeout = useRef(null); // single ref for both product and customer search
 
   const BRANCHES = [{ id:1, name:'GP Racing', type:'Spare Part' },{ id:2, name:'GP Distro', type:'Fashion' }];
   const MP_LIST  = ['Shopee','TikTok Shop','Tokopedia','Lazada','Bukalapak'];

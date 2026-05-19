@@ -175,7 +175,7 @@ export default function SalesReportPage() {
               <div className="divide-y divide-[var(--border-subtle)] max-h-96 overflow-y-auto scrollbar-thin">
                 {report.orders.map(o => {
                   const ch = CHANNELS[o.channel] || CHANNELS.direct;
-                  const profit = o.items?.reduce((s,i) => s+(parseFloat(i.profit)||0), 0) || 0;
+                  const profit = (o.items||[]).reduce((s,i) => s+(parseFloat(i?.profit)||0), 0);
                   return (
                     <div key={o.id} className="flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 min-w-0">
