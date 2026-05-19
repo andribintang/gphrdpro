@@ -113,11 +113,11 @@ export default function DashboardPage() {
               } : null);
             }).catch(() => {}),
           // Recent attendance (last 10)
-          api.get('/attendance/all', { params: { date: new Date().toISOString().split('T')[0], limit: 6 } })
+          api.get('/attendance/admin/realtime', { params: { limit: 6 } })
             .then(r => {
-              const records = r.data.data?.attendances || [];
-              const mapped = records.map(a => ({
-                name:   a.user?.name || '—',
+              const records = r.data.data?.attendance || r.data.data?.attendances || [];
+              const mapped = records.slice(0,6).map(a => ({
+                name:   a.user?.name || a.name || '—',
                 action: a.check_out_time ? 'Check-out' : 'Check-in',
                 time:   a.check_out_time
                   ? formatTime(a.check_out_time)
