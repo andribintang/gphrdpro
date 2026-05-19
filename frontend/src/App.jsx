@@ -52,14 +52,7 @@ export default function App() {
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="leaves" element={<LeavesPage />} />
-              <Route
-                path="payroll"
-                element={
-                  <ProtectedRoute roles={['admin', 'hr']}>
-                    <PayrollPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="payroll" element={<Navigate to="/payroll-pro" replace />} />
               <Route
                 path="employees"
                 element={
