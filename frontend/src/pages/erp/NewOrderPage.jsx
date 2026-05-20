@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { erpService, toRp, toRpShort, CHANNELS, PAYMENT_METHODS } from '../../utils/erp/erpService';
+import { incentiveService } from '../../utils/incentive/incentiveService';
 import { useAuth } from '../../context/AuthContext';
 
 export default function NewOrderPage() {
@@ -65,11 +66,9 @@ export default function NewOrderPage() {
 
   // ── Load employees for WA channel ────────────────────────
   useEffect(() => {
-    import('../../utils/incentive/incentiveService').then(({ incentiveService }) => {
-      incentiveService.getEmployees({ limit: 100 }).then(r => {
-        setEmployees(r.data.data.employees || []);
-      }).catch(() => {});
-    });
+    incentiveService.getEmployees({ limit: 100, is_active: true })
+      .then(r => setEmployees(r.data.data.employees || []))
+      .catch(() => {});
   }, []);
 
   // ── Load sub channels ─────────────────────────────────────
