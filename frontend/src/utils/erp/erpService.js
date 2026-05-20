@@ -3,6 +3,7 @@ import api from '../api';
 const BASE = '/erp';
 
 export const erpService = {
+  getEmployees:    ()       => api.get(`${BASE}/employees`),
   getSubChannels:  (p)      => api.get(`${BASE}/sub-channels`, { params: p }),
   getAllSubChannels:()       => api.get(`${BASE}/sub-channels/all`),
   createSubChannel:(d)      => api.post(`${BASE}/sub-channels`, d),
