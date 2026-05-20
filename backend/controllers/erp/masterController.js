@@ -1,11 +1,59 @@
 const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
 const {
-  Category, Product, Stock, StockMovement,
+  SubChannel, Category, Product, Stock, StockMovement,
   Customer, Order, OrderItem, Payment, Shipment, ImportLog,
 } = require('../../models/erp');
 
 const toNum = v => parseFloat(v) || 0;
+
+
+// ════════════════════════════════════════════════════════════════
+// SUB CHANNELS
+// ════════════════════════════════════════════════════════════════
+const getSubChannels = async (req, res, next) => {
+  try {
+    const { channel } = req.query;
+    const where = { is_active: true };
+    if (channel) where.channel = channel;
+    const rows = await SubChannel.findAll({ where, order: [['channel','ASC'],['sort_order','ASC'],['name','ASC']] });
+    return res.json({ success: true, data: { sub_channels: rows } });
+  } catch (err) { next(err); }
+};
+
+const getAllSubChannels = async (req, res, next) => {
+  try {
+    const rows = await SubChannel.findAll({ order: [['channel','ASC'],['sort_order','ASC']] });
+    return res.json({ success: true, data: { sub_channels: rows } });
+  } catch (err) { next(err); }
+};
+
+const createSubChannel = async (req, res, next) => {
+  try {
+    const { channel, name, description, sort_order } = req.body;
+    if (!channel || !name) return res.status(400).json({ success:false, message:'channel dan name wajib' });
+    const sc = await SubChannel.create({ channel, name, description, sort_order: sort_order||0 });
+    return res.status(201).json({ success:true, data:{ sub_channel: sc } });
+  } catch (err) { next(err); }
+};
+
+const updateSubChannel = async (req, res, next) => {
+  try {
+    const sc = await SubChannel.findByPk(req.params.id);
+    if (!sc) return res.status(404).json({ success:false, message:'Sub channel tidak ditemukan' });
+    await sc.update(req.body);
+    return res.json({ success:true, data:{ sub_channel: sc } });
+  } catch (err) { next(err); }
+};
+
+const deleteSubChannel = async (req, res, next) => {
+  try {
+    const sc = await SubChannel.findByPk(req.params.id);
+    if (!sc) return res.status(404).json({ success:false, message:'Sub channel tidak ditemukan' });
+    await sc.update({ is_active: false });
+    return res.json({ success:true, message:`${sc.name} dinonaktifkan` });
+  } catch (err) { next(err); }
+};
 
 // ════════════════════════════════════════════════════════════════
 // CATEGORIES
@@ -369,6 +417,8 @@ const getImportTemplate = async (req, res) => {
 };
 
 module.exports = {
+  // Sub Channels
+  getSubChannels, getAllSubChannels, createSubChannel, updateSubChannel, deleteSubChannel,
   // Categories
   getCategories, createCategory, updateCategory, deleteCategory,
   // Products

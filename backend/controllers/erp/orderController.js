@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
 const {
-  Category, Product, Stock, StockMovement,
+  SubChannel, Category, Product, Stock, StockMovement,
   Customer, Order, OrderItem, Payment, Shipment,
 } = require('../../models/erp');
 
@@ -88,6 +88,8 @@ const createOrder = async (req, res, next) => {
       discount_amount = 0,
       shipping_cost = 0,
       admin_fee = 0,
+      sub_channel_id,
+      sub_channel_name,
       notes,
       order_date,
       payment_method, // optional: langsung bayar saat buat order

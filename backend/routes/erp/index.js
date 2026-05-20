@@ -8,6 +8,13 @@ const purchase = require('../../controllers/erp/purchaseController');
 const hrAdmin  = authorize('admin','hr');
 const allRoles = authorize('admin','hr','supervisor','employee');
 
+// ── Sub Channels ─────────────────────────────────────────────
+router.get   ('/sub-channels',        authenticate, allRoles, master.getSubChannels);
+router.get   ('/sub-channels/all',    authenticate, hrAdmin,  master.getAllSubChannels);
+router.post  ('/sub-channels',        authenticate, hrAdmin,  master.createSubChannel);
+router.put   ('/sub-channels/:id',    authenticate, hrAdmin,  master.updateSubChannel);
+router.delete('/sub-channels/:id',    authenticate, hrAdmin,  master.deleteSubChannel);
+
 // ── Categories ───────────────────────────────────────────────
 router.get   ('/categories',          authenticate, allRoles, master.getCategories);
 router.post  ('/categories',          authenticate, hrAdmin,  master.createCategory);

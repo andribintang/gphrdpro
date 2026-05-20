@@ -162,6 +162,56 @@ app.post('/run-alter', async (req, res) => {
       }
     }
 
+    // Create erp_sub_channels table if not exists
+    try {
+      await sequelize.query(`CREATE TABLE IF NOT EXISTS erp_sub_channels (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        channel ENUM('wa','marketplace','direct') NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description VARCHAR(200),
+        is_active TINYINT(1) DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+      results.push('OK: erp_sub_channels table ready');
+
+      // Seed default sub channels
+      const existing = await sequelize.query('SELECT COUNT(*) as cnt FROM erp_sub_channels', { type: 'SELECT' });
+      if (existing[0].cnt == 0) {
+        const seeds = [
+          // WA — list karyawan dihandle di frontend via employees API
+          // Marketplace
+          "('marketplace','TOKOPEDIA #01','Toko Tokopedia utama',1,1)",
+          "('marketplace','TOKOPEDIA #02','Toko Tokopedia kedua',1,2)",
+          "('marketplace','SHOPEE #01','Toko Shopee utama',1,3)",
+          "('marketplace','SHOPEE #02','Toko Shopee kedua',1,4)",
+          "('marketplace','TIKTOK SHOP','TikTok Shop official',1,5)",
+          "('marketplace','BRT PLAZA','BRT Plaza offline store',1,6)",
+          // Langsung
+          "('direct','Datang ke Toko','Pelanggan datang langsung',1,1)",
+          "('direct','Website','Order via website',1,2)",
+        ];
+        for (const seed of seeds) {
+          await sequelize.query(`INSERT INTO erp_sub_channels (channel,name,description,is_active,sort_order) VALUES ${seed}`).catch(()=>{});
+        }
+        results.push('OK: erp_sub_channels seeded');
+      }
+    } catch(e) { errors.push('ERR sub_channels: ' + e.message.substring(0,80)); }
+
+    // Add sub_channel columns to erp_orders
+    for (const col of [
+      "ALTER TABLE erp_orders ADD COLUMN sub_channel_id INT",
+      "ALTER TABLE erp_orders ADD COLUMN sub_channel_name VARCHAR(100)",
+    ]) {
+      try { await sequelize.query(col); results.push('OK: ' + col.substring(0,60)); }
+      catch(e) {
+        if (e.message.includes('Duplicate column') || e.message.includes('already exists'))
+          results.push('SKIP: ' + col.substring(0,50));
+        else errors.push('ERR: ' + e.message.substring(0,80));
+      }
+    }
+
     // Add admin_fee column to erp_orders if missing
     try {
       await sequelize.query('ALTER TABLE `erp_orders` ADD COLUMN `admin_fee` DECIMAL(15,2) NOT NULL DEFAULT 0');
@@ -171,6 +221,23 @@ app.post('/run-alter', async (req, res) => {
         results.push('SKIP: erp_orders.admin_fee already exists');
       } else { errors.push('ERR admin_fee: ' + e.message.substring(0,80)); }
     }
+
+
+    // Seed GP Racing categories if empty
+    try {
+      const catCount = await sequelize.query('SELECT COUNT(*) as cnt FROM erp_categories WHERE branch_id=1', { type: 'SELECT' });
+      if (catCount[0].cnt == 0) {
+        const cats = [
+          'BUSI RACING','ROLLER BRT','PAKET TRABAS','RACING PARTS',
+          'CYLINDER HEAD','BORE UP KIT','CDI RACING','ECU RACING',
+          'CAM SHAFT','OTHER PARTS','WORKSHOP TOOLS',
+        ];
+        for (const [i,name] of cats.entries()) {
+          await sequelize.query(`INSERT INTO erp_categories (branch_id,name,sort_order,is_active) VALUES (1,'${name}',${i+1},1)`).catch(()=>{});
+        }
+        results.push('OK: GP Racing categories seeded');
+      }
+    } catch(e) { errors.push('ERR categories seed: ' + e.message.substring(0,60)); }
 
     // Set defaults for eligible_statuses
     await sequelize.query(

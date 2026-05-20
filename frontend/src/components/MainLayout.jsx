@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
-  Home, Users, Clock, CalendarOff, DollarSign,
+  Home, Users, Clock, CalendarOff, DollarSign, Truck,
   TrendingUp, Building2, SlidersHorizontal, Settings,
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
@@ -53,8 +53,9 @@ const NAV = [
         items:[
           { to:'/erp/products',     icon:Package,       label:'Produk',      roles:['admin','hr'] },
           { to:'/erp/purchases',    icon:ShoppingBag,   label:'Pembelian',   roles:['admin','hr'] },
-          { to:'/erp/stock-opname', icon:ClipboardList, label:'Stok Opname', roles:['admin','hr'] },
-          { to:'/erp/import',       icon:Upload,        label:'Import Data', roles:['admin','hr'] },
+          { to:'/erp/stock-opname', icon:ClipboardList, label:'Stok Opname',  roles:['admin','hr'] },
+          { to:'/erp/import',       icon:Upload,        label:'Import Data',  roles:['admin','hr'] },
+          { to:'/erp/shipments',    icon:Truck,         label:'Pengiriman',   roles:['admin','hr','supervisor'] },
         ],
       },
       {

@@ -2,6 +2,16 @@ const { DataTypes } = require('sequelize');
 const { sequelize }  = require('../../config/database');
 const { Purchase, PurchaseItem, Expense } = require('./Purchase');
 
+// ── SUB CHANNEL ──────────────────────────────────────────────
+const SubChannel = sequelize.define('ErpSubChannel', {
+  id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  channel:     { type: DataTypes.ENUM('wa','marketplace','direct'), allowNull: false },
+  name:        { type: DataTypes.STRING(100), allowNull: false },
+  description: { type: DataTypes.STRING(200), allowNull: true },
+  is_active:   { type: DataTypes.BOOLEAN, defaultValue: true },
+  sort_order:  { type: DataTypes.INTEGER, defaultValue: 0 },
+}, { tableName: 'erp_sub_channels', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
+
 // ── CATEGORY ─────────────────────────────────────────────────
 const Category = sequelize.define('ErpCategory', {
   id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -101,6 +111,8 @@ const Order = sequelize.define('ErpOrder', {
     type: DataTypes.ENUM('wa','marketplace','direct'),
     defaultValue: 'direct',
   },
+  sub_channel_id:  { type: DataTypes.INTEGER, allowNull: true, comment: 'FK ke erp_sub_channels' },
+  sub_channel_name:{ type: DataTypes.STRING(100), allowNull: true, comment: 'Snapshot nama sub channel' },
   marketplace_name:{ type: DataTypes.STRING(50), allowNull: true, comment: 'shopee, tiktok, tokopedia' },
   marketplace_order_id: { type: DataTypes.STRING(100), allowNull: true },
   // Customer info (snapshot saat order)
@@ -196,6 +208,10 @@ const ImportLog = sequelize.define('ErpImportLog', {
   imported_by:  { type: DataTypes.INTEGER, allowNull: true },
 }, { tableName: 'erp_import_logs', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
 
+// ── SubChannel associations ───────────────────────────────────
+Order.belongsTo(SubChannel, { foreignKey: 'sub_channel_id', as: 'subChannel' });
+SubChannel.hasMany(Order,   { foreignKey: 'sub_channel_id', as: 'orders' });
+
 // ── ASSOCIATIONS ──────────────────────────────────────────────
 Category.hasMany(Product,    { foreignKey: 'category_id', as: 'products' });
 Product.belongsTo(Category,  { foreignKey: 'category_id', as: 'category' });
@@ -220,6 +236,7 @@ Order.belongsTo(Customer,    { foreignKey: 'customer_id', as: 'customer' });
 Customer.hasMany(Order,      { foreignKey: 'customer_id', as: 'orders' });
 
 module.exports = {
+  SubChannel,
   Category, Product, Stock, StockMovement,
   Customer, Order, OrderItem, Payment, Shipment,
   ImportLog,

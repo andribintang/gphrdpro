@@ -3,6 +3,11 @@ import api from '../api';
 const BASE = '/erp';
 
 export const erpService = {
+  getSubChannels:  (p)      => api.get(`${BASE}/sub-channels`, { params: p }),
+  getAllSubChannels:()       => api.get(`${BASE}/sub-channels/all`),
+  createSubChannel:(d)      => api.post(`${BASE}/sub-channels`, d),
+  updateSubChannel:(id,d)   => api.put(`${BASE}/sub-channels/${id}`, d),
+  deleteSubChannel:(id)     => api.delete(`${BASE}/sub-channels/${id}`),
   getCategories:   (p)      => api.get(`${BASE}/categories`, { params: p }),
   createCategory:  (d)      => api.post(`${BASE}/categories`, d),
   updateCategory:  (id, d)  => api.put(`${BASE}/categories/${id}`, d),

@@ -25,6 +25,9 @@ export default function NewOrderPage() {
   const [discount, setDiscount]   = useState(0);
   const [shippingCost, setShipping] = useState(0);
   const [adminFee, setAdminFee]       = useState(0);
+  const [subChannels, setSubChannels] = useState([]);
+  const [subChannelId, setSubChId]    = useState('');
+  const [subChannelName, setSubChName]= useState('');
   const [payMethod, setPay]       = useState('cash');
   const [notes, setNotes]         = useState('');
   const [saving, setSaving]       = useState(false);
@@ -110,6 +113,8 @@ export default function NewOrderPage() {
         discount_amount:  parseFloat(discount||0),
         shipping_cost:    parseFloat(shippingCost||0),
         admin_fee:        channel === 'marketplace' ? parseFloat(adminFee||0) : 0,
+        sub_channel_id:   subChannelId ? parseInt(subChannelId) : null,
+        sub_channel_name: subChannelName || null,
         payment_method:   payMethod,
         notes,
         order_date:       new Date().toISOString().split('T')[0],
@@ -181,11 +186,25 @@ export default function NewOrderPage() {
                 </button>
               ))}
             </div>
-            {channel === 'marketplace' && (
-              <select value={mpName} onChange={e => setMpName(e.target.value)} className="input-base text-sm">
-                <option value="">Pilih marketplace...</option>
-                {MP_LIST.map(m => <option key={m} value={m.toLowerCase()}>{m}</option>)}
-              </select>
+            {/* Sub channel selector */}
+            {channel !== 'wa' && subChannels.length > 0 && (
+              <div>
+                <label className="field-label">
+                  {channel === 'marketplace' ? 'Toko Marketplace' : 'Metode Langsung'}
+                </label>
+                <select value={subChannelId}
+                  onChange={e => {
+                    setSubChId(e.target.value);
+                    const sc = subChannels.find(s => s.id == e.target.value);
+                    setSubChName(sc?.name || '');
+                  }}
+                  className="input-base text-sm">
+                  <option value="">Pilih...</option>
+                  {subChannels.map(sc => (
+                    <option key={sc.id} value={sc.id}>{sc.name}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 
