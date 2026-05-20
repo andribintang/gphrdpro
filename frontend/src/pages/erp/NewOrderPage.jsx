@@ -62,6 +62,16 @@ export default function NewOrderPage() {
     }, 300);
   }, [custSearch]);
 
+  // ── Load sub channels ─────────────────────────────────────
+  useEffect(() => {
+    setSubChannels([]);
+    setSubChId('');
+    setSubChName('');
+    erpService.getSubChannels({ channel }).then(r => {
+      setSubChannels(r.data.data.sub_channels || []);
+    }).catch(() => {});
+  }, [channel]);
+
   // ── Barcode scan ──────────────────────────────────────────
   const handleBarcode = async (code) => {
     if (!code.trim()) return;
@@ -187,7 +197,7 @@ export default function NewOrderPage() {
               ))}
             </div>
             {/* Sub channel selector */}
-            {channel !== 'wa' && subChannels.length > 0 && (
+            {subChannels.length > 0 && (
               <div>
                 <label className="field-label">
                   {channel === 'marketplace' ? 'Toko Marketplace' : 'Metode Langsung'}
