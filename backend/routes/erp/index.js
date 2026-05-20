@@ -8,6 +8,20 @@ const purchase = require('../../controllers/erp/purchaseController');
 const hrAdmin  = authorize('admin','hr');
 const allRoles = authorize('admin','hr','supervisor','employee');
 
+// ── Employees (for WA sub channel selector) ──────────────────
+router.get('/employees', authenticate, allRoles, async (req, res, next) => {
+  try {
+    const { IncEmployee, Branch } = require('../../models/incentive');
+    const rows = await IncEmployee.findAll({
+      where: { is_active: true },
+      include: [{ model: Branch, as: 'branch', attributes: ['id','name'] }],
+      order: [['name','ASC']],
+      attributes: ['id','name','employee_id','position'],
+    });
+    return res.json({ success: true, data: { employees: rows } });
+  } catch (err) { next(err); }
+});
+
 // ── Sub Channels ─────────────────────────────────────────────
 router.get   ('/sub-channels',        authenticate, allRoles, master.getSubChannels);
 router.get   ('/sub-channels/all',    authenticate, hrAdmin,  master.getAllSubChannels);
