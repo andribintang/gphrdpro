@@ -28,6 +28,7 @@ export default function NewOrderPage() {
   const [subChannels, setSubChannels] = useState([]);
   const [subChannelId, setSubChId]    = useState('');
   const [subChannelName, setSubChName]= useState('');
+  const [employees, setEmployees]     = useState([]);
   const [payMethod, setPay]       = useState('cash');
   const [notes, setNotes]         = useState('');
   const [saving, setSaving]       = useState(false);
@@ -61,6 +62,15 @@ export default function NewOrderPage() {
       } catch {}
     }, 300);
   }, [custSearch]);
+
+  // ── Load employees for WA channel ────────────────────────
+  useEffect(() => {
+    import('../../utils/incentive/incentiveService').then(({ incentiveService }) => {
+      incentiveService.getEmployees({ limit: 100 }).then(r => {
+        setEmployees(r.data.data.employees || []);
+      }).catch(() => {});
+    });
+  }, []);
 
   // ── Load sub channels ─────────────────────────────────────
   useEffect(() => {
@@ -196,8 +206,26 @@ export default function NewOrderPage() {
                 </button>
               ))}
             </div>
-            {/* Sub channel selector */}
-            {subChannels.length > 0 && (
+            {/* Sub channel / Sales selector */}
+            {channel === 'wa' ? (
+              <div>
+                <label className="field-label">Sales / Karyawan WA</label>
+                <select value={subChannelId}
+                  onChange={e => {
+                    setSubChId(e.target.value);
+                    const emp = employees.find(em => em.id == e.target.value);
+                    setSubChName(emp?.name || '');
+                  }}
+                  className="input-base text-sm">
+                  <option value="">Pilih karyawan...</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} — {emp.branch?.name || emp.branch_name || ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : subChannels.length > 0 && (
               <div>
                 <label className="field-label">
                   {channel === 'marketplace' ? 'Toko Marketplace' : 'Metode Langsung'}
