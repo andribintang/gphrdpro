@@ -16,7 +16,7 @@ router.get('/employees', authenticate, allRoles, async (req, res, next) => {
     const rows = await IncEmployee.findAll({
       include: [{ model: Branch, as: 'branch', attributes: ['id','name'] }],
       order: [['branch_id','ASC'],['name','ASC']],
-      attributes: ['id','name','employee_id','employment_status','branch_id'],
+      attributes: ['id','name','employee_code','employment_status','branch_id'],
     });
     return res.json({ success: true, data: { employees: rows } });
   } catch (err) {
