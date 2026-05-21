@@ -230,7 +230,7 @@ export default function NewOrderPage() {
                   ))}
                 </select>
               </div>
-            ) : subChannels.length > 0 && (
+            ) : (
               <div>
                 <label className="field-label">
                   {channel === 'marketplace' ? 'Toko Marketplace' : 'Metode Langsung'}
@@ -247,6 +247,9 @@ export default function NewOrderPage() {
                     <option key={sc.id} value={sc.id}>{sc.name}</option>
                   ))}
                 </select>
+                {subChannels.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">⚠ Belum ada sub channel. Tambah di Master Data ERP.</p>
+                )}
               </div>
             )}
           </div>
