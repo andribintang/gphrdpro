@@ -1,3 +1,4 @@
+// v2.1 — sub channel selector fix
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -72,12 +73,18 @@ export default function NewOrderPage() {
 
   // ── Load sub channels ─────────────────────────────────────
   useEffect(() => {
-    setSubChannels([]);
+    if (channel === 'wa') {
+      setSubChannels([]);
+      return;
+    }
     setSubChId('');
     setSubChName('');
-    erpService.getSubChannels({ channel }).then(r => {
-      setSubChannels(r.data.data.sub_channels || []);
-    }).catch(() => {});
+    erpService.getSubChannels({ channel })
+      .then(r => {
+        const list = r.data?.data?.sub_channels || [];
+        setSubChannels(list);
+      })
+      .catch(e => console.error('Sub channel fetch error:', e));
   }, [channel]);
 
   // ── Barcode scan ──────────────────────────────────────────
