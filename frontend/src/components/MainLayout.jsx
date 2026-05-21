@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
-  Home, Users, Clock, CalendarOff, DollarSign, Truck, Database,
+  Home, Users, Clock, CalendarOff, DollarSign, Truck, Database, CalendarDays,
   TrendingUp, Building2, SlidersHorizontal, Settings,
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
@@ -63,7 +63,8 @@ const NAV = [
         label:'Keuangan', icon:Wallet, key:'finance',
         items:[
           { to:'/erp/expenses',    icon:Wallet,     label:'Pengeluaran',  roles:['admin','hr'] },
-          { to:'/erp/profit-loss', icon:TrendingUp, label:'Laba Rugi',    roles:['admin','hr'] },
+          { to:'/erp/profit-loss',   icon:TrendingUp,  label:'Laba Rugi',      roles:['admin','hr'] },
+          { to:'/erp/daily-report',  icon:CalendarDays,label:'Laporan Harian', roles:['admin','hr'] },
           { to:'/erp/reports',     icon:BarChart3,  label:'Laporan Sales',roles:['admin','hr'] },
         ],
       },

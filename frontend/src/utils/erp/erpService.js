@@ -35,6 +35,7 @@ export const erpService = {
   addShipment:     (id, d)  => api.post(`${BASE}/orders/${id}/shipment`, d),
   updateShipment:  (id, sid, d) => api.put(`${BASE}/orders/${id}/shipment/${sid}`, d),
   getSalesReport:   (p)     => api.get(`${BASE}/reports/sales`, { params: p }),
+  getDailyReport:   (p)     => api.get(`${BASE}/reports/daily`, { params: p }),
   getShipmentReport:(p)     => api.get(`${BASE}/reports/shipments`, { params: p }),
   getProfitLoss:    (p)     => api.get(`${BASE}/reports/profit-loss`, { params: p }),
 

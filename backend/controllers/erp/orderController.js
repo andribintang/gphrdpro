@@ -464,10 +464,127 @@ const getShipmentReport = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+
+// ════════════════════════════════════════════════════════════════
+// LAPORAN SALES HARIAN (format tabel per tanggal)
+// ════════════════════════════════════════════════════════════════
+const getDailyReport = async (req, res, next) => {
+  try {
+    const { branch_id, date_from, date_to } = req.query;
+
+    // Default: bulan ini
+    const now   = new Date();
+    const from  = date_from || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const to    = date_to   || now.toISOString().split('T')[0];
+
+    const where = {
+      status:     { [Op.in]: ['confirmed','processing','shipped','completed'] },
+      order_date: { [Op.between]: [from, to] },
+    };
+    if (branch_id) where.branch_id = branch_id;
+
+    // Ambil semua order dalam range
+    const orders = await Order.findAll({
+      where,
+      attributes: ['id','order_date','channel','sub_channel_name','total_amount','branch_id'],
+      order: [['order_date','ASC']],
+      raw: true,
+    });
+
+    // Build date range array
+    const dates = [];
+    const cur = new Date(from);
+    const end = new Date(to);
+    while (cur <= end) {
+      dates.push(cur.toISOString().split('T')[0]);
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    // Group: channel → sub_channel → date → total
+    const CHANNELS = ['marketplace','direct','wa'];
+    const channelLabel = { marketplace:'MARKETPLACE', direct:'LANGSUNG', wa:'WHATSAPP' };
+
+    // Collect all sub channels per channel
+    const subMap = {}; // { 'marketplace': Set(['TOKOPEDIA #01',...]) }
+    CHANNELS.forEach(ch => { subMap[ch] = new Set(); });
+
+    orders.forEach(o => {
+      const ch  = o.channel || 'direct';
+      const sub = o.sub_channel_name || '(Langsung)';
+      if (subMap[ch]) subMap[ch].add(sub);
+    });
+
+    // Build data matrix: channel.sub → date → amount
+    const matrix = {}; // key: `ch::sub` → { [date]: amount }
+    orders.forEach(o => {
+      const ch  = o.channel || 'direct';
+      const sub = o.sub_channel_name || '(Langsung)';
+      const key = `${ch}::${sub}`;
+      if (!matrix[key]) matrix[key] = {};
+      matrix[key][o.order_date] = (matrix[key][o.order_date] || 0) + parseFloat(o.total_amount || 0);
+    });
+
+    // Build rows per channel
+    const rows = [];
+    let grandTotal = 0;
+    const grandByDate = {};
+
+    CHANNELS.forEach(ch => {
+      const subs = [...subMap[ch]].sort();
+      if (subs.length === 0 && !orders.some(o => (o.channel||'direct') === ch)) return;
+
+      let channelTotal = 0;
+      const channelByDate = {};
+
+      subs.forEach((sub, idx) => {
+        const key = `${ch}::${sub}`;
+        const rowData = { no: rows.length + 1, channel: ch, sub_channel: sub, by_date: {}, total: 0 };
+        dates.forEach(d => {
+          const amt = matrix[key]?.[d] || 0;
+          rowData.by_date[d] = amt;
+          rowData.total     += amt;
+          channelByDate[d]   = (channelByDate[d] || 0) + amt;
+          grandByDate[d]     = (grandByDate[d]   || 0) + amt;
+        });
+        channelTotal += rowData.total;
+        grandTotal   += rowData.total;
+        rows.push(rowData);
+      });
+
+      // Subtotal row per channel
+      rows.push({
+        is_subtotal: true,
+        channel: ch,
+        label: `TOTAL ${channelLabel[ch]}`,
+        by_date: channelByDate,
+        total: channelTotal,
+      });
+    });
+
+    // Grand total row
+    rows.push({
+      is_grand_total: true,
+      label: 'GRAND TOTAL',
+      by_date: grandByDate,
+      total: grandTotal,
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        dates,
+        rows,
+        period: { from, to },
+        grand_total: grandTotal,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getOrders, getOrderDetail, createOrder,
   confirmOrder, completeOrder, cancelOrder,
   addPayment, verifyPayment,
   addShipment, updateShipment,
-  getSalesReport, getShipmentReport,
+  getSalesReport, getShipmentReport, getDailyReport,
 };
