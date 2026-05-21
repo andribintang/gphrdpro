@@ -11,15 +11,18 @@ const allRoles = authorize('admin','hr','supervisor','employee');
 // ── Employees (for WA sub channel selector) ──────────────────
 router.get('/employees', authenticate, allRoles, async (req, res, next) => {
   try {
-    const { IncEmployee, Branch } = require('../../models/incentive');
+    const incentiveModels = require('../../models/incentive');
+    const { IncEmployee, Branch } = incentiveModels;
     const rows = await IncEmployee.findAll({
-      where: { is_active: true },
       include: [{ model: Branch, as: 'branch', attributes: ['id','name'] }],
-      order: [['name','ASC']],
-      attributes: ['id','name','employee_id','position'],
+      order: [['branch_id','ASC'],['name','ASC']],
+      attributes: ['id','name','employee_id','employment_status','branch_id'],
     });
     return res.json({ success: true, data: { employees: rows } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('ERP employees error:', err.message);
+    next(err);
+  }
 });
 
 // ── Sub Channels ─────────────────────────────────────────────
