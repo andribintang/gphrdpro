@@ -39,6 +39,11 @@ export const erpService = {
   getShipmentReport:(p)     => api.get(`${BASE}/reports/shipments`, { params: p }),
   getProfitLoss:    (p)     => api.get(`${BASE}/reports/profit-loss`, { params: p }),
 
+  getReturns:       (p)     => api.get(`${BASE}/returns`, { params: p }),
+  getReturn:        (id)    => api.get(`${BASE}/returns/${id}`),
+  createReturn:     (d)     => api.post(`${BASE}/returns`, d),
+  confirmReturn:    (id)    => api.post(`${BASE}/returns/${id}/confirm`),
+  rejectReturn:     (id,d)  => api.post(`${BASE}/returns/${id}/reject`, d),
   getPurchases:     (p)     => api.get(`${BASE}/purchases`, { params: p }),
   getPurchase:      (id)    => api.get(`${BASE}/purchases/${id}`),
   createPurchase:   (d)     => api.post(`${BASE}/purchases`, d),

@@ -212,6 +212,39 @@ const ImportLog = sequelize.define('ErpImportLog', {
 Order.belongsTo(SubChannel, { foreignKey: 'sub_channel_id', as: 'subChannel' });
 SubChannel.hasMany(Order,   { foreignKey: 'sub_channel_id', as: 'orders' });
 
+// ── RETURN ───────────────────────────────────────────────────
+const Return = sequelize.define('ErpReturn', {
+  id:             { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  return_no:      { type: DataTypes.STRING(50), allowNull: false, unique: true },
+  order_id:       { type: DataTypes.INTEGER, allowNull: false },
+  branch_id:      { type: DataTypes.INTEGER, allowNull: false },
+  status:         { type: DataTypes.ENUM('pending','confirmed','rejected'), defaultValue: 'pending' },
+  reason:         { type: DataTypes.ENUM('barang_rusak','salah_produk','tidak_sesuai','cod_ditolak','lainnya'), defaultValue: 'lainnya' },
+  resolution:     { type: DataTypes.ENUM('refund','exchange','none'), defaultValue: 'refund' },
+  restock:        { type: DataTypes.BOOLEAN, defaultValue: true, comment: 'Apakah stok dikembalikan' },
+  total_return:   { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
+  notes:          { type: DataTypes.TEXT, allowNull: true },
+  confirmed_at:   { type: DataTypes.DATE, allowNull: true },
+  created_by:     { type: DataTypes.INTEGER, allowNull: true },
+}, { tableName: 'erp_returns', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
+
+const ReturnItem = sequelize.define('ErpReturnItem', {
+  id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  return_id:    { type: DataTypes.INTEGER, allowNull: false },
+  order_item_id:{ type: DataTypes.INTEGER, allowNull: false },
+  product_id:   { type: DataTypes.INTEGER, allowNull: false },
+  product_name: { type: DataTypes.STRING(200), allowNull: false },
+  qty_return:   { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+  sell_price:   { type: DataTypes.DECIMAL(15,2), allowNull: false },
+  subtotal:     { type: DataTypes.DECIMAL(15,2), allowNull: false },
+}, { tableName: 'erp_return_items', timestamps: false });
+
+// ── Return associations ───────────────────────────────────────
+Return.hasMany(ReturnItem,   { foreignKey: 'return_id',  as: 'items' });
+ReturnItem.belongsTo(Return, { foreignKey: 'return_id',  as: 'return' });
+Return.belongsTo(Order,      { foreignKey: 'order_id',   as: 'order' });
+Order.hasMany(Return,        { foreignKey: 'order_id',   as: 'returns' });
+
 // ── ASSOCIATIONS ──────────────────────────────────────────────
 Category.hasMany(Product,    { foreignKey: 'category_id', as: 'products' });
 Product.belongsTo(Category,  { foreignKey: 'category_id', as: 'category' });
@@ -241,4 +274,5 @@ module.exports = {
   Customer, Order, OrderItem, Payment, Shipment,
   ImportLog,
   Purchase, PurchaseItem, Expense,
+  Return, ReturnItem,
 };

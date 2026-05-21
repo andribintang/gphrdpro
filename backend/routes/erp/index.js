@@ -4,6 +4,7 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const master = require('../../controllers/erp/masterController');
 const order    = require('../../controllers/erp/orderController');
 const purchase = require('../../controllers/erp/purchaseController');
+const ret      = require('../../controllers/erp/returnController');
 
 const hrAdmin  = authorize('admin','hr');
 const allRoles = authorize('admin','hr','supervisor','employee');
@@ -70,6 +71,13 @@ router.post  ('/orders/:id/payments/:paymentId/verify',   authenticate, hrAdmin,
 // ── Shipments ────────────────────────────────────────────────
 router.post  ('/orders/:id/shipment',                         authenticate, hrAdmin, order.addShipment);
 router.put   ('/orders/:id/shipment/:shipmentId',             authenticate, hrAdmin, order.updateShipment);
+
+// ── Returns ──────────────────────────────────────────────────
+router.get   ('/returns',           authenticate, allRoles, ret.getReturns);
+router.get   ('/returns/:id',       authenticate, allRoles, ret.getReturnDetail);
+router.post  ('/returns',           authenticate, hrAdmin,  ret.createReturn);
+router.post  ('/returns/:id/confirm',authenticate, hrAdmin, ret.confirmReturn);
+router.post  ('/returns/:id/reject', authenticate, hrAdmin, ret.rejectReturn);
 
 // ── Purchases ────────────────────────────────────────────────
 router.get   ('/purchases',                    authenticate, hrAdmin,  purchase.getPurchases);

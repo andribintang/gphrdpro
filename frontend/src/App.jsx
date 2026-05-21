@@ -35,6 +35,7 @@ import ProfitLossPage  from './pages/erp/ProfitLossPage';
 import StockOpnamePage  from './pages/erp/StockOpnamePage';
 import ErpMasterPage   from './pages/erp/MasterDataPage';
 import ShipmentsPage   from './pages/erp/ShipmentsPage';
+import ReturnsPage     from './pages/erp/ReturnsPage';
 
 export default function App() {
   return (
@@ -139,6 +140,9 @@ export default function App() {
                 } />
                 <Route path="erp/stock-opname" element={
                   <ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>
+                } />
+                <Route path="erp/returns" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ReturnsPage /></ProtectedRoute>
                 } />
                 <Route path="erp/shipments" element={
                   <ProtectedRoute roles={['admin','hr','supervisor']}><ShipmentsPage /></ProtectedRoute>

@@ -212,6 +212,47 @@ app.post('/run-alter', async (req, res) => {
       }
     }
 
+    // Create erp_returns table
+    try {
+      await sequelize.query(`CREATE TABLE IF NOT EXISTS erp_returns (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_no VARCHAR(50) NOT NULL UNIQUE,
+        order_id INT NOT NULL,
+        branch_id INT NOT NULL,
+        status ENUM('pending','confirmed','rejected') DEFAULT 'pending',
+        reason ENUM('barang_rusak','salah_produk','tidak_sesuai','cod_ditolak','lainnya') DEFAULT 'lainnya',
+        resolution ENUM('refund','exchange','none') DEFAULT 'refund',
+        restock TINYINT(1) DEFAULT 1,
+        total_return DECIMAL(15,2) DEFAULT 0,
+        notes TEXT,
+        confirmed_at DATETIME,
+        created_by INT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+      results.push('OK: erp_returns table ready');
+    } catch(e) { errors.push('ERR erp_returns: ' + e.message.substring(0,80)); }
+
+    try {
+      await sequelize.query(`CREATE TABLE IF NOT EXISTS erp_return_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_id INT NOT NULL,
+        order_item_id INT NOT NULL,
+        product_id INT NOT NULL,
+        product_name VARCHAR(200) NOT NULL,
+        qty_return INT NOT NULL DEFAULT 1,
+        sell_price DECIMAL(15,2) NOT NULL,
+        subtotal DECIMAL(15,2) NOT NULL
+      )`);
+      results.push('OK: erp_return_items table ready');
+    } catch(e) { errors.push('ERR erp_return_items: ' + e.message.substring(0,80)); }
+
+    // Add 'returned' to order status enum
+    try {
+      await sequelize.query("ALTER TABLE erp_orders MODIFY COLUMN status ENUM('draft','confirmed','processing','shipped','completed','cancelled','returned') DEFAULT 'draft'");
+      results.push('OK: erp_orders.status enum updated');
+    } catch(e) { results.push('SKIP: ' + e.message.substring(0,60)); }
+
     // Add admin_fee column to erp_orders if missing
     try {
       await sequelize.query('ALTER TABLE `erp_orders` ADD COLUMN `admin_fee` DECIMAL(15,2) NOT NULL DEFAULT 0');
