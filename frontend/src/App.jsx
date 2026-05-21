@@ -32,6 +32,7 @@ import PurchasesPage   from './pages/erp/PurchasesPage';
 import ExpensesPage    from './pages/erp/ExpensesPage';
 import ProfitLossPage  from './pages/erp/ProfitLossPage';
 import StockOpnamePage  from './pages/erp/StockOpnamePage';
+import ErpMasterPage   from './pages/erp/MasterDataPage';
 import ShipmentsPage   from './pages/erp/ShipmentsPage';
 
 export default function App() {
@@ -128,6 +129,9 @@ export default function App() {
                 } />
                 <Route path="erp/profit-loss" element={
                   <ProtectedRoute roles={['admin','hr']}><ProfitLossPage /></ProtectedRoute>
+                } />
+                <Route path="erp/master"       element={
+                  <ProtectedRoute roles={['admin','hr']}><ErpMasterPage /></ProtectedRoute>
                 } />
                 <Route path="erp/stock-opname" element={
                   <ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>
