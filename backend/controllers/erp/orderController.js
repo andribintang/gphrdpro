@@ -138,7 +138,8 @@ const createOrder = async (req, res, next) => {
       await stock.update({ qty_reserved: stock.qty_reserved + item.qty }, { transaction: t });
     }
 
-    const totalAmount = subtotal - toNum(discount_amount) + toNum(shipping_cost);
+    const adminFeeAmt = channel === 'marketplace' ? toNum(admin_fee) : 0;
+    const totalAmount  = subtotal - toNum(discount_amount) + toNum(shipping_cost) + adminFeeAmt;
 
     // Create order
     const orderNo = await generateOrderNo(branch_id);
