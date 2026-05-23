@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' });
+const api = axios.create({ baseURL: (import.meta.env.VITE_API_URL || '') + '/api' });
 const BASE = '/erp';
 
 api.interceptors.request.use(config => {
@@ -67,7 +67,9 @@ export const erpService = {
   rejectReturn:     (id,d)   => api.post(`${BASE}/returns/${id}/reject`, d),
 
   // Purchases
+  getSuppliers:     (p)      => api.get(`${BASE}/suppliers`, { params: p }),
   getPurchases:     (p)      => api.get(`${BASE}/purchases`, { params: p }),
+  updatePurchase:   (id,d)   => api.put(`${BASE}/purchases/${id}`, d),
   getPurchase:      (id)     => api.get(`${BASE}/purchases/${id}`),
   createPurchase:   (d)      => api.post(`${BASE}/purchases`, d),
   receivePurchase:  (id,d)   => api.post(`${BASE}/purchases/${id}/receive`, d),

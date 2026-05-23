@@ -73,10 +73,12 @@ router.post  ('/returns/:id/confirm',  authenticate, hrAdmin,  ret.confirmReturn
 router.post  ('/returns/:id/reject',   authenticate, hrAdmin,  ret.rejectReturn);
 
 // ── Purchases ────────────────────────────────────────────────
+router.get   ('/suppliers',             authenticate, hrAdmin,  purchase.getSuppliers);
 router.get   ('/purchases',            authenticate, hrAdmin,  purchase.getPurchases);
 router.get   ('/purchases/:id',        authenticate, hrAdmin,  purchase.getPurchaseDetail);
 router.post  ('/purchases',            authenticate, hrAdmin,  purchase.createPurchase);
 router.post  ('/purchases/:id/receive',authenticate, hrAdmin,  purchase.receivePurchase);
+router.put   ('/purchases/:id',         authenticate, hrAdmin,  purchase.updatePurchase);
 router.post  ('/purchases/:id/cancel', authenticate, hrAdmin,  purchase.cancelPurchase);
 
 // ── Expenses ──────────────────────────────────────────────────
