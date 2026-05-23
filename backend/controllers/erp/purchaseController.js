@@ -95,7 +95,7 @@ const createPurchase = async (req, res, next) => {
     const poNo = await generatePoNo(branch_id);
     const po = await Purchase.create({
       po_no: poNo, branch_id, supplier_name, supplier_phone: supplier_phone||null,
-      supplier_email: supplier_email||null, supplier_address: supplier_address||null,
+      // supplier_email and supplier_address will be added after DB migration
       order_date: order_date||new Date().toISOString().split('T')[0],
       expected_date: expected_date||null, status: 'ordered',
       subtotal, shipping_cost: toNum(shipping_cost), total_amount: totalAmount,
