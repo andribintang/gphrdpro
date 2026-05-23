@@ -60,7 +60,7 @@ const getPurchases = async (req, res, next) => {
 const getPurchaseDetail = async (req, res, next) => {
   try {
     const po = await Purchase.findByPk(req.params.id, {
-      include: [{ model: PurchaseItem, as: 'items', include: [{ model: Product, as: 'product', attributes: ['id','name','sku','buy_price'] }] }],
+      include: [{ model: PurchaseItem, as: 'items' }],
     });
     if (!po) return res.status(404).json({ success:false, message:'PO tidak ditemukan' });
     return res.json({ success:true, data:{ purchase: po } });
