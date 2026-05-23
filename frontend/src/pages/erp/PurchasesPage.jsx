@@ -3,6 +3,7 @@ import { ShoppingBag, Plus, Eye, X, Loader2, CheckCircle2, RefreshCw, Package } 
 import toast from 'react-hot-toast';
 import DataTable, { StatusBadge } from '../../components/DataTable';
 import { erpService, toRp, toRpShort, PURCHASE_STATUS } from '../../utils/erp/erpService';
+import PeriodFilter from '../../components/PeriodFilter';
 
 const STATUS_COLORS = {
   draft:    'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200',
@@ -95,12 +96,23 @@ export default function PurchasesPage() {
   const [purchases, setPO] = useState([]);
   const [loading, setLoad] = useState(true);
   const [showAdd, setAdd]  = useState(false);
+  const [dateRange, setDate]= useState(()=>{
+    const n=new Date();
+    return {from:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`,to:n.toISOString().split('T')[0]};
+  });
+  const [branch, setBranch] = useState('');
 
   const fetch = useCallback(async()=>{
     setLoad(true);
-    try { const r=await erpService.getPurchases({limit:200}); setPO(r.data.data.purchases||[]); }
+    try {
+      const r = await erpService.getPurchases({
+        limit:200, branch_id:branch||undefined,
+        date_from:dateRange.from, date_to:dateRange.to
+      });
+      setPO(r.data.data.purchases||[]);
+    }
     catch { toast.error('Gagal memuat pembelian'); } finally { setLoad(false); }
-  },[]);
+  },[branch, dateRange]);
 
   useEffect(()=>{fetch();},[fetch]);
 
@@ -119,6 +131,13 @@ export default function PurchasesPage() {
 
   return (
     <div className="section animate-fade-in">
+      {/* Period Filter */}
+      <div className="card-sm mb-5 space-y-3">
+        <PeriodFilter value={dateRange} onChange={setDate}/>
+        <select value={branch} onChange={e=>setBranch(e.target.value)} className="input-base h-9 text-sm">
+          <option value="">Semua Cabang</option><option value="1">GP Racing</option><option value="2">GP Distro</option>
+        </select>
+      </div>
       <div className="page-header">
         <div><h1 className="page-title">Pembelian</h1><p className="body-sm text-[var(--text-muted)]">{purchases.length} purchase order</p></div>
         <div className="flex gap-2">

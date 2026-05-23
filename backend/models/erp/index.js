@@ -63,7 +63,7 @@ const StockMovement = sequelize.define('ErpStockMovement', {
   ref_id:     { type: DataTypes.INTEGER, allowNull: true },
   notes:      { type: DataTypes.TEXT, allowNull: true },
   created_by: { type: DataTypes.INTEGER, allowNull: true },
-}, { tableName: 'erp_stock_movements', timestamps: true, createdAt: 'created_at', updatedAt: false });
+}, { tableName: 'erp_stock_movements', timestamps: false });
 
 // ── CUSTOMER ──────────────────────────────────────────────────
 const Customer = sequelize.define('ErpCustomer', {

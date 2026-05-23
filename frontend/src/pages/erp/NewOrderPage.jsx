@@ -153,7 +153,7 @@ export default function NewOrderPage() {
       if (existing) return prev.map(i => i.product_id === product.id ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, {
         product_id: product.id, product_name: product.name, product_sku: product.sku,
-        sell_price: sellPrice, buy_price: parseFloat(product.buy_price || 0),
+        sell_price: sellPrice, buy_price: parseFloat(product.buy_price || 0), orig_buy_price: parseFloat(product.buy_price || 0),
         discount_pct: 0, qty: 1,
         stock_qty: product.stock?.qty || 0, unit: product.unit || 'pcs',
       }];
@@ -162,7 +162,8 @@ export default function NewOrderPage() {
     setProdResults([]);
   };
 
-  const updateQty  = (id, delta) => setItems(p => p.map(i => i.product_id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
+  const updateQty      = (id, delta) => setItems(p => p.map(i => i.product_id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
+  const updateBuyPrice = (id, val)   => setItems(p => p.map(i => i.product_id === id ? { ...i, buy_price: parseFloat(val) || 0 } : i));
   const updatePrice= (id, val)   => setItems(p => p.map(i => i.product_id === id ? { ...i, sell_price: parseFloat(val) || 0 } : i));
   const removeItem = (id)        => setItems(p => p.filter(i => i.product_id !== id));
 
@@ -195,6 +196,7 @@ export default function NewOrderPage() {
           product_id: i.product_id,
           qty: i.qty,
           sell_price: i.sell_price,
+          buy_price: i.buy_price,
           discount_pct: i.discount_pct || 0,
         })),
         discount_amount: parseFloat(discount) || 0,
@@ -427,11 +429,21 @@ export default function NewOrderPage() {
                   <div key={item.product_id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)]">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{item.product_name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <input type="number" value={item.sell_price}
-                          onChange={e => updatePrice(item.product_id, e.target.value)}
-                          className="input-base h-7 w-28 text-xs text-right"
-                          min={0}/>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-[var(--text-muted)]">Jual</span>
+                          <input type="number" value={item.sell_price}
+                            onChange={e => updatePrice(item.product_id, e.target.value)}
+                            className="input-base h-7 w-24 text-xs text-right"
+                            min={0}/>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-[var(--text-muted)]">Beli</span>
+                          <input type="number" value={item.buy_price}
+                            onChange={e => updateBuyPrice(item.product_id, e.target.value)}
+                            className="input-base h-7 w-24 text-xs text-right text-blue-600"
+                            min={0}/>
+                        </div>
                         <span className="text-xs text-[var(--text-muted)]">× {item.qty}</span>
                         <span className="text-xs font-bold text-[var(--brand-600)]">{toRpShort(item.sell_price * item.qty)}</span>
                         {item.sell_price > item.buy_price && (

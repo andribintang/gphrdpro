@@ -169,9 +169,27 @@ const confirmOrder = async (req, res, next) => {
       await StockMovement.create({ product_id: item.product_id, branch_id: order.branch_id,
         type: 'out', qty: -item.qty, qty_before: qtyBefore, qty_after: qtyBefore - item.qty,
         ref_type: 'order', ref_id: order.id, notes: `Order ${order.order_no}`, created_by: req.user?.id }, { transaction: t });
+      // Update product sell price if changed
+      if (item.sell_price && parseFloat(item.sell_price) > 0) {
+        const updateFields = { sell_price: item.sell_price };
+        if (item.buy_price && parseFloat(item.buy_price) > 0) updateFields.buy_price = item.buy_price;
+        await Product.update(updateFields, { where: { id: item.product_id }, transaction: t });
+      }
     }
     await order.update({ status: 'confirmed', confirmed_at: new Date() }, { transaction: t });
     await t.commit();
+    // Update customer stats
+    if (order.customer_id) {
+      try {
+        const { Customer: Cust } = require('../../models/erp');
+        const cust = await Cust.findByPk(order.customer_id);
+        if (cust) {
+          const orderCount = await Order.count({ where: { customer_id: order.customer_id, status: { [Op.in]: ['confirmed','processing','shipped','completed'] } } });
+          const totalSpent = await Order.sum('total_amount', { where: { customer_id: order.customer_id, status: { [Op.in]: ['confirmed','processing','shipped','completed'] } } });
+          await cust.update({ total_orders: orderCount, total_spent: totalSpent || 0 });
+        }
+      } catch(e) { console.warn('Customer stats update failed:', e.message); }
+    }
     try { await syncOrderToIncentive(order); } catch(e) { console.warn('Incentive sync failed:', e.message); }
     return res.json({ success: true, message: `Order ${order.order_no} dikonfirmasi`, data: { order } });
   } catch (err) { await t.rollback(); next(err); }
