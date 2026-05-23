@@ -90,6 +90,8 @@ export const erpService = {
   getShipmentReport:(p)      => api.get(`${BASE}/reports/shipments`, { params: p }),
   getDailyReport:   (p)      => api.get(`${BASE}/reports/daily`, { params: p }),
   getChannelReport: (p)      => api.get(`${BASE}/reports/channel`, { params: p }),
+  importProducts:   (d)      => api.post(`${BASE}/import/products`, d),
+  importCustomers:  (d)      => api.post(`${BASE}/import/customers`, d),
   getProfitLoss:    (p)      => api.get(`${BASE}/reports/profit-loss`, { params: p }),
 };
 

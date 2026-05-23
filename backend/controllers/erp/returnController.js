@@ -98,7 +98,7 @@ const confirmReturn = async (req, res, next) => {
           product_id: item.product_id, branch_id: ret.branch_id,
           type: 'in', qty: item.qty_return, qty_before: qtyBefore, qty_after: qtyBefore + item.qty_return,
           ref_type: 'return', ref_id: ret.id, notes: `Retur ${ret.return_no}`, created_by: req.user?.id,
-        }, { transaction: t });
+          created_at: new Date(), updated_at: new Date()}, { transaction: t });
       }
     }
     const totalOrderItems = await OrderItem.sum('qty', { where: { order_id: ret.order_id }, transaction: t });

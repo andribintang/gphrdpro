@@ -168,7 +168,8 @@ const confirmOrder = async (req, res, next) => {
       await stock.update({ qty: qtyBefore - item.qty, qty_reserved: Math.max(0, (stock.qty_reserved||0) - item.qty) }, { transaction: t });
       await StockMovement.create({ product_id: item.product_id, branch_id: order.branch_id,
         type: 'out', qty: -item.qty, qty_before: qtyBefore, qty_after: qtyBefore - item.qty,
-        ref_type: 'order', ref_id: order.id, notes: `Order ${order.order_no}`, created_by: req.user?.id }, { transaction: t });
+        ref_type: 'order', ref_id: order.id, notes: `Order ${order.order_no}`, created_by: req.user?.id,
+          created_at: new Date(), updated_at: new Date()}, { transaction: t });
       // Update product sell price if changed
       if (item.sell_price && parseFloat(item.sell_price) > 0) {
         const updateFields = { sell_price: item.sell_price };
@@ -218,7 +219,8 @@ const cancelOrder = async (req, res, next) => {
           await stock.update({ qty: qtyBefore + item.qty }, { transaction: t });
           await StockMovement.create({ product_id: item.product_id, branch_id: order.branch_id,
             type: 'in', qty: item.qty, qty_before: qtyBefore, qty_after: qtyBefore + item.qty,
-            ref_type: 'order', ref_id: order.id, notes: `Cancel ${order.order_no}`, created_by: req.user?.id }, { transaction: t });
+            ref_type: 'order', ref_id: order.id, notes: `Cancel ${order.order_no}`, created_by: req.user?.id,
+          created_at: new Date(), updated_at: new Date()}, { transaction: t });
         }
       }
     }

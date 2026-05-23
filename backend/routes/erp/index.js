@@ -91,6 +91,10 @@ router.delete('/expenses/:id',         authenticate, hrAdmin,  purchase.deleteEx
 router.get   ('/stock-opname',         authenticate, hrAdmin,  purchase.getStockOpname);
 router.post  ('/stock-opname',         authenticate, hrAdmin,  purchase.submitStockOpname);
 
+// ── Import ───────────────────────────────────────────────────
+router.post  ('/import/products',      authenticate, hrAdmin,  master.importProducts);
+router.post  ('/import/customers',     authenticate, hrAdmin,  master.importCustomers);
+
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);
 router.get   ('/reports/shipments',    authenticate, allRoles, order.getShipmentReport);
