@@ -102,7 +102,6 @@ const Order = sequelize.define('ErpOrder', {
   admin_fee:           { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
   total_amount:        { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
   status:              { type: DataTypes.ENUM('draft','confirmed','processing','shipped','completed','cancelled','returned'), defaultValue: 'draft' },
-  payment_status:      { type: DataTypes.ENUM('unpaid','partial','paid'), defaultValue: 'unpaid' },
   order_date:          { type: DataTypes.DATEONLY, allowNull: false },
   confirmed_at:        { type: DataTypes.DATE, allowNull: true },
   completed_at:        { type: DataTypes.DATE, allowNull: true },
