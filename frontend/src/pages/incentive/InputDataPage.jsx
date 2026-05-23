@@ -25,6 +25,7 @@ const WaTab = ({ periodId, branches, employees, channel, periodLocked }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [syncing, setSyncing]    = useState(false);
   const [filterBranch, setFB] = useState('');
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
