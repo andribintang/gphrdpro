@@ -582,16 +582,20 @@ const syncFromERP = async (req, res, next) => {
         where: { period_id, notes: { [Op.like]: '%Sync ERP%' } },
       });
 
-      if (mpExisting) {
-        await mpExisting.update({ total_amount: mpNetAmount });
+      // Find existing by period_id + branch_id (handles unique constraint)
+      const mpByBranch = await MarketplaceSale.findOne({
+        where: { period_id, branch_id: mpOrders[0].branch_id || 1 },
+      });
+      const mpNote = `Sync ERP: ${mpOrders.length} order${mpReturnTotal>0?` (deduksi retur Rp${new Intl.NumberFormat('id-ID').format(mpReturnTotal)})`:''}`;
+      if (mpByBranch) {
+        await mpByBranch.update({ total_amount: mpNetAmount, notes: mpNote });
         mpUpdated++;
       } else {
-        const mpSale = await MarketplaceSale.create({
+        await MarketplaceSale.create({
           period_id, branch_id: mpOrders[0].branch_id || 1,
           platform: 'marketplace', total_amount: mpNetAmount,
           channel_pct: parseFloat(mpChannel?.percentage || 0.5),
-          date: to,
-          notes: `Sync ERP: ${mpOrders.length} order${mpReturnTotal>0?` (deduksi retur Rp${new Intl.NumberFormat('id-ID').format(mpReturnTotal)})`:''}`,
+          date: to, notes: mpNote,
         });
         mpAdded++;
       }
