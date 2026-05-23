@@ -9,6 +9,7 @@ router.use(authorize('admin', 'hr'));
 
 // ── Dashboard ────────────────────────────────────────────────
 router.get('/dashboard', trans.getDashboardStats);
+router.post('/sync-erp/:period_id', trans.syncFromERP);
 
 // ── Master: Branches ─────────────────────────────────────────
 router.get('/branches',     master.getBranches);

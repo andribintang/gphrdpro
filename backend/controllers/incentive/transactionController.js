@@ -463,4 +463,161 @@ module.exports = {
   getActivities, createActivity, deleteActivity,
   getResults, getResultDetail,
   getDashboardStats,
+  syncFromERP,
 };
+
+// ═══════════════════════════════════════════════════════════════
+// SYNC FROM ERP
+// Tarik data order ERP yang completed ke insentif WA & Marketplace
+// dengan deduksi retur
+// ═══════════════════════════════════════════════════════════════
+const syncFromERP = async (req, res, next) => {
+  try {
+    const { period_id } = req.params;
+    const period = await IncentivePeriod.findByPk(period_id);
+    if (!period) return res.status(404).json({ success: false, message: 'Periode tidak ditemukan' });
+    if (period.status === 'locked') return res.status(400).json({ success: false, message: 'Periode sudah terkunci' });
+
+    // Build date range from period
+    const from = `${period.year}-${String(period.month).padStart(2,'0')}-01`;
+    const lastDay = new Date(period.year, period.month, 0).getDate();
+    const to = `${period.year}-${String(period.month).padStart(2,'0')}-${lastDay}`;
+
+    const { Op } = require('sequelize');
+    const {
+      Order, OrderItem, Return, ReturnItem
+    } = require('../../models/erp');
+
+    const waChannel  = await SalesChannel.findOne({ where: { code: 'WA' } });
+    const mpChannel  = await SalesChannel.findOne({ where: { code: 'MARKETPLACE' } });
+
+    // ── Fetch completed WA orders ──────────────────────────────
+    const waOrders = await Order.findAll({
+      where: {
+        channel: 'wa',
+        status: 'completed',
+        order_date: { [Op.between]: [from, to] },
+        salesperson_id: { [Op.ne]: null },
+      },
+      raw: true,
+    });
+
+    // ── Fetch returns for WA this period ──────────────────────
+    const waReturns = await Return.findAll({
+      where: {
+        status: 'confirmed',
+        created_at: { [Op.between]: [new Date(from), new Date(to + 'T23:59:59')] },
+      },
+      include: [
+        { model: ReturnItem, as: 'items', attributes: ['subtotal'] },
+        { model: Order, as: 'order', attributes: ['channel', 'salesperson_id'] },
+      ],
+    });
+
+    // Build retur map per salesperson for WA
+    const waReturnByEmp = {};
+    waReturns.forEach(r => {
+      if (r.order?.channel !== 'wa' || !r.order?.salesperson_id) return;
+      const empId = r.order.salesperson_id;
+      const total = (r.items||[]).reduce((s,i) => s + parseFloat(i.subtotal||0), 0);
+      waReturnByEmp[empId] = (waReturnByEmp[empId]||0) + total;
+    });
+
+    // ── Sync WA ────────────────────────────────────────────────
+    let waAdded = 0, waSkipped = 0, waUpdated = 0;
+    for (const order of waOrders) {
+      const empId = order.salesperson_id;
+      const netAmount = parseFloat(order.total_amount) - (waReturnByEmp[empId]||0);
+      if (netAmount <= 0) { waSkipped++; continue; }
+
+      // Check if already synced (by order ref)
+      const existing = await WaSale.findOne({
+        where: { period_id, employee_id: empId, notes: { [Op.like]: `%${order.order_no}%` } },
+      });
+
+      const pct       = parseFloat(waChannel?.percentage || 3);
+      const incentive = engine.calcWaIncentive ? engine.calcWaIncentive(netAmount, pct) : Math.round(netAmount * pct / 100);
+
+      if (existing) {
+        // Update if amount changed
+        if (Math.abs(parseFloat(existing.sale_amount) - netAmount) > 1) {
+          await existing.update({ sale_amount: netAmount, incentive_amount: incentive });
+          waUpdated++;
+        } else { waSkipped++; }
+      } else {
+        await WaSale.create({
+          period_id, employee_id: empId, branch_id: order.branch_id,
+          sale_amount: netAmount, channel_pct: pct, incentive_amount: incentive,
+          date: order.order_date, customer_name: order.customer_name||'',
+          notes: `Sync ERP: ${order.order_no}${(waReturnByEmp[empId]||0)>0?` (sudah deduksi retur Rp${new Intl.NumberFormat('id-ID').format(waReturnByEmp[empId]||0)})`:''}`,
+          created_by: req.user?.id,
+        });
+        waAdded++;
+      }
+    }
+
+    // ── Fetch completed Marketplace orders ─────────────────────
+    const mpOrders = await Order.findAll({
+      where: {
+        channel: 'marketplace',
+        status: 'completed',
+        order_date: { [Op.between]: [from, to] },
+      },
+      raw: true,
+    });
+
+    // ── Fetch returns for Marketplace this period ──────────────
+    const mpReturns = await Return.findAll({
+      where: { status: 'confirmed', created_at: { [Op.between]: [new Date(from), new Date(to + 'T23:59:59')] } },
+      include: [
+        { model: ReturnItem, as: 'items', attributes: ['subtotal'] },
+        { model: Order, as: 'order', attributes: ['channel', 'sub_channel_name'] },
+      ],
+    });
+
+    // Build return total for marketplace
+    let mpReturnTotal = 0;
+    mpReturns.forEach(r => {
+      if (r.order?.channel !== 'marketplace') return;
+      mpReturnTotal += (r.items||[]).reduce((s,i) => s + parseFloat(i.subtotal||0), 0);
+    });
+
+    // Total MP sales this period
+    const mpTotalAmount = mpOrders.reduce((s, o) => s + parseFloat(o.total_amount), 0);
+    const mpNetAmount   = Math.max(0, mpTotalAmount - mpReturnTotal);
+    const mpPct         = parseFloat(mpChannel?.percentage || 0.5);
+
+    // Sync as single aggregate MP sale per branch per period
+    let mpAdded = 0, mpUpdated = 0;
+    if (mpOrders.length > 0 && mpNetAmount > 0) {
+      const mpExisting = await MarketplaceSale.findOne({
+        where: { period_id, notes: { [Op.like]: '%Sync ERP%' } },
+      });
+
+      if (mpExisting) {
+        await mpExisting.update({ total_amount: mpNetAmount });
+        mpUpdated++;
+      } else {
+        const mpSale = await MarketplaceSale.create({
+          period_id, branch_id: mpOrders[0].branch_id || 1,
+          platform: 'marketplace', total_amount: mpNetAmount,
+          date: to,
+          notes: `Sync ERP: ${mpOrders.length} order${mpReturnTotal>0?` (deduksi retur Rp${new Intl.NumberFormat('id-ID').format(mpReturnTotal)})`:''}`,
+        });
+        mpAdded++;
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Sinkronisasi selesai`,
+      data: {
+        wa:  { added: waAdded, updated: waUpdated, skipped: waSkipped, return_deducted: Object.values(waReturnByEmp).reduce((s,v)=>s+v,0) },
+        mp:  { added: mpAdded, updated: mpUpdated, net_amount: mpNetAmount, return_deducted: mpReturnTotal },
+        period: period.name,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// syncFromERP exported in main module.exports above
