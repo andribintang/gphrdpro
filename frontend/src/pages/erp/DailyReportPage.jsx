@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, RefreshCw, Loader2, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { erpService } from '../../utils/erp/erpService';
+import PeriodFilter from '../../components/PeriodFilter';
 
 const fmt = (n) => { if (!n||n===0) return '—'; return new Intl.NumberFormat('id-ID').format(Math.round(n)); };
 
@@ -79,19 +80,10 @@ export default function DailyReportPage() {
         </div>
       </div>
       <div className="card-sm mb-5 space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          {[{l:'Bulan Ini',f:()=>{const n=new Date();setDate({from:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`,to:n.toISOString().split('T')[0]})}},
-            {l:'Bulan Lalu',f:()=>{const n=new Date();setDate({from:new Date(n.getFullYear(),n.getMonth()-1,1).toISOString().split('T')[0],to:new Date(n.getFullYear(),n.getMonth(),0).toISOString().split('T')[0]})}},
-          ].map(q=>(<button key={q.l} onClick={q.f} className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-all">{q.l}</button>))}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <input type="date" value={dateRange.from} onChange={e=>setDate(r=>({...r,from:e.target.value}))} className="input-base h-9 text-sm flex-1 min-w-28"/>
-          <span className="text-xs text-[var(--text-muted)]">s/d</span>
-          <input type="date" value={dateRange.to} onChange={e=>setDate(r=>({...r,to:e.target.value}))} className="input-base h-9 text-sm flex-1 min-w-28"/>
-          <select value={branch} onChange={e=>setBranch(e.target.value)} className="input-base h-9 text-sm min-w-36">
-            <option value="">Semua Cabang</option><option value="1">GP Racing</option><option value="2">GP Distro</option>
-          </select>
-        </div>
+        <PeriodFilter value={dateRange} onChange={setDate}/>
+        <select value={branch} onChange={e=>setBranch(e.target.value)} className="input-base h-9 text-sm">
+          <option value="">Semua Cabang</option><option value="1">GP Racing</option><option value="2">GP Distro</option>
+        </select>
       </div>
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_,i)=><div key={i} className="skeleton h-12"/>)}</div>

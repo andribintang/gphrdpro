@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Download, RefreshCw, Loader2, BarChart3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { erpService } from '../../utils/erp/erpService';
+import PeriodFilter from '../../components/PeriodFilter';
 
 const fmt = (n) => {
   if (!n || n === 0) return '-';
