@@ -53,7 +53,7 @@ const calculatePeriod = async (periodId) => {
   let erpReturnsLoaded = false;
   let mpReturnTotal = 0;
   try {
-    const { Return, ReturnItem, Order } = require('../models/erp');
+    const { Return, ReturnItem, Order } = require('./models/erp');
     const from = `${period.year}-${String(period.month).padStart(2,'0')}-01`;
     const lastDay = new Date(period.year, period.month, 0).getDate();
     const to = `${period.year}-${String(period.month).padStart(2,'0')}-${lastDay}`;

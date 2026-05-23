@@ -454,18 +454,6 @@ const getDashboardStats = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = {
-  getPeriods, getPeriod, createPeriod, approvePeriod, lockPeriod,
-  calculatePeriod,
-  getWaSales, createWaSale, updateWaSale, deleteWaSale,
-  getMarketplaceSales, upsertMarketplaceSale,
-  getWebSales, upsertWebSale,
-  getActivities, createActivity, deleteActivity,
-  getResults, getResultDetail,
-  getDashboardStats,
-  syncFromERP,
-};
-
 // ═══════════════════════════════════════════════════════════════
 // SYNC FROM ERP
 // Tarik data order ERP yang completed ke insentif WA & Marketplace
@@ -620,4 +608,14 @@ const syncFromERP = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// syncFromERP exported in main module.exports above
+module.exports = {
+  getPeriods, getPeriod, createPeriod, approvePeriod, lockPeriod,
+  calculatePeriod,
+  getWaSales, createWaSale, updateWaSale, deleteWaSale,
+  getMarketplaceSales, upsertMarketplaceSale,
+  getWebSales, upsertWebSale,
+  getActivities, createActivity, deleteActivity,
+  getResults, getResultDetail,
+  getDashboardStats,
+  syncFromERP,
+};
