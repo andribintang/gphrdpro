@@ -589,6 +589,7 @@ const syncFromERP = async (req, res, next) => {
         const mpSale = await MarketplaceSale.create({
           period_id, branch_id: mpOrders[0].branch_id || 1,
           platform: 'marketplace', total_amount: mpNetAmount,
+          channel_pct: parseFloat(mpChannel?.percentage || 0.5),
           date: to,
           notes: `Sync ERP: ${mpOrders.length} order${mpReturnTotal>0?` (deduksi retur Rp${new Intl.NumberFormat('id-ID').format(mpReturnTotal)})`:''}`,
         });
