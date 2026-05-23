@@ -177,6 +177,8 @@ const submitStockOpname = async (req, res, next) => {
           type: 'adjustment', qty: qtyAfter - qtyBefore,
           qty_before: qtyBefore, qty_after: qtyAfter,
           ref_type: 'opname', notes: 'Stock Opname', created_by: req.user?.id,
+          created_at: new Date(), updated_at: new Date(),
+          created_at: new Date(), updated_at: new Date(),
         }, { transaction: t });
         updated++;
       }
