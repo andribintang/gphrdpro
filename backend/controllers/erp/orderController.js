@@ -365,9 +365,20 @@ const getChannelReport = async (req, res, next) => {
       Return.findAll({ where: { ...retWhere, confirmed_at: { [Op.between]: [new Date(mtdFrom), new Date(mtdTo+'T23:59:59')] } }, include: [{ model: ReturnItem, as:'items', attributes:['subtotal'] }, { model: Order, as:'order', attributes:['channel','sub_channel_name'] }] }),
     ]);
 
+    const getSubLabel = (channel, subName) => {
+      if (subName && subName.trim()) return subName;
+      if (channel === 'wa')          return '(WhatsApp)';
+      if (channel === 'marketplace') return '(Marketplace)';
+      return '(Langsung)';
+    };
     const sumBy = (arr) => {
       const m = {};
-      arr.forEach(o => { const k = `${o.channel||'direct'}::${o.sub_channel_name||'(Langsung)'}`; m[k] = (m[k]||0) + parseFloat(o.total_amount||0); });
+      arr.forEach(o => {
+        const ch  = o.channel || 'direct';
+        const sub = getSubLabel(ch, o.sub_channel_name);
+        const k   = `${ch}::${sub}`;
+        m[k] = (m[k]||0) + parseFloat(o.total_amount||0);
+      });
       return m;
     };
     const sumRets = (arr) => {
