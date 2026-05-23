@@ -10,6 +10,7 @@ import {
   PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
+import useAutoLogout from '../hooks/useAutoLogout';
 import { useTheme } from '../context/ThemeContext';
 
 const NAV = [
@@ -261,8 +262,9 @@ const Sidebar = ({ collapsed, onToggle, onClose }) => {
 };
 
 export default function MainLayout() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
+  useAutoLogout(logout); // Auto-logout after 30 min inactivity on shared PC
   const [collapsed,  setCollapsed]  = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
