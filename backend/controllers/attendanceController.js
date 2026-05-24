@@ -301,14 +301,21 @@ const getAllAttendances = async (req, res, next) => {
     const where = { date: { [Op.between]: [from, to] } };
     if (status) where.status = status;
 
+    const empWhere = branch_id ? { branch_id } : undefined;
+
     const records = await Attendance.findAll({
       where,
       include: [{
         model: User, as: 'user',
         attributes: ['id','name','email','role'],
-        include: [{ model: Employee, as: 'employee', required: false, attributes: ['id','employee_no','branch_id'] }],
+        required: false,
+        include: [{
+          model: Employee, as: 'employee',
+          required: !!branch_id,
+          attributes: ['id','branch_id'],
+          ...(empWhere ? { where: empWhere } : {}),
+        }],
       }],
-      ...(branch_id ? { where: { '$user.employee.branch_id$': branch_id } } : {}),
       order: [['date','DESC'],['check_in','ASC']],
     });
 
