@@ -443,7 +443,6 @@ const resetPassword = async (req, res, next) => {
     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
     
     // Use bcrypt to hash password
-    const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash(new_password, 10);
     await user.update({ password_hash: hash });
     return res.json({ success: true, message: 'Password berhasil direset' });
