@@ -215,8 +215,8 @@ const Sidebar = ({ collapsed, onToggle, onClose }) => {
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-sm font-bold text-[var(--text-primary)] leading-none truncate">GPDISTRO</p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">ERP & HRD System</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] leading-none truncate">GPDISTRO RACING ID</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">ERP & HRD Integrated System</p>
           </div>
         )}
       </div>
@@ -288,7 +288,7 @@ export default function MainLayout() {
         if (f) return f.label;
       }
     }
-    return 'GPDISTRO HR Pro';
+    return 'GPDISTRO RACING ID';
   };
 
   return (
