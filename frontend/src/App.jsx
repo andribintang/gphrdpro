@@ -39,6 +39,13 @@ import ErpMasterPage   from './pages/erp/MasterDataPage';
 import DailyReportPage  from './pages/erp/DailyReportPage';
 import ChannelReportPage from './pages/erp/ChannelReportPage';
 
+
+// ── Device-aware default redirect ────────────────────────────
+function DeviceRedirect() {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  return <Navigate to={isMobile ? '/dashboard' : '/erp/dashboard'} replace />;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -49,7 +56,7 @@ export default function App() {
 
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<DeviceRedirect />} />
 
               {/* ALL protected routes inside MainLayout */}
               <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>

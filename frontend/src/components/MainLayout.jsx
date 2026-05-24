@@ -113,12 +113,14 @@ const NavItem = ({ to, icon: Icon, label, collapsed, onClick }) => (
   </NavLink>
 );
 
-const NavGroup = ({ section, collapsed, role, onClose }) => {
+const NavGroup = ({ section, collapsed, role, onClose, forceClose }) => {
   const location = useLocation();
   const visible = section.items?.filter(i => !i.roles || i.roles.includes(role));
   if (!visible?.length) return null;
   const isAnyActive = visible.some(i => location.pathname === i.to || location.pathname.startsWith(i.to + '/'));
-  const [open, setOpen] = useState(isAnyActive);
+  const [open, setOpen] = useState(isAnyActive && !forceClose);
+  // Auto-collapse when forceClose changes
+  useEffect(() => { if (forceClose) setOpen(false); }, [forceClose]);
   if (collapsed) return (
     <div className="space-y-0.5">{visible.map(item => <NavItem key={item.to} {...item} collapsed onClick={onClose} />)}</div>
   );
@@ -226,7 +228,7 @@ const Sidebar = ({ collapsed, onToggle, onClose }) => {
             return <div key={idx} className="space-y-0.5">{vis.map(item => <NavItem key={item.to} {...item} collapsed={collapsed} onClick={onClose} />)}</div>;
           }
           if (section.children) return <ErpGroup key="erp" section={section} collapsed={collapsed} role={role} onClose={onClose} />;
-          return <NavGroup key={section.group} section={section} collapsed={collapsed} role={role} onClose={onClose} />;
+          return <NavGroup key={section.group} section={section} collapsed={collapsed} role={role} onClose={onClose} forceClose={section.group === 'HRD' && isOnErp} />;
         })}
       </nav>
 
@@ -266,8 +268,11 @@ export default function MainLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   useAutoLogout(logout); // Auto-logout after 30 min inactivity on shared PC
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
   const [collapsed,  setCollapsed]  = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Track which nav groups are open - HRD collapses when on ERP
+  const isOnErp = location.pathname.startsWith('/erp');
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
@@ -294,7 +299,7 @@ export default function MainLayout() {
         </div>
       )}
       <aside className={`fixed lg:relative inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out ${collapsed ? 'lg:w-[68px]' : 'lg:w-[248px]'} w-[248px] ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} shadow-xl lg:shadow-none`}>
-        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v => !v)} onClose={() => setMobileOpen(false)} />
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v => !v)} onClose={() => setMobileOpen(false)} isOnErp={isOnErp} />
       </aside>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="flex-shrink-0 flex items-center gap-4 px-4 bg-[var(--topbar-bg)] border-b border-[var(--topbar-border)]" style={{ height:'60px' }}>
