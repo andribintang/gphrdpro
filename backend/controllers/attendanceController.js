@@ -34,16 +34,25 @@ const calcWorkHours = (checkIn, checkOut, breakMins = 0) => {
 
 const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
   return new Promise((resolve) => {
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    const preset = process.env.CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
+    const cloudName  = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey     = process.env.CLOUDINARY_API_KEY;
+    const apiSecret  = process.env.CLOUDINARY_API_SECRET;
     if (!cloudName || !base64Image) { resolve(null); return; }
 
-    const imageData = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const imageData  = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const timestamp  = Math.floor(Date.now() / 1000);
+
+    // Generate signature for signed upload
+    const crypto     = require('crypto');
+    const sigStr     = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+    const signature  = crypto.createHash('sha1').update(sigStr).digest('hex');
+
     const body = JSON.stringify({
       file: `data:image/jpeg;base64,${imageData}`,
-      upload_preset: preset,
+      api_key: apiKey,
+      timestamp,
+      signature,
       folder,
-      transformation: 'w_400,h_400,c_fill,g_face',
     });
 
     const req = https.request({
@@ -55,11 +64,14 @@ const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
       let data = '';
       res.on('data', d => { data += d; });
       res.on('end', () => {
-        try { resolve(JSON.parse(data).secure_url || null); } catch { resolve(null); }
+        try {
+          const result = JSON.parse(data);
+          resolve(result.secure_url || null);
+        } catch { resolve(null); }
       });
     });
     req.on('error', () => resolve(null));
-    req.setTimeout(15000, () => { req.destroy(); resolve(null); });
+    req.setTimeout(20000, () => { req.destroy(); resolve(null); });
     req.write(body); req.end();
   });
 };
