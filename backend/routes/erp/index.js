@@ -73,22 +73,22 @@ router.post  ('/returns/:id/confirm',  authenticate, hrAdmin,  ret.confirmReturn
 router.post  ('/returns/:id/reject',   authenticate, hrAdmin,  ret.rejectReturn);
 
 // ── Purchases ────────────────────────────────────────────────
-router.get   ('/suppliers',             authenticate, hrAdmin,  purchase.getSuppliers);
-router.get   ('/purchases',            authenticate, hrAdmin,  purchase.getPurchases);
-router.get   ('/purchases/:id',        authenticate, hrAdmin,  purchase.getPurchaseDetail);
+router.get   ('/suppliers',             authenticate, allRoles,  purchase.getSuppliers);
+router.get   ('/purchases',            authenticate, allRoles, purchase.getPurchases);
+router.get   ('/purchases/:id',        authenticate, allRoles, purchase.getPurchaseDetail);
 router.post  ('/purchases',            authenticate, hrAdmin,  purchase.createPurchase);
 router.post  ('/purchases/:id/receive',authenticate, hrAdmin,  purchase.receivePurchase);
 router.put   ('/purchases/:id',         authenticate, hrAdmin,  purchase.updatePurchase);
 router.post  ('/purchases/:id/cancel', authenticate, hrAdmin,  purchase.cancelPurchase);
 
 // ── Expenses ──────────────────────────────────────────────────
-router.get   ('/expenses',             authenticate, hrAdmin,  purchase.getExpenses);
+router.get   ('/expenses',             authenticate, allRoles, purchase.getExpenses);
 router.post  ('/expenses',             authenticate, hrAdmin,  purchase.createExpense);
 router.put   ('/expenses/:id',         authenticate, hrAdmin,  purchase.updateExpense);
 router.delete('/expenses/:id',         authenticate, hrAdmin,  purchase.deleteExpense);
 
 // ── Stock Opname ──────────────────────────────────────────────
-router.get   ('/stock-opname',         authenticate, hrAdmin,  purchase.getStockOpname);
+router.get   ('/stock-opname',         authenticate, allRoles, purchase.getStockOpname);
 router.post  ('/stock-opname',         authenticate, hrAdmin,  purchase.submitStockOpname);
 
 // ── Import ───────────────────────────────────────────────────
