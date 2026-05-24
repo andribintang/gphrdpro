@@ -48,6 +48,7 @@ const NAV = [
         items:[
           { to:'/erp',           icon:Home,        label:'Dashboard', roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/orders',    icon:ShoppingCart,label:'Order',     roles:['admin','hr','supervisor','employee'] },
+          { to:'/erp/shipments',  icon:Truck,       label:'Pengiriman',  roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/customers', icon:Users,       label:'Pelanggan', roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/returns',   icon:RotateCcw,   label:'Retur',     roles:['admin','hr','supervisor','employee'] },
         ],
@@ -60,7 +61,6 @@ const NAV = [
           { to:'/erp/purchases',    icon:ShoppingBag,   label:'Pembelian',   roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/stock-opname', icon:ClipboardList, label:'Stok Opname', roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/import',       icon:Upload,        label:'Import Data', roles:['admin','hr','supervisor','employee'] },
-          { to:'/erp/shipments',    icon:Truck,         label:'Pengiriman',  roles:['admin','hr','supervisor','employee'] },
         ],
       },
       {
