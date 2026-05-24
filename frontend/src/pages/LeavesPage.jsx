@@ -686,7 +686,7 @@ export default function LeavesPage() {
   useEffect(() => { fetchQuota(); }, [fetchQuota]);
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full animate-fade-in">
       {/* Page header */}
       <div className="flex items-center justify-between mb-5">
         <div>

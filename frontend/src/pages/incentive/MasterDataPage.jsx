@@ -908,7 +908,7 @@ export default function MasterDataPage() {
   const [activeTab, setActiveTab] = useState('branches');
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full animate-fade-in">
       <div className="mb-5">
         <h1 className="page-title">Master Data</h1>
         <p className="text-sm text-[var(--text-secondary)]">Cabang · Karyawan · Jalur Penjualan · Aktivitas · Target</p>

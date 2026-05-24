@@ -862,7 +862,7 @@ export default function AttendancePage() {
   useEffect(() => { fetchToday(); }, [fetchToday]);
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full animate-fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Absensi</h1>
@@ -880,7 +880,7 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      <div className="flex p-1 gap-1 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] mb-5">
+      <div className="flex p-1 gap-1 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] mb-5 max-w-md">
         {TABS.map(tab => { const Icon = tab.icon; const active = activeTab === tab.id;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -899,7 +899,7 @@ export default function AttendancePage() {
         </div>
       ) : (
         <>
-          {activeTab === 'clock'   && <ClockTab todayData={todayData} onRefresh={fetchToday} />}
+          {activeTab === 'clock'   && <div className="grid lg:grid-cols-[420px_1fr] gap-6 items-start"><div><ClockTab todayData={todayData} onRefresh={fetchToday} /></div><div className="hidden lg:block"/></div>}
           {activeTab === 'history' && <HistoryTab />}
           {activeTab === 'monitor' && <MonitoringTab />}
         </>

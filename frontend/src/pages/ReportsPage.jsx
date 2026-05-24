@@ -747,7 +747,7 @@ export default function ReportsPage() {
   const [year, setYear]     = useState(currentYear());
 
   return (
-    <div className="max-w-lg lg:max-w-5xl mx-auto">
+    <div className="w-full animate-fade-in">
       {/* Header */}
       <div className="page-header">
         <div>

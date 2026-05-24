@@ -147,7 +147,7 @@ export default function PeriodsPage() {
   const WORKFLOW_STEPS = ['draft','calculated','approved','locked'];
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full animate-fade-in">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Periode Insentif</h1>
