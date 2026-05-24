@@ -3,7 +3,7 @@ const router  = express.Router();
 const { body, param, query } = require('express-validator');
 const {
   getAll, getOne, create, update,
-  deactivate, reactivate, getStats, getDepartments,
+  deactivate, reactivate, resetPassword, getStats, getDepartments,
 } = require('../controllers/employeeController');
 const { authenticate, authorize } = require('../middleware/auth');
 
