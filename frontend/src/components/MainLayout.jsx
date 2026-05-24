@@ -201,7 +201,7 @@ const ErpGroup = ({ section, collapsed, role, onClose }) => {
   );
 };
 
-const Sidebar = ({ collapsed, onToggle, onClose }) => {
+const Sidebar = ({ collapsed, onToggle, onClose, isOnErp }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
