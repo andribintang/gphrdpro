@@ -115,10 +115,16 @@ export default function AttendanceAdminPage() {
           role: r.user?.role || '',
           branch: r.user?.employee?.branch || null,
         },
-        check_in_photo:  r.check_in_photo  || r.photo_in  || null,
-        check_out_photo: r.check_out_photo || r.photo_out || null,
-        check_in_location:  r.check_in_location  || r.location_in  || null,
-        check_out_location: r.check_out_location || r.location_out || null,
+        check_in_photo:  r.check_in_selfie_url  || r.check_in_photo  || null,
+        check_out_photo: r.check_out_selfie_url || r.check_out_photo || null,
+        check_in_location:  r.check_in_lat && r.check_in_lng
+          ? `${parseFloat(r.check_in_lat).toFixed(5)}, ${parseFloat(r.check_in_lng).toFixed(5)}`
+          : r.check_in_location || null,
+        check_out_location: r.check_out_lat && r.check_out_lng
+          ? `${parseFloat(r.check_out_lat).toFixed(5)}, ${parseFloat(r.check_out_lng).toFixed(5)}`
+          : r.check_out_location || null,
+        work_hours: r.work_hours,
+        break_duration: r.total_break_minutes,
       }));
       setRecords(mapped);
     } catch(e) {
