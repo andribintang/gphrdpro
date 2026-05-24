@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import AttendancePage      from './pages/AttendancePage';
 import AttendanceAdminPage from './pages/AttendanceAdminPage';
 import UserAccessPage      from './pages/UserAccessPage';
+import DepartmentsPage     from './pages/DepartmentsPage';
 import LeavesPage from './pages/LeavesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -84,6 +85,9 @@ export default function App() {
 
                 {/* Pengaturan */}
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="departments" element={
+                  <ProtectedRoute roles={['admin','hr']}><DepartmentsPage /></ProtectedRoute>
+                } />
                 <Route path="user-access" element={
                   <ProtectedRoute roles={['admin','hr']}><UserAccessPage /></ProtectedRoute>
                 } />
