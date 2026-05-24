@@ -95,6 +95,23 @@ app.post('/run-alter', async (req, res) => {
   try {
     const { sequelize } = require('./config/database');
     const results = [];
+
+    // Create departments table
+    try {
+      await sequelize.query(`CREATE TABLE IF NOT EXISTS departments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        code VARCHAR(20) NULL,
+        description TEXT NULL,
+        head_name VARCHAR(100) NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+      results.push('OK: departments table created');
+    } catch(e) { results.push('SKIP: departments - ' + e.message.substring(0,60)); }
+
     const errors  = [];
 
     const alters = [
