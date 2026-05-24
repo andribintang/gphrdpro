@@ -104,7 +104,7 @@ const checkIn = async (req, res, next) => {
       locationVerified = distanceFromOffice <= parseInt(office.radius || DEFAULT_RADIUS);
     }
 
-    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance/check-in') : null;
+    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance_checkin') : null;
     const checkInTime = getTimeString(now);
     const status = determineStatus(checkInTime, office.check_in_deadline || '08:05');
 
@@ -152,7 +152,7 @@ const checkOut = async (req, res, next) => {
 
     const { lat, lng, selfie_base64, face_verified = false } = req.body;
     const checkOutTime = getTimeString(now);
-    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance/check-out') : null;
+    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance_checkout') : null;
     const workHours = calcWorkHours(attendance.check_in, checkOutTime, breakMins);
 
     await attendance.update({
