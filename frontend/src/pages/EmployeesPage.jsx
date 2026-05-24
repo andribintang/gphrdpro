@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Users, Search, Plus, X, ChevronRight, Filter,
+  Users, Search, Plus, X, ChevronRight, Filter, Eye,
   Loader2, RefreshCw, Phone, MapPin, AlertTriangle,
   Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
@@ -215,7 +215,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
-      <div className="relative w-full sm:max-w-lg bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
+      <div className="rew-full bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-[var(--border2)]" />
@@ -737,7 +737,7 @@ export default function EmployeesPage() {
   };
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full">
       <div className="page-header">
         <div>
           <h1 className="page-title">Karyawan</h1>
@@ -815,32 +815,94 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* List */}
+      {/* Employee Table */}
       {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-[72px] rounded-2xl" />)}</div>
+        <div className="table-wrapper divide-y divide-[var(--border-subtle)]">
+          {[...Array(6)].map((_,i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4">
+              <div className="skeleton w-9 h-9 rounded-xl flex-shrink-0"/>
+              <div className="flex-1 space-y-2"><div className="skeleton h-3.5 w-40 rounded"/><div className="skeleton h-3 w-28 rounded opacity-60"/></div>
+              <div className="skeleton h-6 w-16 rounded-full"/>
+              <div className="skeleton h-3 w-24 rounded hidden md:block"/>
+              <div className="skeleton h-3 w-20 rounded hidden lg:block"/>
+            </div>
+          ))}
+        </div>
       ) : employees.length === 0 ? (
-        <div className="text-center py-14">
+        <div className="table-wrapper text-center py-16">
           <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium text-[var(--text-muted)]">Tidak ada karyawan ditemukan</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">Tidak ada karyawan ditemukan</p>
+          <p className="text-xs text-[var(--text-muted)]">Coba ubah filter atau tambah karyawan baru</p>
+          {canManage && <button onClick={() => setShowAddForm(true)} className="btn-primary mt-4 text-sm"><Plus className="w-4 h-4"/> Tambah Karyawan</button>}
         </div>
       ) : (
         <div className="table-wrapper">
-          {employees.map(emp => (
-            <button key={emp.id} onClick={() => setProfileId(emp.id)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors text-left">
-              <Avatar name={emp.name} size="md" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-bold text-[var(--text-primary)] truncate">{emp.name}</p>
-                  <RoleBadge role={emp.role} />
-                </div>
-                <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{emp.employee?.position} · {emp.employee?.department}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <StatusBadge status={emp.employee?.status} />
+          {/* Desktop header */}
+          <div className="hidden md:grid grid-cols-[minmax(200px,1fr)_120px_140px_120px_100px_auto] gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]/70">
+            {['KARYAWAN','JABATAN','DEPARTEMEN','STATUS','BERGABUNG','AKSI'].map(h=>(
+              <p key={h} className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{h}</p>
+            ))}
+          </div>
+          {employees.map((emp,idx) => (
+            <div key={emp.id}
+              className={`flex flex-col md:grid md:grid-cols-[minmax(200px,1fr)_120px_140px_120px_100px_auto] md:gap-4 px-5 py-3.5 transition-colors hover:bg-[var(--bg-secondary)]/50 cursor-pointer border-b border-[var(--border-subtle)] last:border-0 group ${idx%2===0?'':'bg-[var(--bg-secondary)]/20'}`}
+              onClick={() => setProfileId(emp.id)}>
+              {/* Karyawan */}
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar name={emp.name} size="md"/>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{emp.name}</p>
+                    <RoleBadge role={emp.role}/>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] truncate">{emp.email}</p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
-            </button>
+              {/* Jabatan */}
+              <div className="hidden md:flex items-center">
+                <p className="text-[13px] text-[var(--text-secondary)] truncate">{emp.employee?.position || '—'}</p>
+              </div>
+              {/* Departemen */}
+              <div className="hidden md:flex items-center">
+                <span className="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-full">
+                  {emp.employee?.department || '—'}
+                </span>
+              </div>
+              {/* Status */}
+              <div className="hidden md:flex items-center">
+                <StatusBadge status={emp.employee?.status}/>
+              </div>
+              {/* Bergabung */}
+              <div className="hidden lg:flex items-center">
+                <p className="text-[12px] text-[var(--text-muted)]">
+                  {emp.employee?.join_date ? new Date(emp.employee.join_date).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}
+                </p>
+              </div>
+              {/* Aksi */}
+              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" onClick={e=>e.stopPropagation()}>
+                <button onClick={()=>setProfileId(emp.id)} title="Lihat Detail"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand-600)] hover:bg-[var(--brand-600)]/8 transition-all">
+                  <Eye className="w-3.5 h-3.5"/>
+                </button>
+                {canManage && (
+                  <button onClick={()=>setEditEmployee(emp)} title="Edit"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all">
+                    <Edit3 className="w-3.5 h-3.5"/>
+                  </button>
+                )}
+                {canManage && emp.employee?.status === 'active' && (
+                  <button onClick={()=>setDeactivateTarget(emp)} title="Nonaktifkan"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all">
+                    <UserX className="w-3.5 h-3.5"/>
+                  </button>
+                )}
+              </div>
+              {/* Mobile: info tambahan */}
+              <div className="flex md:hidden items-center gap-2 mt-2">
+                <StatusBadge status={emp.employee?.status}/>
+                <span className="text-[11px] text-[var(--text-muted)]">{emp.employee?.position} · {emp.employee?.department}</span>
+              </div>
+            </div>
           ))}
         </div>
       )}

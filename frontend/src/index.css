@@ -49,8 +49,8 @@
 }
 
 @layer components {
-  .page-container { @apply w-full mx-auto px-4 md:px-6 lg:px-8; max-width: 1400px; }
-  .section { @apply space-y-6; }
+  .page-container { @apply w-full px-4 md:px-5 lg:px-6; }
+  .section { @apply space-y-4; }
   .page-header { @apply flex items-start justify-between mb-8; }
   .page-title { @apply text-2xl font-bold tracking-tight; color: var(--text-primary); }
   .page-subtitle { @apply text-sm mt-1; color: var(--text-muted); }

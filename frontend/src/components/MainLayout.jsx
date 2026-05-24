@@ -297,7 +297,7 @@ export default function MainLayout() {
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(v => !v)} onClose={() => setMobileOpen(false)} />
       </aside>
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="flex-shrink-0 flex items-center gap-4 px-4 lg:px-6 bg-[var(--topbar-bg)] border-b border-[var(--topbar-border)]" style={{ height:'60px' }}>
+        <header className="flex-shrink-0 flex items-center gap-4 px-4 bg-[var(--topbar-bg)] border-b border-[var(--topbar-border)]" style={{ height:'60px' }}>
           <button onClick={() => setMobileOpen(v => !v)} className="lg:hidden btn-icon"><Menu size={18} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">{getTitle()}</h1>
@@ -316,7 +316,7 @@ export default function MainLayout() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto scrollbar-thin">
-          <div className="page-container py-6 lg:py-8 animate-fade-in">
+          <div className="page-container py-4 lg:py-5 animate-fade-in">
             <Outlet />
           </div>
         </main>
