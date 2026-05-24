@@ -27,6 +27,7 @@ const NAV = [
       { to:'/attendance',       icon:Clock,        label:'Absensi',         roles:['admin','hr','supervisor','employee'] },
       { to:'/attendance-admin', icon:ClipboardList, label:'Data Absensi',    roles:['admin','hr'] },
       { to:'/leaves',      icon:CalendarOff,     label:'Cuti',        roles:['admin','hr','supervisor','employee'] },
+      { to:'/departments',  icon:Building2,       label:'Departemen',  roles:['admin','hr'] },
       { to:'/payroll-pro', icon:DollarSign,      label:'Gaji',        roles:['admin','hr'] },
       { to:'/reports',     icon:BarChart3,       label:'Laporan HRD', roles:['admin','hr'] },
     ],
