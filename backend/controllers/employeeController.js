@@ -431,7 +431,26 @@ const getDepartments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+
+// ── Reset Password (admin/HR only) ───────────────────────────
+const resetPassword = async (req, res, next) => {
+  try {
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password minimal 6 karakter' });
+    }
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    
+    // Use bcrypt to hash password
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(new_password, 10);
+    await user.update({ password_hash: hash });
+    return res.json({ success: true, message: 'Password berhasil direset' });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
-  getAll, getOne, create, update,
+  getAll, getOne, create, update, resetPassword,
   deactivate, reactivate, getStats, getDepartments,
 };

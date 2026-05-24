@@ -34,6 +34,7 @@ router.patch('/:id/deactivate', authorize('admin', 'hr'), [
   body('status').optional().isIn(['inactive', 'terminated', 'on_leave']),
 ], deactivate);
 
-router.patch('/:id/reactivate', authorize('admin', 'hr'), [param('id').isInt()], reactivate);
+router.patch('/:id/reactivate',     authorize('admin', 'hr'), [param('id').isInt()], reactivate);
+router.put  ('/:id/reset-password', authorize('admin', 'hr'), [param('id').isInt()], resetPassword);
 
 module.exports = router;

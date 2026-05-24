@@ -195,7 +195,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
   // This prevents React from unmounting/remounting the input on re-render
   const renderF = (label, field, type = 'text', placeholder, required = false, disabled = false) => (
     <div key={field}>
-      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+      <label className="block text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <input
@@ -205,9 +205,14 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
-        className={`input-base text-sm ${errors[field] ? 'border-red-400' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`w-full h-10 px-3.5 rounded-xl border text-[13.5px] text-[var(--text-primary)]
+          bg-[var(--bg-secondary)] placeholder:text-[var(--text-muted)]
+          focus:outline-none focus:ring-2 focus:ring-[var(--brand-600)]/20 focus:border-[var(--brand-600)]/60
+          transition-all duration-150
+          ${errors[field] ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-[var(--border)]'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       />
-      {errors[field] && <p className="text-xs text-red-500 mt-1">{errors[field]}</p>}
+      {errors[field] && <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1">⚠ {errors[field]}</p>}
     </div>
   );
 
@@ -215,7 +220,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
-      <div className="rew-full bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
+      <div className="relative w-full sm:max-w-2xl bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-[var(--border2)]" />
@@ -245,10 +250,14 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
           {step === 1 && (
             <>
-              {renderF("Nama Lengkap", "name", "text", "Ahmad Fauzi", true, false)}
-              {renderF("Email", "email", "email", "ahmad@perusahaan.com", true, false)}
-              {!isEdit && renderF("Password Default", "password", "password", "Min 6 karakter", true, false)}
-              {renderF("NIP", "nip", "text", "NIP-005", true, false)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderF("Nama Lengkap", "name", "text", "Ahmad Fauzi", true, false)}
+                {renderF("Email", "email", "email", "ahmad@perusahaan.com", true, false)}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {!isEdit && renderF("Password Default", "password", "password", "Min 6 karakter", true, false)}
+                {renderF("NIP", "nip", "text", "NIP-005", true, false)}
+              </div>
 
               {/* Role */}
               <div>
@@ -267,7 +276,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {renderF("Jabatan", "position", "text", "Staff IT", true, false)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderF("Jabatan", "position", "text", "Staff IT", true, false)}
+                {renderF("Telepon", "phone", "tel", "08xxxxxxxxxx", false, false)}
+              </div>
 
               {/* Departemen */}
               <div>
@@ -285,7 +297,6 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 {errors.department && <p className="text-xs text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              {renderF("Telepon", "phone", "tel", "08xxxxxxxxxx", false, false)}
             </>
           )}
 
@@ -340,8 +351,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
               </div>
 
               {renderF("Alamat", "address", "text", "Jl. Contoh No.1, Jakarta", false, false)}
-              {renderF("Kontak Darurat", "emergency_contact", "text", "Nama kontak darurat", false, false)}
-              {renderF("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx", false, false)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderF("Kontak Darurat", "emergency_contact", "text", "Nama kontak darurat", false, false)}
+                {renderF("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx", false, false)}
+              </div>
 
               {/* ── Sync ke Sistem Insentif ─────────────────── */}
               {(!isEdit || (isEdit && !isLinked)) && (

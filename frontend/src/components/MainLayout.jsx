@@ -7,7 +7,7 @@ import {
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
   RotateCcw, LayoutList, Layers, Target, Zap,
-  PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen, Shield
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
 import useAutoLogout from '../hooks/useAutoLogout';

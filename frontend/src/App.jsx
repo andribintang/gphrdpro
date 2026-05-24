@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AttendancePage      from './pages/AttendancePage';
 import AttendanceAdminPage from './pages/AttendanceAdminPage';
+import UserAccessPage      from './pages/UserAccessPage';
 import LeavesPage from './pages/LeavesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -83,6 +84,9 @@ export default function App() {
 
                 {/* Pengaturan */}
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="user-access" element={
+                  <ProtectedRoute roles={['admin','hr']}><UserAccessPage /></ProtectedRoute>
+                } />
                 <Route path="company-settings" element={
                   <ProtectedRoute roles={['admin']}><CompanySettingsPage /></ProtectedRoute>
                 } />
