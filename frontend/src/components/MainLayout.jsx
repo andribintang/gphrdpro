@@ -79,6 +79,7 @@ const NAV = [
     items: [
       { to:'/company-settings',   icon:Building2,         label:'Perusahaan',    roles:['admin'] },
       { to:'/payroll-components', icon:SlidersHorizontal, label:'Komponen Gaji', roles:['admin','hr'] },
+      { to:'/user-access',        icon:Shield,            label:'Hak Akses',     roles:['admin','hr'] },
       { to:'/settings',           icon:Settings,          label:'Akun',          roles:['admin','hr','supervisor','employee'] },
     ],
   },
