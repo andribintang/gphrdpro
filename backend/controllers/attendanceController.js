@@ -311,9 +311,8 @@ const getAllAttendances = async (req, res, next) => {
         required: false,
         include: [{
           model: Employee, as: 'employee',
-          required: !!branch_id,
-          attributes: ['id','branch_id'],
-          ...(empWhere ? { where: empWhere } : {}),
+          required: false,
+          
         }],
       }],
       order: [['date','DESC'],['check_in','ASC']],
