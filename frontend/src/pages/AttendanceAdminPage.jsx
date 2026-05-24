@@ -103,10 +103,24 @@ export default function AttendanceAdminPage() {
   const fetch = useCallback(async () => {
     setLoad(true);
     try {
-      const res = await attendanceService.getAdminMonthly({
+      const res = await attendanceService.getAllAttendances({
         month, year, branch_id: branch||undefined, status: status||undefined,
       });
-      setRecords(res.data.data?.records || res.data.data?.attendances || []);
+      // Map records - normalize employee name from user or employee
+      const raw = res.data.data?.records || [];
+      const mapped = raw.map(r => ({
+        ...r,
+        employee: {
+          name: r.user?.name || r.employee?.name || '—',
+          role: r.user?.role || '',
+          branch: r.user?.employee?.branch || null,
+        },
+        check_in_photo:  r.check_in_photo  || r.photo_in  || null,
+        check_out_photo: r.check_out_photo || r.photo_out || null,
+        check_in_location:  r.check_in_location  || r.location_in  || null,
+        check_out_location: r.check_out_location || r.location_out || null,
+      }));
+      setRecords(mapped);
     } catch(e) {
       toast.error('Gagal memuat data absensi');
       console.error(e);

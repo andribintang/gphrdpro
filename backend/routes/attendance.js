@@ -4,7 +4,7 @@ const { body, query, param } = require('express-validator');
 const {
   checkIn, checkOut, breakStart, breakEnd,
   getToday, getHistory,
-  getRealtimeMonitoring, getAdminMonthly,
+  getRealtimeMonitoring, getAdminMonthly, getAllAttendances,
   getOfficeSettingsApi, updateOfficeSettings,
   registerFace, getFaceStatus,
 } = require('../controllers/attendanceController');
@@ -39,5 +39,6 @@ router.put('/office/settings',  authorize('admin', 'hr'), [
 // ── Admin / HR ───────────────────────────────────────────────
 router.get('/admin/realtime', authorize('admin', 'hr', 'supervisor'), getRealtimeMonitoring);
 router.get('/admin/monthly',  authorize('admin', 'hr'),               getAdminMonthly);
+router.get('/admin/all',      authorize('admin', 'hr'),               getAllAttendances);
 
 module.exports = router;

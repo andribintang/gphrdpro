@@ -12,7 +12,8 @@ export const attendanceService = {
   getRealtimeMonitoring: () => api.get('/attendance/admin/realtime'),
   getOfficeSettings:    () => api.get('/attendance/office/settings'),
   updateOfficeSettings: (data) => api.put('/attendance/office/settings', data),
-  getAdminMonthly: (params) => api.get('/attendance/admin/monthly', { params }),
+  getAdminMonthly:     (params) => api.get('/attendance/admin/monthly', { params }),
+  getAllAttendances:    (params) => api.get('/attendance/admin/all', { params }),
 };
 
 export const getGPSLocation = (options = {}) => new Promise((resolve, reject) => {

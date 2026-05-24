@@ -288,4 +288,32 @@ const getAdminMonthly = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus };
+
+// ── Get ALL employees attendance for a month (admin/HR) ──────
+const getAllAttendances = async (req, res, next) => {
+  try {
+    const { month, year, branch_id, status } = req.query;
+    const y = parseInt(year  || new Date().getFullYear());
+    const m = parseInt(month || new Date().getMonth() + 1);
+    const from = `${y}-${String(m).padStart(2,'0')}-01`;
+    const to   = new Date(y, m, 0).toISOString().split('T')[0];
+
+    const where = { date: { [Op.between]: [from, to] } };
+    if (status) where.status = status;
+
+    const records = await Attendance.findAll({
+      where,
+      include: [{
+        model: User, as: 'user',
+        attributes: ['id','name','email','role'],
+        include: [{ model: Employee, as: 'employee', required: false, attributes: ['id','employee_no','branch_id'], include: [{association: 'branch', required: false, attributes: ['id','name']}] }],
+        ...(branch_id ? { where: { '$user.employee.branch_id$': branch_id } } : {}),
+      }],
+      order: [['date','DESC'],['check_in','ASC']],
+    });
+
+    return res.json({ success: true, data: { records, period: { year: y, month: m, from, to }, total: records.length } });
+  } catch (err) { next(err); }
+};
+
+module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getAllAttendances, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus };
