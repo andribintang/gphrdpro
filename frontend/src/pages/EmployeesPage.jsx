@@ -91,7 +91,16 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
 
   useEffect(() => {
     Promise.all([
-      employeeService.getDepartments().then(r => setDepts(r.data.data.departments)).catch(() => {}),
+      // Try master departments table first, fallback to employee departments
+      import('../utils/api').then(({default: api}) => {
+        api.get('/departments', { params: { is_active: true } })
+          .then(r => {
+            const names = (r.data.data.departments || []).map(d => d.name);
+            if (names.length) setDepts(names);
+            else employeeService.getDepartments().then(r2 => setDepts(r2.data.data.departments || [])).catch(() => {});
+          })
+          .catch(() => employeeService.getDepartments().then(r2 => setDepts(r2.data.data.departments || [])).catch(() => {}));
+      }),
       incentiveService.getBranches().then(r => setBranches(r.data.data.branches)).catch(() => {}),
     ]);
   }, []);
