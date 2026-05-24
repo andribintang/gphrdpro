@@ -32,7 +32,7 @@ const calcWorkHours = (checkIn, checkOut, breakMins = 0) => {
   return Math.max(0, Math.round((mins / 60) * 100) / 100);
 };
 
-const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
+const uploadToCloudinary = async (base64Image, folder = 'hrd_photos') => {
   return new Promise((resolve) => {
     const cloudName  = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey     = process.env.CLOUDINARY_API_KEY;
@@ -44,7 +44,7 @@ const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
 
     // Generate signature for signed upload
     const crypto     = require('crypto');
-    const sigStr     = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+    const sigStr     = `timestamp=${timestamp}${apiSecret}`; // No folder in sig
     const signature  = crypto.createHash('sha1').update(sigStr).digest('hex');
 
     const body = JSON.stringify({
@@ -52,7 +52,6 @@ const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
       api_key: apiKey,
       timestamp,
       signature,
-      folder,
     });
 
     const req = https.request({
