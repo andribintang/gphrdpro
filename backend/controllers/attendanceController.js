@@ -32,52 +32,64 @@ const calcWorkHours = (checkIn, checkOut, breakMins = 0) => {
   return Math.max(0, Math.round((mins / 60) * 100) / 100);
 };
 
-const uploadToCloudinary = async (base64Image, folder = 'hrd_photos') => {
-  return new Promise((resolve) => {
-    const cloudName  = process.env.CLOUDINARY_CLOUD_NAME;
-    const apiKey     = process.env.CLOUDINARY_API_KEY;
-    const apiSecret  = process.env.CLOUDINARY_API_SECRET;
-    if (!cloudName || !base64Image) { resolve(null); return; }
+const uploadToCloudinary = async (base64Image) => {
+  try {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey    = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (!cloudName || !apiKey || !apiSecret || !base64Image) return null;
 
-    const imageData  = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const timestamp  = Math.floor(Date.now() / 1000);
+    const imageData = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const imgBuffer = Buffer.from(imageData, 'base64');
+    const timestamp = Math.floor(Date.now() / 1000);
+    const crypto    = require('crypto');
+    const signature = crypto.createHash('sha1')
+      .update(`timestamp=${timestamp}${apiSecret}`)
+      .digest('hex');
 
-    // Generate signature for signed upload
-    const crypto     = require('crypto');
-    const sigStr     = `timestamp=${timestamp}${apiSecret}`; // No folder in sig
-    const signature  = crypto.createHash('sha1').update(sigStr).digest('hex');
+    // Use multipart/form-data (more reliable than JSON for binary)
+    const boundary = `----FormBoundary${Date.now()}`;
+    const parts = [
+      `--${boundary}\r\nContent-Disposition: form-data; name="api_key"\r\n\r\n${apiKey}`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="timestamp"\r\n\r\n${timestamp}`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="signature"\r\n\r\n${signature}`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="photo.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`,
+    ];
 
-    const body = JSON.stringify({
-      file: `data:image/jpeg;base64,${imageData}`,
-      api_key: apiKey,
-      timestamp,
-      signature,
-    });
+    const textBuf = Buffer.from(parts.join('\r\n'), 'utf8');
+    const endBuf  = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
+    const body    = Buffer.concat([textBuf, imgBuffer, endBuf]);
 
-    const req = https.request({
-      hostname: 'api.cloudinary.com',
-      path: `/v1_1/${cloudName}/image/upload`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, (res) => {
-      let data = '';
-      res.on('data', d => { data += d; });
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(data);
-          if (!result.secure_url) {
-            console.error('[Cloudinary] Upload failed:', JSON.stringify(result).substring(0, 200));
-          } else {
-            console.log('[Cloudinary] Upload OK:', result.secure_url);
-          }
-          resolve(result.secure_url || null);
-        } catch(e) { console.error('[Cloudinary] Parse error:', e.message); resolve(null); }
+    return await new Promise((resolve) => {
+      const req = https.request({
+        hostname: 'api.cloudinary.com',
+        path: `/v1_1/${cloudName}/image/upload`,
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': body.length,
+        },
+      }, (res) => {
+        let data = '';
+        res.on('data', d => data += d);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.secure_url) {
+              console.log('[Cloudinary] Upload OK:', result.secure_url);
+              resolve(result.secure_url);
+            } else {
+              console.error('[Cloudinary] Failed:', JSON.stringify(result).substring(0, 200));
+              resolve(null);
+            }
+          } catch(e) { console.error('[Cloudinary] Parse error:', e.message); resolve(null); }
+        });
       });
+      req.on('error', (e) => { console.error('[Cloudinary] Error:', e.message); resolve(null); });
+      req.setTimeout(20000, () => { req.destroy(); resolve(null); });
+      req.write(body); req.end();
     });
-    req.on('error', (e) => { console.error('[Cloudinary] Request error:', e.message); resolve(null); });
-    req.setTimeout(20000, () => { req.destroy(); resolve(null); });
-    req.write(body); req.end();
-  });
+  } catch(e) { console.error('[Cloudinary] Exception:', e.message); return null; }
 };
 
 const getOfficeCfg = async () => {
