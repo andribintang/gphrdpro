@@ -29,7 +29,7 @@ router.get('/employees', authenticate, allRoles, async (req, res, next) => {
 
 // ── Sub Channels ─────────────────────────────────────────────
 router.get   ('/sub-channels',        authenticate, allRoles, master.getSubChannels);
-router.get   ('/sub-channels/all',    authenticate, hrAdmin,  master.getAllSubChannels);
+router.get   ('/sub-channels/all',    authenticate, allRoles, master.getAllSubChannels);
 router.post  ('/sub-channels',        authenticate, hrAdmin,  master.createSubChannel);
 router.put   ('/sub-channels/:id',    authenticate, hrAdmin,  master.updateSubChannel);
 router.delete('/sub-channels/:id',    authenticate, hrAdmin,  master.deleteSubChannel);
