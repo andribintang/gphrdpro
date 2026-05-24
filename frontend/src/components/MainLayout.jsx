@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
-  Home, Users, Clock, CalendarOff, DollarSign,
+  Home, Users, Clock, CalendarOff, DollarSign, ClipboardList,
   TrendingUp, Building2, SlidersHorizontal, Settings,
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
@@ -24,7 +24,8 @@ const NAV = [
     group: 'HRD',
     items: [
       { to:'/employees',   icon:Users,           label:'Karyawan',    roles:['admin','hr','supervisor'] },
-      { to:'/attendance',  icon:Clock,           label:'Absensi',     roles:['admin','hr','supervisor','employee'] },
+      { to:'/attendance',       icon:Clock,        label:'Absensi',         roles:['admin','hr','supervisor','employee'] },
+      { to:'/attendance-admin', icon:ClipboardList, label:'Data Absensi',    roles:['admin','hr'] },
       { to:'/leaves',      icon:CalendarOff,     label:'Cuti',        roles:['admin','hr','supervisor','employee'] },
       { to:'/payroll-pro', icon:DollarSign,      label:'Gaji',        roles:['admin','hr'] },
       { to:'/reports',     icon:BarChart3,       label:'Laporan HRD', roles:['admin','hr'] },
@@ -213,7 +214,7 @@ const Sidebar = ({ collapsed, onToggle, onClose }) => {
         {!collapsed && (
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--text-primary)] leading-none truncate">GPDISTRO</p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">HR Pro · ERP</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-0.5">ERP & HRD System</p>
           </div>
         )}
       </div>

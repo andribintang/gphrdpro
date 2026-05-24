@@ -7,7 +7,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/MainLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import AttendancePage from './pages/AttendancePage';
+import AttendancePage      from './pages/AttendancePage';
+import AttendanceAdminPage from './pages/AttendanceAdminPage';
 import LeavesPage from './pages/LeavesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -58,6 +59,9 @@ export default function App() {
 
                 {/* HRD */}
                 <Route path="attendance" element={<AttendancePage />} />
+                <Route path="attendance-admin" element={
+                  <ProtectedRoute roles={['admin','hr']}><AttendanceAdminPage /></ProtectedRoute>
+                } />
                 <Route path="leaves" element={<LeavesPage />} />
                 <Route path="payroll" element={<Navigate to="/payroll-pro" replace />} />
                 <Route path="employees" element={
@@ -104,7 +108,7 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ErpDashboard /></ProtectedRoute>
                 } />
                 <Route path="erp/products" element={
-                  <ProtectedRoute roles={['admin','hr']}><ProductsPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ProductsPage /></ProtectedRoute>
                 } />
                 <Route path="erp/orders" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrdersPage /></ProtectedRoute>
@@ -116,25 +120,25 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrderDetailPage /></ProtectedRoute>
                 } />
                 <Route path="erp/customers" element={
-                  <ProtectedRoute roles={['admin','hr']}><CustomersPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><CustomersPage /></ProtectedRoute>
                 } />
                 <Route path="erp/reports" element={
-                  <ProtectedRoute roles={['admin','hr']}><SalesReportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><SalesReportPage /></ProtectedRoute>
                 } />
                 <Route path="erp/import" element={
-                  <ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ImportPage /></ProtectedRoute>
                 } />
                 <Route path="erp/purchases" element={
-                  <ProtectedRoute roles={['admin','hr']}><PurchasesPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><PurchasesPage /></ProtectedRoute>
                 } />
                 <Route path="erp/expenses" element={
-                  <ProtectedRoute roles={['admin','hr']}><ExpensesPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ExpensesPage /></ProtectedRoute>
                 } />
                 <Route path="erp/profit-loss" element={
-                  <ProtectedRoute roles={['admin','hr']}><ProfitLossPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ProfitLossPage /></ProtectedRoute>
                 } />
                 <Route path="erp/stock-opname" element={
-                  <ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><StockOpnamePage /></ProtectedRoute>
                 } />
                 <Route path="erp/shipments" element={
                   <ProtectedRoute roles={['admin','hr','supervisor']}><ShipmentsPage /></ProtectedRoute>
@@ -143,13 +147,13 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr','supervisor']}><ReturnsPage /></ProtectedRoute>
                 } />
                 <Route path="erp/master" element={
-                  <ProtectedRoute roles={['admin','hr']}><ErpMasterPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ErpMasterPage /></ProtectedRoute>
                 } />
                 <Route path="erp/daily-report" element={
-                  <ProtectedRoute roles={['admin','hr']}><DailyReportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><DailyReportPage /></ProtectedRoute>
                 } />
                 <Route path="erp/report-channel" element={
-                  <ProtectedRoute roles={['admin','hr']}><ChannelReportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ChannelReportPage /></ProtectedRoute>
                 } />
 
                 {/* 404 */}

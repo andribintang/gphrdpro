@@ -45,7 +45,6 @@ export default function LoginPage() {
     } finally { setIsLoading(false); }
   };
 
-  const setDemo = (email, password) => setForm({ email, password });
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
@@ -77,10 +76,10 @@ export default function LoginPage() {
             </div>
 
             <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
-              {settings.app_name || 'GPDISTRO HR Pro'}
+              {settings.app_name || 'GPDISTRO RACING ID'}
             </h1>
             <p className="text-white/70 text-lg mb-10">
-              {settings.company_tagline || 'Human Resource Management System'}
+              {settings.company_tagline || 'ERP & HRD Integrated System'}
             </p>
 
             {/* Feature pills */}
@@ -113,10 +112,10 @@ export default function LoginPage() {
               />
             </div>
             <h1 className="text-xl font-black text-[var(--text-primary)]">
-              {settings.app_name || 'GPDISTRO HR Pro'}
+              {settings.app_name || 'GPDISTRO RACING ID'}
             </h1>
             <p className="text-sm text-[var(--text-muted)] mt-1">
-              {settings.company_tagline || 'Human Resource Management System'}
+              {settings.company_tagline || 'ERP & HRD Integrated System'}
             </p>
           </div>
 
@@ -174,26 +173,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Demo accounts */}
-            <div className="mt-6">
-              <p className="text-xs text-[var(--text-muted)] text-center font-semibold uppercase tracking-wider mb-3">
-                Akun Demo
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label:'Admin',      email:'admin@hrd.com',      pass:'Admin@123',   color:'bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-400' },
-                  { label:'HR',         email:'hr@hrd.com',         pass:'Hr@123456',   color:'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400' },
-                  { label:'Supervisor', email:'supervisor@hrd.com', pass:'Super@123',   color:'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' },
-                  { label:'Karyawan',   email:'ahmad@hrd.com',      pass:'Emp@123456',  color:'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400' },
-                ].map((d, i) => (
-                  <button key={i} type="button" onClick={() => setDemo(d.email, d.pass)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 ${d.color} border border-current/20`}>
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">Klik untuk isi otomatis</p>
-            </div>
+
           </div>
         </div>
       </div>
