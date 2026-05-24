@@ -8,7 +8,7 @@ const DEFAULT_RADIUS = 100;
 
 const getWIBNow = () => new Date(Date.now() + 7 * 3600000);
 const getTodayWIB = () => getWIBNow().toISOString().split('T')[0];
-const getTimeString = (d) => new Date(d.getTime() + 7 * 3600000).toISOString().split('T')[1].split('.')[0];
+const getTimeString = (d) => d.toISOString().split('T')[1].split('.')[0]; // d is already WIB (from getWIBNow)
 
 const determineStatus = (timeStr, deadline = '08:05') => {
   const [h, m] = timeStr.split(':').map(Number);
@@ -66,11 +66,16 @@ const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
       res.on('end', () => {
         try {
           const result = JSON.parse(data);
+          if (!result.secure_url) {
+            console.error('[Cloudinary] Upload failed:', JSON.stringify(result).substring(0, 200));
+          } else {
+            console.log('[Cloudinary] Upload OK:', result.secure_url);
+          }
           resolve(result.secure_url || null);
-        } catch { resolve(null); }
+        } catch(e) { console.error('[Cloudinary] Parse error:', e.message); resolve(null); }
       });
     });
-    req.on('error', () => resolve(null));
+    req.on('error', (e) => { console.error('[Cloudinary] Request error:', e.message); resolve(null); });
     req.setTimeout(20000, () => { req.destroy(); resolve(null); });
     req.write(body); req.end();
   });
