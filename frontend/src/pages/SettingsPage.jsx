@@ -1,198 +1,217 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  User, Lock, Sun, Moon, Shield, Bell,
-  ChevronRight, CheckCircle2, Loader2,
-  LogOut, Info, Palette, BarChart3
+  Shield, Lock, Sun, Moon, BarChart3, LogOut,
+  Eye, EyeOff, Loader2, CheckCircle2, ChevronRight,
+  User, Bell, Palette, Info, Key
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import api from '../utils/api';
 
-const ROLE_LABEL = {
+const ROLE_LABELS = {
   admin: 'Administrator', hr: 'HR Manager',
   supervisor: 'Supervisor', employee: 'Karyawan',
 };
 
-const Section = ({ title, children }) => (
-  <div className="space-y-2">
-    <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider px-1">{title}</h3>
-    <div className="table-wrapper">
-      {children}
-    </div>
-  </div>
-);
-
-const SettingRow = ({ icon: Icon, label, sublabel, onClick, danger, children, iconBg = 'bg-[var(--bg-tertiary)]' }) => (
-  <button onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors
-      ${danger
-        ? 'hover:bg-red-50 dark:hover:bg-red-950'
-        : 'hover:bg-[var(--bg-secondary)]'
-      } ${!onClick ? 'cursor-default' : ''}`}>
-    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-      <Icon className={`w-4 h-4 ${danger ? 'text-red-500' : 'text-[var(--text-secondary)]'}`} />
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className={`text-sm font-semibold ${danger ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-primary)]'}`}>
-        {label}
-      </p>
-      {sublabel && <p className="text-xs text-[var(--text-muted)] mt-0.5">{sublabel}</p>}
-    </div>
-    {children || (onClick && <ChevronRight className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />)}
-  </button>
-);
-
-// Change password modal
-const ChangePasswordModal = ({ onClose }) => {
-  const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async () => {
-    if (form.newPassword !== form.confirmPassword) {
-      toast.error('Password baru tidak cocok'); return;
-    }
-    if (form.newPassword.length < 6) {
-      toast.error('Password minimal 6 karakter'); return;
-    }
-    setLoading(true);
-    try {
-      await api.put('/auth/change-password', {
-        currentPassword: form.currentPassword,
-        newPassword: form.newPassword,
-      });
-      toast.success('Password berhasil diubah');
-      onClose();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal mengubah password');
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
-      <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl
-        border border-[var(--border)] shadow-2xl animate-slide-up p-5 space-y-4"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex justify-center sm:hidden mb-1">
-          <div className="w-10 h-1 rounded-full bg-[var(--border2)]" />
-        </div>
-        <h3 className="text-base font-bold text-[var(--text-primary)]">Ganti Password</h3>
-        {[
-          { key: 'currentPassword', label: 'Password Saat Ini' },
-          { key: 'newPassword',     label: 'Password Baru' },
-          { key: 'confirmPassword', label: 'Konfirmasi Password Baru' },
-        ].map(f => (
-          <div key={f.key}>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">{f.label}</label>
-            <input type="password" value={form[f.key]}
-              onChange={e => setForm(x => ({ ...x, [f.key]: e.target.value }))}
-              className="input-base text-sm" placeholder="••••••••" />
-          </div>
-        ))}
-        <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
-          <button onClick={handleSubmit} disabled={loading} className="btn-primary flex-1 h-11 text-sm">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Simpan
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+const ROLE_COLORS = {
+  admin:      'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400',
+  hr:         'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400',
+  supervisor: 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400',
+  employee:   'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
 };
 
 export default function SettingsPage() {
-  const { user, logout, isHR } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [showPwModal, setShowPwModal] = useState(false);
+  const [showPw, setShowPw]     = useState(false);
+  const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
+  const [changingPw, setChangePw] = useState(false);
+  const [pwForm, setPwForm]     = useState({ current: '', newPw: '', confirm: '' });
+  const [saving, setSaving]     = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
-    toast.success('Berhasil keluar');
+  const toggleDark = () => {
+    const html = document.documentElement;
+    html.classList.toggle('dark');
+    setDarkMode(html.classList.contains('dark'));
+    localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+  };
+
+  const handleChangePassword = async () => {
+    if (!pwForm.current) { toast.error('Password saat ini wajib'); return; }
+    if (pwForm.newPw.length < 6) { toast.error('Password baru min 6 karakter'); return; }
+    if (pwForm.newPw !== pwForm.confirm) { toast.error('Konfirmasi tidak cocok'); return; }
+    setSaving(true);
+    try {
+      await api.put('/auth/change-password', { current_password: pwForm.current, new_password: pwForm.newPw });
+      toast.success('Password berhasil diubah');
+      setChangePw(false);
+      setPwForm({ current: '', newPw: '', confirm: '' });
+    } catch(e) { toast.error(e.response?.data?.message || 'Gagal mengubah password'); }
+    finally { setSaving(false); }
+  };
+
+  const handleLogout = () => {
+    if (!confirm('Yakin ingin keluar?')) return;
+    logout();
     navigate('/login');
   };
 
+  const Section = ({ label, children }) => (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] px-1 mb-2">{label}</p>
+      <div className="card overflow-hidden divide-y divide-[var(--border-subtle)]">{children}</div>
+    </div>
+  );
+
+  const MenuItem = ({ icon: Icon, label, sub, onClick, right, color='text-[var(--text-secondary)]', danger }) => (
+    <button onClick={onClick}
+      className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--bg-secondary)]/60 ${danger?'hover:bg-red-50 dark:hover:bg-red-950/20':''}`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${danger?'bg-red-100 dark:bg-red-950/50':'bg-[var(--bg-secondary)]'}`}>
+        <Icon size={16} className={danger?'text-red-600':color}/>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-[13.5px] font-semibold ${danger?'text-red-600':''}`}>{label}</p>
+        {sub && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{sub}</p>}
+      </div>
+      {right || <ChevronRight size={15} className="text-[var(--text-muted)] opacity-40 flex-shrink-0"/>}
+    </button>
+  );
+
   return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto space-y-5 animate-slide-up">
-      {/* Profile card */}
-      <div className="card-padded">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600
-            flex items-center justify-center shadow-glow flex-shrink-0">
-            <span className="text-white font-black text-2xl">{user?.name?.[0]}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-black text-[var(--text-primary)] truncate">{user?.name}</h2>
-            <p className="text-sm text-[var(--text-secondary)] truncate">{user?.email}</p>
-            <div className="mt-1.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
-                bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-400">
-                <Shield className="w-3 h-3" />
-                {ROLE_LABEL[user?.role] || user?.role}
+    <div className="w-full animate-fade-in">
+      <div className="page-header mb-6">
+        <h1 className="page-title">Akun</h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── LEFT: Profile card ──────────────────────── */}
+        <div className="lg:col-span-1">
+          <div className="card p-6 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--brand-500)] to-[var(--brand-700)] flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <span className="text-white font-black text-3xl">{user?.name?.[0]?.toUpperCase()}</span>
+            </div>
+            <h2 className="text-lg font-black text-[var(--text-primary)]">{user?.name}</h2>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">{user?.email}</p>
+            <div className="flex justify-center mt-3">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${ROLE_COLORS[user?.role]||ROLE_COLORS.employee}`}>
+                <Shield size={11}/>{ROLE_LABELS[user?.role]||user?.role}
               </span>
+            </div>
+            <div className="mt-4 pt-4 border-t border-[var(--border)]">
+              <p className="text-[11px] text-[var(--text-muted)]">Login terakhir</p>
+              <p className="text-xs font-semibold text-[var(--text-secondary)] mt-0.5">
+                {new Date().toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+              </p>
+            </div>
+          </div>
+
+          {/* App info */}
+          <div className="card p-5 mt-4">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">Aplikasi</p>
+            <div className="space-y-2.5">
+              {[
+                { l:'Nama', v:'GPDISTRO RACING ID' },
+                { l:'Versi', v:'2.0.0 · 2026' },
+                { l:'Platform', v:'ERP & HRD System' },
+              ].map(item => (
+                <div key={item.l} className="flex justify-between">
+                  <span className="text-[12px] text-[var(--text-muted)]">{item.l}</span>
+                  <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{item.v}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-        {user?.last_login && (
-          <p className="text-xs text-[var(--text-muted)] mt-3 border-t border-[var(--border)] pt-3">
-            Login terakhir: {new Date(user.last_login).toLocaleString('id-ID')}
-          </p>
-        )}
+
+        {/* ── RIGHT: Settings ─────────────────────────── */}
+        <div className="lg:col-span-2 space-y-5">
+
+          <Section label="Keamanan">
+            <div>
+              <MenuItem
+                icon={Key}
+                label="Ganti Password"
+                sub="Ubah password login Anda"
+                color="text-amber-600"
+                onClick={() => setChangePw(v => !v)}
+                right={
+                  <span className={`text-[11px] font-semibold transition-colors ${changingPw?'text-[var(--brand-600)]':'text-[var(--text-muted)]'}`}>
+                    {changingPw ? 'Tutup' : 'Ubah'}
+                  </span>
+                }
+              />
+              {changingPw && (
+                <div className="px-5 pb-5 pt-3 space-y-3 bg-[var(--bg-secondary)]/50 border-t border-[var(--border-subtle)]">
+                  {[
+                    { k:'current', l:'Password Saat Ini', ph:'Masukkan password lama' },
+                    { k:'newPw',   l:'Password Baru',     ph:'Min. 6 karakter' },
+                    { k:'confirm', l:'Konfirmasi Password Baru', ph:'Ulangi password baru' },
+                  ].map(f => (
+                    <div key={f.k}>
+                      <label className="field-label">{f.l}</label>
+                      <div className="relative">
+                        <input type={showPw?'text':'password'} value={pwForm[f.k]}
+                          onChange={e=>setPwForm(p=>({...p,[f.k]:e.target.value}))}
+                          placeholder={f.ph} autoComplete="new-password" className="input-base pr-10"/>
+                        {f.k==='newPw' && (
+                          <button type="button" onClick={()=>setShowPw(v=>!v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                            {showPw?<EyeOff size={15}/>:<Eye size={15}/>}
+                          </button>
+                        )}
+                      </div>
+                      {f.k==='confirm' && pwForm.confirm && pwForm.newPw !== pwForm.confirm && (
+                        <p className="text-[11px] text-red-500 mt-1">⚠ Password tidak cocok</p>
+                      )}
+                    </div>
+                  ))}
+                  <button onClick={handleChangePassword} disabled={saving}
+                    className="btn-primary w-full gap-2">
+                    {saving?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>}
+                    Simpan Password Baru
+                  </button>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <Section label="Tampilan">
+            <MenuItem
+              icon={darkMode ? Moon : Sun}
+              label={darkMode ? 'Mode Gelap' : 'Mode Terang'}
+              sub="Klik untuk mengganti tema"
+              color={darkMode?'text-indigo-600':'text-amber-500'}
+              onClick={toggleDark}
+              right={
+                <div onClick={toggleDark} className={`w-11 h-6 rounded-full transition-all duration-300 flex items-center px-0.5 cursor-pointer ${darkMode?'bg-[var(--brand-600)]':'bg-slate-200 dark:bg-slate-700'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform duration-300 ${darkMode?'translate-x-5':'translate-x-0'}`}/>
+                </div>
+              }
+            />
+          </Section>
+
+          <Section label="Laporan">
+            <MenuItem
+              icon={BarChart3}
+              label="Buka Laporan & Analitik"
+              sub="Data absensi, gaji, cuti, karyawan"
+              color="text-[var(--brand-600)]"
+              onClick={() => navigate('/reports')}
+            />
+          </Section>
+
+          <Section label="Aksi">
+            <MenuItem
+              icon={LogOut}
+              label="Keluar"
+              sub="Logout dari akun ini"
+              danger
+              onClick={handleLogout}
+            />
+          </Section>
+        </div>
       </div>
-
-      {/* Akun */}
-      <Section title="Akun">
-        <SettingRow icon={Lock} label="Ganti Password"
-          sublabel="Ubah password login Anda"
-          iconBg="bg-amber-100 dark:bg-amber-950"
-          onClick={() => setShowPwModal(true)} />
-      </Section>
-
-      {/* Tampilan */}
-      <Section title="Tampilan">
-        <SettingRow
-          icon={isDark ? Moon : Sun}
-          label={isDark ? 'Mode Gelap' : 'Mode Terang'}
-          sublabel="Klik untuk mengganti tema"
-          iconBg="bg-indigo-100 dark:bg-indigo-950"
-          onClick={toggleTheme}
-        >
-          <div className={`w-10 h-5.5 rounded-full transition-colors relative flex-shrink-0 ${isDark ? 'bg-brand-500' : 'bg-[var(--border)]'}`}
-            style={{ height: '22px' }}>
-            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isDark ? 'left-[calc(100%-18px)]' : 'left-0.5'}`} />
-          </div>
-        </SettingRow>
-      </Section>
-
-      {/* Laporan — for admin/HR */}
-      {(isHR || user?.role === 'admin') && (
-        <Section title="Laporan">
-          <SettingRow icon={BarChart3} label="Buka Laporan & Analitik"
-            sublabel="Data absensi, gaji, cuti, karyawan"
-            iconBg="bg-indigo-100 dark:bg-indigo-950"
-            onClick={() => navigate('/reports')} />
-        </Section>
-      )}
-
-      {/* Info aplikasi */}
-      <Section title="Aplikasi">
-        <SettingRow icon={Info} label="HRD Lite Professional"
-          sublabel="Versi 1.0.0 · 2024"
-          iconBg="bg-[var(--bg-tertiary)]"
-        />
-      </Section>
-
-      {/* Logout */}
-      <Section title="Aksi">
-        <SettingRow icon={LogOut} label="Keluar" sublabel="Logout dari akun ini"
-          danger onClick={handleLogout} />
-      </Section>
-
-      {showPwModal && <ChangePasswordModal onClose={() => setShowPwModal(false)} />}
     </div>
   );
 }

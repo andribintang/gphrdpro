@@ -84,20 +84,19 @@ export default function CompanySettingsPage() {
   };
 
   return (
-    <div className="max-w-lg lg:max-w-3xl mx-auto space-y-5 animate-slide-up">
+    <div className="w-full animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Pengaturan Perusahaan</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Branding, logo & info perusahaan</p>
+          <h1 className="page-title">Pengaturan Perusahaan</h1>
+          <p className="body-sm text-[var(--text-muted)]">Branding, logo & info perusahaan</p>
         </div>
-        <button onClick={handleSave} disabled={saving}
-          className="btn-primary h-9 px-4 text-sm disabled:opacity-60">
-          {saving
-            ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
-            : <><Save className="w-4 h-4" /> Simpan</>}
+        <button onClick={handleSave} disabled={saving} className="btn-primary gap-2 disabled:opacity-60">
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin" />Menyimpan...</> : <><Save className="w-4 h-4" />Simpan</>}
         </button>
       </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="space-y-5">
 
       {/* ── Logo Upload ─────────────────────────────────────── */}
       <div className="card p-5 space-y-4">
@@ -211,7 +210,9 @@ export default function CompanySettingsPage() {
       </div>
 
       {/* ── App Identity ────────────────────────────────────── */}
-      <div className="card p-5 space-y-4">
+      </div>
+      <div className="space-y-5">
+            <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <Building2 className="w-4 h-4 text-brand-500" />
           <h3 className="text-sm font-bold text-[var(--text-primary)]">Identitas Aplikasi</h3>
@@ -276,6 +277,8 @@ export default function CompanySettingsPage() {
       <p className="text-xs text-[var(--text-muted)] text-center pb-4">
         Perubahan warna brand berlaku setelah halaman di-refresh
       </p>
+    </div>
+      </div>
     </div>
   );
 }
