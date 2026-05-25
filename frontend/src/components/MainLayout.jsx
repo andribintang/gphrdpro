@@ -397,7 +397,6 @@ export default function MainLayout() {
         </main>
       </div>
       <BottomNav />
-      </div>
     </div>
   );
 }
