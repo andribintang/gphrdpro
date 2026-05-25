@@ -214,7 +214,7 @@ function CameraModal({ mode, onCapture, onClose, registeredDescriptor }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}>
-      <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] overflow-hidden animate-slide-up"
+      <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] overflow-y-auto max-h-[92dvh] animate-slide-up"
         onClick={e => e.stopPropagation()}>
         {/* Handle */}
         <div className="flex justify-center pt-3 sm:hidden">
@@ -317,7 +317,7 @@ function CameraModal({ mode, onCapture, onClose, registeredDescriptor }) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 space-y-3">
+        <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom)+60px)] sm:pb-4 space-y-3">
           <p className="text-xs text-center text-[var(--text-muted)]">{cfg.hint}</p>
 
           {mode === 'register' || !registeredDescriptor ? (
