@@ -712,7 +712,7 @@ const LoanTab = () => {
     start_date: new Date().toISOString().split('T')[0], description:'',
   });
 
-  const fetch = useCallback(async () => {
+  const loadLoans = useCallback(async () => {
     setLoading(true);
     try {
       const res = canManage
@@ -723,12 +723,12 @@ const LoanTab = () => {
   }, [filterStatus, canManage]);
 
   useEffect(() => {
-    fetch();
+    loadLoans();
     if (canManage) {
-      fetch('/api/employees?status=active', { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } })
+      window.fetch('/api/employees?status=active', { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } })
         .then(r => r.json()).then(r => { if(r.success) setEmployees(r.data.employees || []); }).catch(() => {});
     }
-  }, [fetch]);
+  }, [loadLoans]);
 
   const handleAdd = async () => {
     if (!form.total_amount || !form.monthly_installment) { toast.error('Jumlah dan cicilan wajib diisi'); return; }
@@ -736,12 +736,12 @@ const LoanTab = () => {
       await payrollEngineService.createLoan(form);
       toast.success('Pinjaman berhasil diajukan');
       setShowAdd(false);
-      fetch();
+      loadLoans();
     } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
   };
 
   const handleApprove = async (id) => {
-    try { await payrollEngineService.approveLoan(id); toast.success('Pinjaman disetujui'); fetch(); }
+    try { await payrollEngineService.approveLoan(id); toast.success('Pinjaman disetujui'); loadLoans(); }
     catch { toast.error('Gagal'); }
   };
 
