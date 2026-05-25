@@ -23,6 +23,16 @@ const CompanySetting = sequelize.define('CompanySetting', {
     defaultValue: '#e11d48',
     comment: 'Hex warna utama brand',
   },
+  sidebar_color: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'default',
+    comment: 'Tema warna sidebar: default|brand|dark|slate|navy',
+  },
+  topbar_color: {
+    type: DataTypes.STRING(20),
+    defaultValue: 'default',
+    comment: 'Tema warna topbar/header: default|brand|dark|slate|glass',
+  },
   favicon_url: { type: DataTypes.STRING(500), allowNull: true },
 
   // App config

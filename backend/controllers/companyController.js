@@ -56,7 +56,7 @@ const updateSettings = async (req, res, next) => {
     const {
       company_name, company_tagline, company_address,
       company_phone, company_email, company_website,
-      app_name, primary_color, logo_base64,
+      app_name, primary_color, sidebar_color, topbar_color, logo_base64,
     } = req.body;
 
     let logoUrl = s.logo_url;
@@ -84,6 +84,8 @@ const updateSettings = async (req, res, next) => {
       company_website: company_website ?? s.company_website,
       app_name:        app_name        ?? s.app_name,
       primary_color:   primary_color   ?? s.primary_color,
+      sidebar_color:   sidebar_color   ?? s.sidebar_color,
+      topbar_color:    topbar_color    ?? s.topbar_color,
       logo_url:        logoUrl,
     });
 
