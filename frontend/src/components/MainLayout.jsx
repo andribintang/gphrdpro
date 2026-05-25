@@ -6,7 +6,7 @@ import {
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
-  RotateCcw, LayoutList, Layers, Target, Zap,
+  RotateCcw, LayoutList, Layers, Target, Zap, Plus,
   PanelLeftClose, PanelLeftOpen, Shield
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
@@ -271,6 +271,69 @@ const Sidebar = ({ collapsed, onToggle, onClose, isOnErp }) => {
   );
 };
 
+// ── Bottom Navigation Bar (mobile only) ───────────────────────
+const BottomNav = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const role = user?.role;
+
+  const isActive = (path, exact = false) =>
+    exact ? location.pathname === path : location.pathname === path || location.pathname.startsWith(path + '/');
+
+  return (
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
+      style={{
+        background: 'var(--topbar-bg)',
+        borderTop: '1px solid var(--topbar-border)',
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        height: 'calc(60px + env(safe-area-inset-bottom))',
+      }}>
+
+      {/* Home — Dashboard ERP */}
+      <button onClick={() => navigate('/erp')}
+        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/erp', true) ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
+        <Home size={20} strokeWidth={isActive('/erp', true) ? 2.5 : 1.8} />
+        <span className="text-[10px] font-medium leading-none">Home</span>
+        {isActive('/erp', true) && <span className="absolute bottom-[calc(env(safe-area-inset-bottom)+56px)] w-5 h-0.5 rounded-full bg-[var(--brand-600)]" />}
+      </button>
+
+      {/* Check IN/Out — Absensi */}
+      <button onClick={() => navigate('/attendance')}
+        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/attendance') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
+        <Clock size={20} strokeWidth={isActive('/attendance') ? 2.5 : 1.8} />
+        <span className="text-[10px] font-medium leading-none">Check In</span>
+      </button>
+
+      {/* +Sales — Input New Order (center FAB style) */}
+      <button onClick={() => navigate('/erp/orders/new')}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 -mt-4 relative">
+        <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90"
+          style={{ background: `linear-gradient(135deg, var(--brand-500), var(--brand-700))` }}>
+          <Plus size={22} strokeWidth={2.5} className="text-white" />
+        </div>
+        <span className="text-[10px] font-medium leading-none mt-0.5 text-[var(--brand-600)]">+Sales</span>
+      </button>
+
+      {/* Salary — Slip Gaji */}
+      <button onClick={() => navigate('/payroll-pro')}
+        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/payroll-pro') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
+        <DollarSign size={20} strokeWidth={isActive('/payroll-pro') ? 2.5 : 1.8} />
+        <span className="text-[10px] font-medium leading-none">Salary</span>
+      </button>
+
+      {/* Akun */}
+      <button onClick={() => navigate('/settings')}
+        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/settings') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
+        <Settings size={20} strokeWidth={isActive('/settings') ? 2.5 : 1.8} />
+        <span className="text-[10px] font-medium leading-none">Akun</span>
+      </button>
+
+    </nav>
+  );
+};
+
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -328,10 +391,12 @@ export default function MainLayout() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto scrollbar-thin">
-          <div className="page-container py-4 lg:py-5 animate-fade-in">
+          <div className="page-container py-4 lg:py-5 pb-[80px] lg:pb-5 animate-fade-in">
             <Outlet />
           </div>
         </main>
+      </div>
+      <BottomNav />
       </div>
     </div>
   );
