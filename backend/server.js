@@ -167,6 +167,29 @@ app.post('/run-alter', async (req, res) => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`,
+      // Create loan_management table for kasbon feature
+      `CREATE TABLE IF NOT EXISTS loan_management (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        type ENUM('kasbon','hutang') DEFAULT 'kasbon',
+        total_amount DECIMAL(15,2) NOT NULL,
+        remaining_amount DECIMAL(15,2) NOT NULL,
+        monthly_installment DECIMAL(15,2) NOT NULL,
+        installment_count INT DEFAULT 0,
+        total_installments INT NOT NULL,
+        loan_date DATE NOT NULL,
+        start_date DATE NOT NULL,
+        end_date DATE NULL,
+        status ENUM('pending','active','completed','cancelled') DEFAULT 'pending',
+        approved_by INT NULL,
+        approved_at DATETIME NULL,
+        description TEXT NULL,
+        installment_history JSON,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_loan_user (user_id),
+        INDEX idx_loan_status (status)
+      )`,
     ];
 
     for (const sql of alters) {
