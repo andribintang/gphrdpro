@@ -14,6 +14,7 @@ const payrollRoutes    = require('./routes/payroll');
 const employeeRoutes   = require('./routes/employees');
 const departmentRoutes = require('./routes/departments');
 const reportsRoutes      = require('./routes/reports');
+const storeRoutes = require('./routes/store');   // di bagian require
 const payrollEngineRoutes = require('./routes/payrollEngine');
 const incentiveRoutes      = require('./routes/incentive');
 const companyRoutes        = require('./routes/company');
@@ -115,6 +116,241 @@ app.post('/run-alter', async (req, res) => {
     const errors  = [];
 
     const alters = [
+      `CREATE TABLE IF NOT EXISTS store_config (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  brand ENUM('gpdistro','gpracing') NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL,
+  tagline VARCHAR(200),
+  logo_url TEXT,
+  favicon_url TEXT,
+  primary_color VARCHAR(20) DEFAULT '#e11d48',
+  domain VARCHAR(100),
+  whatsapp VARCHAR(20),
+  email VARCHAR(100),
+  address TEXT,
+  meta_title VARCHAR(200),
+  meta_desc TEXT,
+  is_active TINYINT(1) DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_categories (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  brand ENUM('gpdistro','gpracing') NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(120) NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  parent_id INT NULL,
+  sort_order INT DEFAULT 0,
+  is_active TINYINT(1) DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sc_brand (brand),
+  INDEX idx_sc_parent (parent_id)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  brand ENUM('gpdistro','gpracing') NOT NULL,
+  category_id INT NULL,
+  erp_product_id INT NULL,
+  name VARCHAR(200) NOT NULL,
+  slug VARCHAR(220) NOT NULL UNIQUE,
+  sku VARCHAR(50),
+  description TEXT,
+  short_desc VARCHAR(500),
+  price DECIMAL(15,2) NOT NULL DEFAULT 0,
+  price_compare DECIMAL(15,2) DEFAULT 0,
+  weight INT DEFAULT 500,
+  stock INT DEFAULT 0,
+  images JSON,
+  variants JSON,
+  tags JSON,
+  is_featured TINYINT(1) DEFAULT 0,
+  is_active TINYINT(1) DEFAULT 1,
+  sold_count INT DEFAULT 0,
+  view_count INT DEFAULT 0,
+  meta_title VARCHAR(200),
+  meta_desc TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sp_brand (brand),
+  INDEX idx_sp_category (category_id),
+  INDEX idx_sp_active (is_active),
+  FULLTEXT idx_sp_search (name)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_banners (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  brand ENUM('gpdistro','gpracing') NOT NULL,
+  title VARCHAR(150),
+  subtitle VARCHAR(250),
+  image_url TEXT NOT NULL,
+  image_mobile_url TEXT,
+  link_url TEXT,
+  sort_order INT DEFAULT 0,
+  is_active TINYINT(1) DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_customers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  phone VARCHAR(20),
+  password VARCHAR(255) NOT NULL,
+  avatar_url TEXT,
+  is_active TINYINT(1) DEFAULT 1,
+  email_verified_at DATETIME NULL,
+  last_login_at DATETIME NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_scust_email (email)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_addresses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT NOT NULL,
+  label VARCHAR(50) DEFAULT 'Rumah',
+  recipient VARCHAR(100) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  province_id INT,
+  province VARCHAR(100),
+  city_id INT,
+  city VARCHAR(100),
+  district VARCHAR(100),
+  postal_code VARCHAR(10),
+  address TEXT NOT NULL,
+  is_default TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_saddr_customer (customer_id)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_carts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT NULL,
+  session_id VARCHAR(100) NULL,
+  brand ENUM('gpdistro','gpracing') NOT NULL,
+  product_id INT NOT NULL,
+  variant JSON,
+  quantity INT NOT NULL DEFAULT 1,
+  price DECIMAL(15,2) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_scart_customer (customer_id),
+  INDEX idx_scart_session (session_id)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_vouchers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  brand ENUM('gpdistro','gpracing') NOT NULL,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  type ENUM('percent','fixed','free_ongkir') NOT NULL,
+  value DECIMAL(15,2) DEFAULT 0,
+  min_purchase DECIMAL(15,2) DEFAULT 0,
+  max_discount DECIMAL(15,2) DEFAULT 0,
+  quota INT DEFAULT 0,
+  used_count INT DEFAULT 0,
+  valid_from DATETIME,
+  valid_until DATETIME,
+  is_active TINYINT(1) DEFAULT 1,
+  description VARCHAR(200),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_svoucher_code (code)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  brand ENUM('gpdistro','gpracing') NOT NULL,
+  order_number VARCHAR(30) NOT NULL UNIQUE,
+  customer_id INT NULL,
+  customer_name VARCHAR(100) NOT NULL,
+  customer_email VARCHAR(150) NOT NULL,
+  customer_phone VARCHAR(20) NOT NULL,
+  shipping_address TEXT NOT NULL,
+  shipping_city VARCHAR(100),
+  shipping_province VARCHAR(100),
+  shipping_postal VARCHAR(10),
+  shipping_courier VARCHAR(50),
+  shipping_service VARCHAR(50),
+  shipping_cost DECIMAL(15,2) DEFAULT 0,
+  shipping_etd VARCHAR(50),
+  tracking_number VARCHAR(100),
+  subtotal DECIMAL(15,2) NOT NULL,
+  discount DECIMAL(15,2) DEFAULT 0,
+  voucher_code VARCHAR(50),
+  total DECIMAL(15,2) NOT NULL,
+  status ENUM('pending','paid','processing','shipped','delivered','cancelled','refunded') DEFAULT 'pending',
+  payment_status ENUM('unpaid','paid','partial','refunded') DEFAULT 'unpaid',
+  payment_method VARCHAR(50),
+  midtrans_order_id VARCHAR(100),
+  midtrans_token TEXT,
+  midtrans_redirect TEXT,
+  paid_at DATETIME,
+  notes TEXT,
+  erp_order_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sorder_brand (brand),
+  INDEX idx_sorder_customer (customer_id),
+  INDEX idx_sorder_status (status),
+  INDEX idx_sorder_midtrans (midtrans_order_id)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_order_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT NOT NULL,
+  product_id INT NOT NULL,
+  product_name VARCHAR(200) NOT NULL,
+  product_image TEXT,
+  sku VARCHAR(50),
+  variant JSON,
+  price DECIMAL(15,2) NOT NULL,
+  quantity INT NOT NULL,
+  subtotal DECIMAL(15,2) NOT NULL,
+  INDEX idx_soi_order (order_id)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_payments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT NOT NULL,
+  midtrans_order_id VARCHAR(100),
+  transaction_id VARCHAR(100),
+  payment_type VARCHAR(50),
+  amount DECIMAL(15,2) NOT NULL,
+  status VARCHAR(30),
+  raw_response JSON,
+  paid_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_spay_order (order_id)
+)`,
+
+`CREATE TABLE IF NOT EXISTS store_reviews (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  order_id INT NOT NULL,
+  customer_id INT NOT NULL,
+  customer_name VARCHAR(100),
+  rating TINYINT NOT NULL,
+  comment TEXT,
+  images JSON,
+  is_approved TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_srev_product (product_id)
+)`,
+
+// Seed default store configs
+`INSERT IGNORE INTO store_config (brand, name, tagline, primary_color, domain, is_active) VALUES
+  ('gpdistro', 'GPDISTRO', 'Fashion & Digital Printing', '#1a1a2e', 'gpdistro.com', 1),
+  ('gpracing', 'GP RACING STORE', 'Spare Part Motor Racing', '#dc2626', 'gpracingstore.com', 1)`,
+  
       // Add employment_status to inc_employees
       `ALTER TABLE inc_employees ADD COLUMN employment_status ENUM('magang','training','kontrak','tetap') NOT NULL DEFAULT 'kontrak'`,
       // Add eligible_statuses to inc_bonus_targets
@@ -509,6 +745,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves',     leaveRoutes);
 app.use('/api/payroll',    payrollRoutes);
 app.use('/api/employees',  employeeRoutes);
+app.use('/api/store', storeRoutes);               // di bagian app.use
 app.use('/api/departments', departmentRoutes);
 app.use('/api/reports',       reportsRoutes);
 app.use('/api/payroll-engine', payrollEngineRoutes);

@@ -13,6 +13,11 @@ const EmployeeAllowance  = require('./EmployeeAllowance');
 const PayrollRun         = require('./PayrollRun');
 const PayrollItem        = require('./PayrollItem');
 const LoanManagement     = require('./LoanManagement');
+const {
+  StoreConfig, StoreCategory, StoreProduct, StoreBanner,
+  StoreCustomer, StoreAddress, StoreCart, StoreVoucher,
+  StoreOrder, StoreOrderItem, StorePayment, StoreReview,
+} = require('./store');
 const { IncentiveParameter, IncentiveEmployeeRate } = require('./IncentiveParameter');
 
 // User <-> Employee
@@ -60,5 +65,7 @@ module.exports = {
   PayrollSetting, PayrollComponent, EmployeeAllowance,
   PayrollRun, PayrollItem, LoanManagement,
   IncentiveParameter, IncentiveEmployeeRate,
-  CompanySetting,
+  CompanySetting,StoreConfig, StoreCategory, StoreProduct, StoreBanner, 
+  StoreCustomer, StoreAddress, StoreCart, StoreVoucher,
+  StoreOrder, StoreOrderItem, StorePayment, StoreReview,
 };
