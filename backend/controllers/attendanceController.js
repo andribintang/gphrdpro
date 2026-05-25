@@ -8,7 +8,7 @@ const DEFAULT_RADIUS = 100;
 
 const getWIBNow = () => new Date(Date.now() + 7 * 3600000);
 const getTodayWIB = () => getWIBNow().toISOString().split('T')[0];
-const getTimeString = (d) => new Date(d.getTime() + 7 * 3600000).toISOString().split('T')[1].split('.')[0];
+const getTimeString = (d) => d.toISOString().split('T')[1].split('.')[0]; // d is already WIB (from getWIBNow)
 
 const determineStatus = (timeStr, deadline = '08:05') => {
   const [h, m] = timeStr.split(':').map(Number);
@@ -32,36 +32,64 @@ const calcWorkHours = (checkIn, checkOut, breakMins = 0) => {
   return Math.max(0, Math.round((mins / 60) * 100) / 100);
 };
 
-const uploadToCloudinary = async (base64Image, folder = 'attendance') => {
-  return new Promise((resolve) => {
+const uploadToCloudinary = async (base64Image) => {
+  try {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    const preset = process.env.CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
-    if (!cloudName || !base64Image) { resolve(null); return; }
+    const apiKey    = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (!cloudName || !apiKey || !apiSecret || !base64Image) return null;
 
     const imageData = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const body = JSON.stringify({
-      file: `data:image/jpeg;base64,${imageData}`,
-      upload_preset: preset,
-      folder,
-      transformation: 'w_400,h_400,c_fill,g_face',
-    });
+    const imgBuffer = Buffer.from(imageData, 'base64');
+    const timestamp = Math.floor(Date.now() / 1000);
+    const crypto    = require('crypto');
+    const signature = crypto.createHash('sha1')
+      .update(`timestamp=${timestamp}${apiSecret}`)
+      .digest('hex');
 
-    const req = https.request({
-      hostname: 'api.cloudinary.com',
-      path: `/v1_1/${cloudName}/image/upload`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, (res) => {
-      let data = '';
-      res.on('data', d => { data += d; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data).secure_url || null); } catch { resolve(null); }
+    // Use multipart/form-data (more reliable than JSON for binary)
+    const boundary = `----FormBoundary${Date.now()}`;
+    const parts = [
+      `--${boundary}\r\nContent-Disposition: form-data; name="api_key"\r\n\r\n${apiKey}`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="timestamp"\r\n\r\n${timestamp}`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="signature"\r\n\r\n${signature}`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="photo.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`,
+    ];
+
+    const textBuf = Buffer.from(parts.join('\r\n'), 'utf8');
+    const endBuf  = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
+    const body    = Buffer.concat([textBuf, imgBuffer, endBuf]);
+
+    return await new Promise((resolve) => {
+      const req = https.request({
+        hostname: 'api.cloudinary.com',
+        path: `/v1_1/${cloudName}/image/upload`,
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': body.length,
+        },
+      }, (res) => {
+        let data = '';
+        res.on('data', d => data += d);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.secure_url) {
+              console.log('[Cloudinary] Upload OK:', result.secure_url);
+              resolve(result.secure_url);
+            } else {
+              console.error('[Cloudinary] Failed:', JSON.stringify(result).substring(0, 200));
+              resolve(null);
+            }
+          } catch(e) { console.error('[Cloudinary] Parse error:', e.message); resolve(null); }
+        });
       });
+      req.on('error', (e) => { console.error('[Cloudinary] Error:', e.message); resolve(null); });
+      req.setTimeout(20000, () => { req.destroy(); resolve(null); });
+      req.write(body); req.end();
     });
-    req.on('error', () => resolve(null));
-    req.setTimeout(15000, () => { req.destroy(); resolve(null); });
-    req.write(body); req.end();
-  });
+  } catch(e) { console.error('[Cloudinary] Exception:', e.message); return null; }
 };
 
 const getOfficeCfg = async () => {
@@ -87,7 +115,7 @@ const checkIn = async (req, res, next) => {
       locationVerified = distanceFromOffice <= parseInt(office.radius || DEFAULT_RADIUS);
     }
 
-    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance/check-in') : null;
+    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance_checkin') : null;
     const checkInTime = getTimeString(now);
     const status = determineStatus(checkInTime, office.check_in_deadline || '08:05');
 
@@ -135,7 +163,7 @@ const checkOut = async (req, res, next) => {
 
     const { lat, lng, selfie_base64, face_verified = false } = req.body;
     const checkOutTime = getTimeString(now);
-    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance/check-out') : null;
+    const selfieUrl = selfie_base64 ? await uploadToCloudinary(selfie_base64, 'attendance_checkout') : null;
     const workHours = calcWorkHours(attendance.check_in, checkOutTime, breakMins);
 
     await attendance.update({
@@ -288,4 +316,38 @@ const getAdminMonthly = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus };
+
+// ── Get ALL employees attendance for a month (admin/HR) ──────
+const getAllAttendances = async (req, res, next) => {
+  try {
+    const { month, year, branch_id, status } = req.query;
+    const y = parseInt(year  || new Date().getFullYear());
+    const m = parseInt(month || new Date().getMonth() + 1);
+    const from = `${y}-${String(m).padStart(2,'0')}-01`;
+    const to   = new Date(y, m, 0).toISOString().split('T')[0];
+
+    const where = { date: { [Op.between]: [from, to] } };
+    if (status) where.status = status;
+
+    const empWhere = branch_id ? { branch_id } : undefined;
+
+    const records = await Attendance.findAll({
+      where,
+      include: [{
+        model: User, as: 'user',
+        attributes: ['id','name','email','role'],
+        required: false,
+        include: [{
+          model: Employee, as: 'employee',
+          required: false,
+          
+        }],
+      }],
+      order: [['date','DESC'],['check_in','ASC']],
+    });
+
+    return res.json({ success: true, data: { records, period: { year: y, month: m, from, to }, total: records.length } });
+  } catch (err) { next(err); }
+};
+
+module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getAllAttendances, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus };

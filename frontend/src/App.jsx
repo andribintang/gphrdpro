@@ -4,10 +4,13 @@ import { AuthProvider } from './context/AuthContext';
 import { CompanyProvider } from './context/CompanyContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import MainLayout  from './components/MainLayout';
+import MainLayout from './components/MainLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import AttendancePage from './pages/AttendancePage';
+import AttendancePage      from './pages/AttendancePage';
+import AttendanceAdminPage from './pages/AttendanceAdminPage';
+import UserAccessPage      from './pages/UserAccessPage';
+import DepartmentsPage     from './pages/DepartmentsPage';
 import LeavesPage from './pages/LeavesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -26,16 +29,24 @@ import OrdersPage      from './pages/erp/OrdersPage';
 import NewOrderPage    from './pages/erp/NewOrderPage';
 import OrderDetailPage from './pages/erp/OrderDetailPage';
 import CustomersPage   from './pages/erp/CustomersPage';
-import SalesReportPage  from './pages/erp/SalesReportPage';
-import DailyReportPage  from './pages/erp/DailyReportPage';
+import SalesReportPage from './pages/erp/SalesReportPage';
 import ImportPage      from './pages/erp/ImportPage';
 import PurchasesPage   from './pages/erp/PurchasesPage';
 import ExpensesPage    from './pages/erp/ExpensesPage';
 import ProfitLossPage  from './pages/erp/ProfitLossPage';
-import StockOpnamePage  from './pages/erp/StockOpnamePage';
-import ErpMasterPage   from './pages/erp/MasterDataPage';
+import StockOpnamePage from './pages/erp/StockOpnamePage';
 import ShipmentsPage   from './pages/erp/ShipmentsPage';
 import ReturnsPage     from './pages/erp/ReturnsPage';
+import ErpMasterPage   from './pages/erp/MasterDataPage';
+import DailyReportPage  from './pages/erp/DailyReportPage';
+import ChannelReportPage from './pages/erp/ChannelReportPage';
+
+
+// ── Device-aware default redirect ────────────────────────────
+function DeviceRedirect() {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  return <Navigate to={isMobile ? '/dashboard' : '/erp/dashboard'} replace />;
+}
 
 export default function App() {
   return (
@@ -47,16 +58,19 @@ export default function App() {
 
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<DeviceRedirect />} />
 
-              {/* ALL protected routes inside MainLayout — sidebar always visible */}
+              {/* ALL protected routes inside MainLayout */}
               <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
 
-                {/* ── Dashboard ── */}
+                {/* Dashboard */}
                 <Route path="dashboard" element={<DashboardPage />} />
 
-                {/* ── HRD ── */}
+                {/* HRD */}
                 <Route path="attendance" element={<AttendancePage />} />
+                <Route path="attendance-admin" element={
+                  <ProtectedRoute roles={['admin','hr']}><AttendanceAdminPage /></ProtectedRoute>
+                } />
                 <Route path="leaves" element={<LeavesPage />} />
                 <Route path="payroll" element={<Navigate to="/payroll-pro" replace />} />
                 <Route path="employees" element={
@@ -69,8 +83,14 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><PayrollEnginePage /></ProtectedRoute>
                 } />
 
-                {/* ── Pengaturan ── */}
+                {/* Pengaturan */}
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="departments" element={
+                  <ProtectedRoute roles={['admin','hr']}><DepartmentsPage /></ProtectedRoute>
+                } />
+                <Route path="user-access" element={
+                  <ProtectedRoute roles={['admin','hr']}><UserAccessPage /></ProtectedRoute>
+                } />
                 <Route path="company-settings" element={
                   <ProtectedRoute roles={['admin']}><CompanySettingsPage /></ProtectedRoute>
                 } />
@@ -78,7 +98,7 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr']}><PayrollComponentManager /></ProtectedRoute>
                 } />
 
-                {/* ── Insentif ── */}
+                {/* Insentif */}
                 <Route path="incentive" element={
                   <ProtectedRoute roles={['admin','hr']}><IncentiveDashboard /></ProtectedRoute>
                 } />
@@ -95,15 +115,15 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr']}><InputDataPage /></ProtectedRoute>
                 } />
                 <Route path="incentive/results/:periodId" element={
-                  <ProtectedRoute roles={['admin','hr']}><ResultsPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','employee']}><ResultsPage /></ProtectedRoute>
                 } />
 
-                {/* ── ERP — di dalam MainLayout, sidebar selalu tampil ── */}
+                {/* ERP */}
                 <Route path="erp" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ErpDashboard /></ProtectedRoute>
                 } />
                 <Route path="erp/products" element={
-                  <ProtectedRoute roles={['admin','hr']}><ProductsPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ProductsPage /></ProtectedRoute>
                 } />
                 <Route path="erp/orders" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrdersPage /></ProtectedRoute>
@@ -115,43 +135,46 @@ export default function App() {
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><OrderDetailPage /></ProtectedRoute>
                 } />
                 <Route path="erp/customers" element={
-                  <ProtectedRoute roles={['admin','hr']}><CustomersPage /></ProtectedRoute>
-                } />
-                <Route path="erp/daily-report" element={
-                  <ProtectedRoute roles={['admin','hr']}><DailyReportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><CustomersPage /></ProtectedRoute>
                 } />
                 <Route path="erp/reports" element={
-                  <ProtectedRoute roles={['admin','hr']}><SalesReportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><SalesReportPage /></ProtectedRoute>
                 } />
                 <Route path="erp/import" element={
-                  <ProtectedRoute roles={['admin','hr']}><ImportPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ImportPage /></ProtectedRoute>
                 } />
                 <Route path="erp/purchases" element={
-                  <ProtectedRoute roles={['admin','hr']}><PurchasesPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><PurchasesPage /></ProtectedRoute>
                 } />
                 <Route path="erp/expenses" element={
-                  <ProtectedRoute roles={['admin','hr']}><ExpensesPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ExpensesPage /></ProtectedRoute>
                 } />
                 <Route path="erp/profit-loss" element={
-                  <ProtectedRoute roles={['admin','hr']}><ProfitLossPage /></ProtectedRoute>
-                } />
-                <Route path="erp/master"       element={
-                  <ProtectedRoute roles={['admin','hr']}><ErpMasterPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><ProfitLossPage /></ProtectedRoute>
                 } />
                 <Route path="erp/stock-opname" element={
-                  <ProtectedRoute roles={['admin','hr']}><StockOpnamePage /></ProtectedRoute>
-                } />
-                <Route path="erp/returns" element={
-                  <ProtectedRoute roles={['admin','hr','supervisor']}><ReturnsPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><StockOpnamePage /></ProtectedRoute>
                 } />
                 <Route path="erp/shipments" element={
-                  <ProtectedRoute roles={['admin','hr','supervisor']}><ShipmentsPage /></ProtectedRoute>
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ShipmentsPage /></ProtectedRoute>
+                } />
+                <Route path="erp/returns" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ReturnsPage /></ProtectedRoute>
+                } />
+                <Route path="erp/master" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ErpMasterPage /></ProtectedRoute>
+                } />
+                <Route path="erp/daily-report" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><DailyReportPage /></ProtectedRoute>
+                } />
+                <Route path="erp/report-channel" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ChannelReportPage /></ProtectedRoute>
                 } />
 
-                {/* 404 → dashboard */}
+                {/* 404 */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
-              </Route>{/* end MainLayout */}
+              </Route>
 
             </Routes>
           </CompanyProvider>

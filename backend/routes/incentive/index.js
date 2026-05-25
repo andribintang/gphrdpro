@@ -5,10 +5,16 @@ const master = require('../../controllers/incentive/masterController');
 const trans  = require('../../controllers/incentive/transactionController');
 
 router.use(authenticate);
+// Results accessible by employee (own data)
+router.get('/results',     authenticate, authorize('admin','hr','employee'), trans.getResults);
+router.get('/results/:id', authenticate, authorize('admin','hr','employee'), trans.getResultDetail);
+
+// All other incentive routes require admin/hr
 router.use(authorize('admin', 'hr'));
 
 // ── Dashboard ────────────────────────────────────────────────
 router.get('/dashboard', trans.getDashboardStats);
+router.post('/sync-erp/:period_id', trans.syncFromERP);
 
 // ── Master: Branches ─────────────────────────────────────────
 router.get('/branches',     master.getBranches);
@@ -78,7 +84,6 @@ router.post('/activities',       trans.createActivity);
 router.delete('/activities/:id', trans.deleteActivity);
 
 // ── Results / Slips ──────────────────────────────────────────
-router.get('/results',     trans.getResults);
-router.get('/results/:id', trans.getResultDetail);
+// Results routes moved above for employee access
 
 module.exports = router;

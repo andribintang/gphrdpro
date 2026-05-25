@@ -1,4 +1,3 @@
-// v2.1 — sub channel selector fix
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,86 +7,130 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { erpService, toRp, toRpShort, CHANNELS, PAYMENT_METHODS } from '../../utils/erp/erpService';
-import { useAuth } from '../../context/AuthContext';
 
+// ── Add Customer Modal ────────────────────────────────────────
+const AddCustomerModal = ({ onClose, onAdd }) => {
+  const [form, setForm] = useState({ name:'', phone:'', city:'' });
+  const [saving, setSaving] = useState(false);
+  const handle = async () => {
+    if (!form.name.trim()) { toast.error('Nama wajib'); return; }
+    setSaving(true);
+    try {
+      const res = await erpService.createCustomer(form);
+      toast.success('Pelanggan ditambahkan');
+      onAdd(res.data.data.customer);
+      onClose();
+    } catch(e) { toast.error(e.response?.data?.message||'Gagal'); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop"/>
+      <div className="modal-box max-w-sm" onClick={e=>e.stopPropagation()}>
+        <div className="modal-header"><h3 className="text-sm font-bold">Tambah Pelanggan Baru</h3><button onClick={onClose} className="btn-icon-sm"><X size={14}/></button></div>
+        <div className="modal-body">
+          <div><label className="field-label">Nama *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="input-base" autoFocus/></div>
+          <div><label className="field-label">No. HP</label><input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} className="input-base" type="tel"/></div>
+          <div><label className="field-label">Kota</label><input value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} className="input-base"/></div>
+        </div>
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handle} disabled={saving} className="btn-primary flex-1">{saving?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>} Tambah</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
 export default function NewOrderPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
-  const [branch, setBranch]       = useState(1);
-  const [channel, setChannel]     = useState('direct');
-  const [mpName, setMpName]       = useState('');
-  const [customer, setCustomer]   = useState(null);
-  const [custSearch, setCustSearch] = useState('');
-  const [custResults, setCustResults] = useState([]);
-  const [items, setItems]         = useState([]);
-  const [prodSearch, setProdSearch] = useState('');
-  const [prodResults, setProdResults] = useState([]);
-  const [discount, setDiscount]   = useState(0);
-  const [shippingCost, setShipping] = useState(0);
-  const [adminFee, setAdminFee]       = useState(0);
-  const [subChannels, setSubChannels] = useState([]);
+  // ── State ──────────────────────────────────────────────────
+  const [branch, setBranch]           = useState(1);
+  const [channel, setChannel]         = useState('wa');
   const [subChannelId, setSubChId]    = useState('');
   const [subChannelName, setSubChName]= useState('');
   const [employees, setEmployees]     = useState([]);
-  const [payMethod, setPay]       = useState('cash');
-  const [notes, setNotes]         = useState('');
-  const [saving, setSaving]       = useState(false);
-  const [showCustForm, setShowCustForm] = useState(false);
-  const [newCust, setNewCust]     = useState({ name:'', phone:'', city:'' });
-  const searchTimeout = useRef(null); // single ref for both product and customer search
+  const [subChannels, setSubChannels] = useState([]);
+  const [customer, setCustomer]       = useState(null);
+  const [custSearch, setCustSearch]   = useState('');
+  const [custResults, setCustResults] = useState([]);
+  const [prodSearch, setProdSearch]   = useState('');
+  const [prodResults, setProdResults] = useState([]);
+  const [items, setItems]             = useState([]);
+  const [discount, setDiscount]       = useState(0);
+  const [shipping, setShipping]       = useState(0);
+  const [adminFee, setAdminFee]       = useState(0);
+  const [paymentMethod, setPayMethod] = useState('cash');
+  const [notes, setNotes]             = useState('');
+  const [saving, setSaving]           = useState(false);
+  const [showAddCust, setAddCust]     = useState(false);
+  const [loadingEmps, setLoadingEmps] = useState(false);
+  const barcodeRef = useRef(null);
 
-  const BRANCHES = [{ id:1, name:'GP Racing', type:'Spare Part' },{ id:2, name:'GP Distro', type:'Fashion' }];
-  const MP_LIST  = ['Shopee','TikTok Shop','Tokopedia','Lazada','Bukalapak'];
-
-  // ── Search products ───────────────────────────────────────
+  // ── Load employees for WA ────────────────────────────────────
   useEffect(() => {
-    clearTimeout(searchTimeout.current);
-    if (!prodSearch.trim()) { setProdResults([]); return; }
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const res = await erpService.getProducts({ search: prodSearch, branch_id: branch, limit: 8 });
-        setProdResults(res.data.data.products);
-      } catch {}
-    }, 300);
-  }, [prodSearch, branch]);
-
-  // ── Search customers ──────────────────────────────────────
-  useEffect(() => {
-    clearTimeout(searchTimeout.current);
-    if (!custSearch.trim()) { setCustResults([]); return; }
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const res = await erpService.getCustomers({ search: custSearch, limit: 6 });
-        setCustResults(res.data.data.customers);
-      } catch {}
-    }, 300);
-  }, [custSearch]);
-
-  // ── Load employees for WA channel ────────────────────────
-  useEffect(() => {
+    setLoadingEmps(true);
     erpService.getEmployees()
-      .then(r => setEmployees(r.data.data.employees || []))
-      .catch(() => {});
+      .then(r => {
+        const emps = r.data?.data?.employees || [];
+        setEmployees(emps);
+      })
+      .catch(e => {
+        console.error('Load employees error:', e.message);
+        setEmployees([]);
+      })
+      .finally(() => setLoadingEmps(false));
   }, []);
 
-  // ── Load sub channels ─────────────────────────────────────
+  // ── Load sub channels when channel changes ───────────────────
   useEffect(() => {
-    if (channel === 'wa') {
-      setSubChannels([]);
-      return;
-    }
     setSubChId('');
     setSubChName('');
+    setSubChannels([]);
+    if (channel === 'wa') return; // WA uses employees
     erpService.getSubChannels({ channel })
-      .then(r => {
-        const list = r.data?.data?.sub_channels || [];
-        setSubChannels(list);
-      })
-      .catch(e => console.error('Sub channel fetch error:', e));
+      .then(r => setSubChannels(r.data?.data?.sub_channels || []))
+      .catch(() => {});
   }, [channel]);
 
-  // ── Barcode scan ──────────────────────────────────────────
+  // ── Reset sub channel when branch changes ────────────────────
+  useEffect(() => {
+    setSubChId('');
+    setSubChName('');
+    setChannel('wa');
+  }, [branch]);
+
+  // ── Customer search ──────────────────────────────────────────
+  const searchCustomers = useCallback(async (q) => {
+    if (!q.trim()) { setCustResults([]); return; }
+    try {
+      const res = await erpService.getCustomers({ search: q, limit: 10 });
+      setCustResults(res.data.data.customers || []);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => searchCustomers(custSearch), 300);
+    return () => clearTimeout(t);
+  }, [custSearch, searchCustomers]);
+
+  // ── Product search ───────────────────────────────────────────
+  const searchProducts = useCallback(async (q) => {
+    if (!q.trim()) { setProdResults([]); return; }
+    try {
+      const res = await erpService.getProducts({ search: q, branch_id: branch, limit: 10 });
+      setProdResults(res.data.data.products || []);
+    } catch {}
+  }, [branch]);
+
+  useEffect(() => {
+    const t = setTimeout(() => searchProducts(prodSearch), 300);
+    return () => clearTimeout(t);
+  }, [prodSearch, searchProducts]);
+
+  // ── Barcode scan ─────────────────────────────────────────────
   const handleBarcode = async (code) => {
     if (!code.trim()) return;
     try {
@@ -97,282 +140,325 @@ export default function NewOrderPage() {
     } catch { toast.error('Produk tidak ditemukan'); }
   };
 
-  // ── Add/update item ───────────────────────────────────────
+  // ── Add product to cart ──────────────────────────────────────
   const addProduct = (product) => {
-    const price = channel === 'marketplace' && product.sell_price_mp ? product.sell_price_mp
-                : channel === 'wa'          && product.sell_price_wa ? product.sell_price_wa
-                : product.sell_price;
+    const sellPrice = channel === 'marketplace'
+      ? parseFloat(product.sell_price_mp || product.sell_price)
+      : channel === 'wa'
+      ? parseFloat(product.sell_price_wa || product.sell_price)
+      : parseFloat(product.sell_price);
+
     setItems(prev => {
       const existing = prev.find(i => i.product_id === product.id);
       if (existing) return prev.map(i => i.product_id === product.id ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { product_id: product.id, product_name: product.name, sku: product.sku, unit: product.unit, buy_price: product.buy_price, sell_price: parseFloat(price), qty: 1, discount_pct: 0, stock: product.stock?.qty || 0 }];
+      return [...prev, {
+        product_id: product.id, product_name: product.name, product_sku: product.sku,
+        sell_price: sellPrice, buy_price: parseFloat(product.buy_price || 0), orig_buy_price: parseFloat(product.buy_price || 0),
+        discount_pct: 0, qty: 1,
+        stock_qty: product.stock?.qty || 0, unit: product.unit || 'pcs',
+      }];
     });
-    setProdSearch(''); setProdResults([]);
-    toast.success(`${product.name} ditambahkan`);
+    setProdSearch('');
+    setProdResults([]);
   };
 
-  const updateQty  = (idx, v) => setItems(p => p.map((i,n) => n===idx ? { ...i, qty: Math.max(1, v) } : i));
-  const updatePrice= (idx, v) => setItems(p => p.map((i,n) => n===idx ? { ...i, sell_price: parseFloat(v)||0 } : i));
-  const removeItem = (idx)    => setItems(p => p.filter((_,n) => n!==idx));
+  const updateQty      = (id, delta) => setItems(p => p.map(i => i.product_id === id ? { ...i, qty: Math.max(1, i.qty + delta) } : i));
+  const updateBuyPrice = (id, val)   => setItems(p => p.map(i => i.product_id === id ? { ...i, buy_price: parseFloat(val) || 0 } : i));
+  const updatePrice= (id, val)   => setItems(p => p.map(i => i.product_id === id ? { ...i, sell_price: parseFloat(val) || 0 } : i));
+  const removeItem = (id)        => setItems(p => p.filter(i => i.product_id !== id));
 
-  // ── Calculations ──────────────────────────────────────────
-  const subtotal    = items.reduce((s, i) => s + (i.sell_price * i.qty * (1 - i.discount_pct/100)), 0);
-  const adminFeeAmt = channel === 'marketplace' ? parseFloat(adminFee||0) : 0;
-  const totalAmount = subtotal - parseFloat(discount||0) + parseFloat(shippingCost||0) + adminFeeAmt;
-  const totalProfit = items.reduce((s,i) => s + ((i.sell_price - i.buy_price) * i.qty), 0) - parseFloat(discount||0) - adminFeeAmt;
+  // ── Calculations ─────────────────────────────────────────────
+  const subtotal   = items.reduce((s, i) => s + (i.sell_price * i.qty), 0);
+  const adminAmt   = channel === 'marketplace' ? parseFloat(adminFee) || 0 : 0;
+  const total      = subtotal - (parseFloat(discount) || 0) + (parseFloat(shipping) || 0) + adminAmt;
+  const estProfit  = items.reduce((s, i) => s + ((i.sell_price - i.buy_price) * i.qty), 0) - adminAmt;
 
-  // ── Submit ────────────────────────────────────────────────
-  const handleSubmit = async (autoConfirm = false) => {
-    if (items.length === 0) { toast.error('Tambahkan minimal 1 produk'); return; }
+  // ── Submit order ─────────────────────────────────────────────
+  const handleSubmit = async (status = 'confirmed') => {
+    if (!items.length)   { toast.error('Tambahkan minimal 1 produk'); return; }
+    if (channel === 'wa' && !subChannelId)   { toast.error('Pilih karyawan WA'); return; }
+    if (channel !== 'wa' && !subChannelId)   { toast.error(`Pilih ${channel === 'marketplace' ? 'toko marketplace' : 'metode langsung'}`); return; }
+
     setSaving(true);
     try {
-      const res = await erpService.createOrder({
-        branch_id:       branch,
+      const payload = {
+        branch_id: branch,
+        customer_id: customer?.id || null,
+        customer_name: customer?.name || '',
+        customer_phone: customer?.phone || '',
+        customer_city: customer?.city || '',
         channel,
-        marketplace_name: channel === 'marketplace' ? mpName : undefined,
-        customer_id:      customer?.id || null,
-        customer_name:    customer?.name || custSearch || null,
-        customer_phone:   customer?.phone || null,
-        customer_city:    customer?.city  || null,
-        items:            items.map(i => ({ product_id: i.product_id, qty: i.qty, sell_price: i.sell_price, discount_pct: i.discount_pct })),
-        discount_amount:  parseFloat(discount||0),
-        shipping_cost:    parseFloat(shippingCost||0),
-        admin_fee:        channel === 'marketplace' ? parseFloat(adminFee||0) : 0,
-        sub_channel_id:   subChannelId ? parseInt(subChannelId) : null,
+        sub_channel_id: subChannelId ? parseInt(subChannelId) : null,
         sub_channel_name: subChannelName || null,
-        payment_method:   payMethod,
+        // For WA: salesperson_id = employee id
+        salesperson_id: channel === 'wa' ? parseInt(subChannelId) : null,
+        items: items.map(i => ({
+          product_id: i.product_id,
+          qty: i.qty,
+          sell_price: i.sell_price,
+          buy_price: i.buy_price,
+          discount_pct: i.discount_pct || 0,
+        })),
+        discount_amount: parseFloat(discount) || 0,
+        shipping_cost:   parseFloat(shipping) || 0,
+        admin_fee:       adminAmt,
+        payment_method:  paymentMethod,
         notes,
-        order_date:       new Date().toISOString().split('T')[0],
-      });
+        order_date: new Date().toISOString().split('T')[0],
+      };
+
+      const res = await erpService.createOrder(payload);
       const orderId = res.data.data.order.id;
 
-      if (autoConfirm) {
+      // Auto confirm if not draft
+      if (status === 'confirmed') {
         await erpService.confirmOrder(orderId);
-        toast.success('Order dikonfirmasi & stok berkurang!');
-      } else {
-        toast.success(`Order ${res.data.data.order.order_no} dibuat!`);
       }
+
+      toast.success(`Order ${res.data.data.order.order_no} berhasil!`);
       navigate(`/erp/orders/${orderId}`);
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal membuat order'); }
-    finally { setSaving(false); }
+    } catch(e) {
+      toast.error(e.response?.data?.message || 'Gagal membuat order');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleNewCustomer = async () => {
-    if (!newCust.name.trim()) { toast.error('Nama pelanggan wajib'); return; }
-    try {
-      const res = await erpService.createCustomer({ ...newCust, branch_id: branch });
-      setCustomer(res.data.data.customer);
-      setShowCustForm(false);
-      toast.success(`Pelanggan ${newCust.name} ditambahkan`);
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
-  };
+  const BRANCH_OPTIONS = [
+    { id: 1, name: 'GP Racing',  sub: 'Spare Part' },
+    { id: 2, name: 'GP Distro',  sub: 'Fashion' },
+  ];
+  const CHANNEL_OPTS = ['wa', 'marketplace', 'direct'];
+  const CHANNEL_LABEL = { wa: 'WhatsApp', marketplace: 'Marketplace', direct: 'Langsung' };
 
   return (
-    <div className="section animate-fade-in">
-      {/* ERP Breadcrumb */}
-      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
-        <span>ERP</span><span>›</span>
-        <span>Penjualan</span><span>›</span>
-        <span className="font-semibold text-[var(--text-primary)]">Buat Order</span>
-      </nav>
-
+    <div className="animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => navigate('/erp/orders')}
-          className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
-          <ChevronLeft className="w-4 h-4" />
-        </button>
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => navigate('/erp/orders')} className="btn-icon"><ChevronLeft size={18}/></button>
         <div>
-          <h1 className="text-base font-bold text-[var(--text-primary)]">Buat Order Baru</h1>
+          <h1 className="text-xl font-bold">Buat Order Baru</h1>
           <p className="text-xs text-[var(--text-muted)]">GPDISTRO Racing ID</p>
         </div>
       </div>
 
-      <div className="lg:grid lg:grid-cols-5 lg:gap-5 space-y-4 lg:space-y-0">
-        {/* LEFT — order details */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Branch + Channel */}
-          <div className="card-sm space-y-3">
-            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Cabang & Channel</p>
-            <div className="grid grid-cols-2 gap-2">
-              {BRANCHES.map(b => (
-                <button key={b.id} onClick={() => { setBranch(b.id); setItems([]); }}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${branch===b.id ? 'border-brand-500 bg-brand-50 dark:bg-brand-950' : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'}`}>
-                  <p className={`text-sm font-bold ${branch===b.id ? 'text-brand-600 dark:text-brand-400' : 'text-[var(--text-primary)]'}`}>{b.name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">{b.type}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* ── LEFT COLUMN ───────────────────────────────────── */}
+        <div className="lg:col-span-2 space-y-4">
+
+          {/* Cabang & Channel */}
+          <div className="card p-5">
+            <p className="field-label mb-3">CABANG & CHANNEL</p>
+
+            {/* Branch selector */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {BRANCH_OPTIONS.map(b => (
+                <button key={b.id} onClick={() => setBranch(b.id)}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${branch===b.id ? 'border-[var(--brand-600)] bg-[var(--brand-50)] dark:bg-[var(--brand-100)]' : 'border-[var(--border)] hover:border-[var(--brand-600)]/50'}`}>
+                  <p className={`font-bold text-sm ${branch===b.id ? 'text-[var(--brand-600)]' : 'text-[var(--text-primary)]'}`}>{b.name}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{b.sub}</p>
                 </button>
               ))}
             </div>
+
+            {/* Channel selector */}
             <div className="grid grid-cols-3 gap-2">
-              {Object.entries(CHANNELS).map(([k,v]) => (
-                <button key={k} onClick={() => setChannel(k)}
-                  className={`py-2 rounded-xl text-xs font-semibold border transition-all ${channel===k ? `${v.bg} ${v.color} border-current` : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
-                  {v.label}
+              {CHANNEL_OPTS.map(ch => (
+                <button key={ch} onClick={() => setChannel(ch)}
+                  className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${channel===ch ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
+                  {CHANNEL_LABEL[ch]}
                 </button>
               ))}
             </div>
-            {/* Sub channel / Sales selector */}
-            {channel === 'wa' ? (
-              <div>
-                <label className="field-label">Sales / Karyawan WA</label>
-                <select value={subChannelId}
-                  onChange={e => {
-                    setSubChId(e.target.value);
-                    const emp = employees.find(em => em.id == e.target.value);
-                    setSubChName(emp?.name || '');
-                  }}
-                  className="input-base text-sm">
-                  <option value="">Pilih karyawan...</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} — {emp.branch?.name || emp.branch_name || ''}
-                    </option>
-                  ))}
-                </select>
+
+            {/* ── WA: Employee selector ── */}
+            {channel === 'wa' && (
+              <div className="mt-4">
+                <label className="field-label">SALES / KARYAWAN WA</label>
+                {loadingEmps ? (
+                  <div className="input-base flex items-center gap-2 text-[var(--text-muted)]">
+                    <Loader2 size={14} className="animate-spin"/> Memuat daftar karyawan...
+                  </div>
+                ) : employees.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">⚠ Belum ada karyawan terdaftar di sistem insentif</p>
+                  </div>
+                ) : (
+                  <select value={subChannelId}
+                    onChange={e => {
+                      const emp = employees.find(em => em.id == e.target.value);
+                      setSubChId(e.target.value);
+                      setSubChName(emp?.name || '');
+                    }}
+                    className="input-base">
+                    <option value="">Pilih karyawan...</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name}{emp.branch ? ` — ${emp.branch.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {subChannelName && (
+                  <p className="text-xs text-emerald-600 mt-1 font-semibold">✓ Sales: {subChannelName}</p>
+                )}
               </div>
-            ) : (
-              <div>
-                <label className="field-label">
-                  {channel === 'marketplace' ? 'Toko Marketplace' : 'Metode Langsung'}
-                </label>
+            )}
+
+            {/* ── Marketplace: Sub channel selector ── */}
+            {channel === 'marketplace' && (
+              <div className="mt-4">
+                <label className="field-label">TOKO MARKETPLACE</label>
                 <select value={subChannelId}
                   onChange={e => {
-                    setSubChId(e.target.value);
                     const sc = subChannels.find(s => s.id == e.target.value);
+                    setSubChId(e.target.value);
                     setSubChName(sc?.name || '');
                   }}
-                  className="input-base text-sm">
-                  <option value="">Pilih...</option>
+                  className="input-base">
+                  <option value="">Pilih toko...</option>
                   {subChannels.map(sc => (
                     <option key={sc.id} value={sc.id}>{sc.name}</option>
                   ))}
                 </select>
                 {subChannels.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">⚠ Belum ada sub channel. Tambah di Master Data ERP.</p>
+                  <p className="text-xs text-amber-600 mt-1">⚠ Belum ada sub channel marketplace. Tambah di Master Data ERP.</p>
                 )}
+              </div>
+            )}
+
+            {/* ── Direct: Sub channel selector ── */}
+            {channel === 'direct' && (
+              <div className="mt-4">
+                <label className="field-label">METODE LANGSUNG</label>
+                <select value={subChannelId}
+                  onChange={e => {
+                    const sc = subChannels.find(s => s.id == e.target.value);
+                    setSubChId(e.target.value);
+                    setSubChName(sc?.name || '');
+                  }}
+                  className="input-base">
+                  <option value="">Pilih metode...</option>
+                  {subChannels.map(sc => (
+                    <option key={sc.id} value={sc.id}>{sc.name}</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
 
-          {/* Customer */}
-          <div className="card-sm space-y-3">
-            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Pelanggan</p>
+          {/* Pelanggan */}
+          <div className="card p-5">
+            <p className="field-label mb-3">PELANGGAN</p>
             {customer ? (
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-brand-100 dark:bg-brand-950 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--brand-500)] to-[var(--brand-700)] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                  {customer.name?.[0]?.toUpperCase()}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{customer.name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">{customer.phone} · {customer.city}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">{customer.name}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{customer.phone} {customer.city ? `· ${customer.city}` : ''}</p>
                 </div>
-                <button onClick={() => setCustomer(null)} className="w-7 h-7 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <button onClick={() => { setCustomer(null); setCustSearch(''); }} className="btn-icon-sm"><X size={14}/></button>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-                  <input value={custSearch} onChange={e => setCustSearch(e.target.value)}
-                    placeholder="Cari nama / no. HP pelanggan..."
-                    className="input-base pl-9 text-sm" />
-                </div>
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
+                <input value={custSearch} onChange={e => setCustSearch(e.target.value)}
+                  placeholder="Cari nama / no. HP pelanggan..."
+                  className="input-base pl-9"/>
                 {custResults.length > 0 && (
-                  <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                  <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
                     {custResults.map(c => (
                       <button key={c.id} onClick={() => { setCustomer(c); setCustSearch(''); setCustResults([]); }}
-                        className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-secondary)] text-left border-b border-[var(--border-subtle)] last:border-0">
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-secondary)] transition-colors text-left">
+                        <User size={14} className="text-[var(--text-muted)] flex-shrink-0"/>
                         <div>
-                          <p className="text-xs font-semibold text-[var(--text-primary)]">{c.name}</p>
-                          <p className="text-[10px] text-[var(--text-muted)]">{c.phone} · {c.city}</p>
+                          <p className="text-sm font-semibold">{c.name}</p>
+                          <p className="text-xs text-[var(--text-muted)]">{c.phone}</p>
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
-                <button onClick={() => setShowCustForm(v => !v)}
-                  className="text-xs text-brand-500 hover:underline font-semibold">
-                  + Tambah pelanggan baru
-                </button>
-                {showCustForm && (
-                  <div className="rounded-xl border border-[var(--border)] p-3 space-y-2 bg-[var(--bg-secondary)]">
-                    {[{key:'name',ph:'Nama pelanggan *'},{key:'phone',ph:'No. HP'},{key:'city',ph:'Kota'}].map(f => (
-                      <input key={f.key} value={newCust[f.key]} onChange={e => setNewCust(p => ({...p,[f.key]:e.target.value}))}
-                        placeholder={f.ph} className="input-base text-sm block w-full" />
-                    ))}
-                    <button onClick={handleNewCustomer} className="btn-primary w-full h-9 text-sm">Simpan Pelanggan</button>
-                  </div>
-                )}
               </div>
+            )}
+            {!customer && (
+              <button onClick={() => setAddCust(true)} className="text-xs text-[var(--brand-600)] font-semibold mt-2 hover:underline">
+                + Tambah pelanggan baru
+              </button>
             )}
           </div>
 
-          {/* Products */}
-          <div className="card-sm space-y-3">
-            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Produk</p>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+          {/* Produk */}
+          <div className="card p-5">
+            <p className="field-label mb-3">PRODUK</p>
+            <div className="relative mb-3">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
               <input value={prodSearch} onChange={e => setProdSearch(e.target.value)}
                 placeholder="Cari produk / scan barcode..."
-                onKeyDown={e => e.key === 'Enter' && prodSearch.length > 5 && handleBarcode(prodSearch)}
-                className="input-base pl-9 pr-10 text-sm" />
-              <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                className="input-base pl-9 pr-10"
+                ref={barcodeRef}
+                onKeyDown={e => e.key === 'Enter' && handleBarcode(prodSearch)}/>
+              <Barcode size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
+              {prodResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto scrollbar-thin">
+                  {prodResults.map(p => (
+                    <button key={p.id} onClick={() => addProduct(p)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-secondary)] transition-colors text-left">
+                      <Package size={14} className="text-[var(--text-muted)] flex-shrink-0"/>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{p.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">Stok: {p.stock?.qty || 0} · {toRp(p.sell_price)}</p>
+                      </div>
+                      <span className="text-xs font-bold text-[var(--brand-600)] flex-shrink-0">{toRpShort(p.sell_price)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {prodResults.length > 0 && (
-              <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-                {prodResults.map(p => (
-                  <button key={p.id} onClick={() => addProduct(p)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-secondary)] text-left border-b border-[var(--border-subtle)] last:border-0">
-                    <Package className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{p.name}</p>
-                      <p className="text-[10px] text-[var(--text-muted)]">Stok: {p.stock?.qty||0} · {toRp(p.sell_price)}</p>
-                    </div>
-                    <Plus className="w-4 h-4 text-brand-500 flex-shrink-0" />
-                  </button>
-                ))}
+            {items.length === 0 ? (
+              <div className="text-center py-8 text-[var(--text-muted)]">
+                <Package size={32} className="mx-auto mb-2 opacity-30"/>
+                <p className="text-sm">Belum ada produk ditambahkan</p>
               </div>
-            )}
-
-            {/* Cart items */}
-            {items.length > 0 && (
+            ) : (
               <div className="space-y-2">
-                {items.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                {items.map(item => (
+                  <div key={item.product_id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{item.product_name}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <button onClick={() => updateQty(idx, item.qty-1)}
-                          className="w-6 h-6 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <input type="number" value={item.qty} min={1}
-                          onChange={e => updateQty(idx, parseInt(e.target.value)||1)}
-                          className="w-14 text-center input-base text-sm h-7 px-1" />
-                        <button onClick={() => updateQty(idx, item.qty+1)}
-                          className="w-6 h-6 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
-                          <Plus className="w-3 h-3" />
-                        </button>
-                        <span className="text-xs text-[var(--text-muted)]">{item.unit}</span>
+                      <p className="text-sm font-semibold truncate">{item.product_name}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-[var(--text-muted)]">Jual</span>
+                          <input type="number" value={item.sell_price}
+                            onChange={e => updatePrice(item.product_id, e.target.value)}
+                            className="input-base h-7 w-24 text-xs text-right"
+                            min={0}/>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-[var(--text-muted)]">Beli</span>
+                          <input type="number" value={item.buy_price}
+                            onChange={e => updateBuyPrice(item.product_id, e.target.value)}
+                            className="input-base h-7 w-24 text-xs text-right text-blue-600"
+                            min={0}/>
+                        </div>
+                        <span className="text-xs text-[var(--text-muted)]">× {item.qty}</span>
+                        <span className="text-xs font-bold text-[var(--brand-600)]">{toRpShort(item.sell_price * item.qty)}</span>
+                        {item.sell_price > item.buy_price && (
+                          <span className="text-[10px] text-emerald-600">+{toRpShort((item.sell_price-item.buy_price)*item.qty)}</span>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">Rp</span>
-                        <input type="number" value={item.sell_price}
-                          onChange={e => updatePrice(idx, e.target.value)}
-                          className="input-base pl-7 text-xs h-7 w-28 text-right" />
-                      </div>
-                      <p className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-1">
-                        {toRp(item.sell_price * item.qty)}
-                      </p>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => updateQty(item.product_id, -1)} className="btn-icon-sm"><Minus size={12}/></button>
+                      <span className="w-8 text-center text-sm font-bold">{item.qty}</span>
+                      <button onClick={() => updateQty(item.product_id, 1)}
+                        disabled={item.qty >= item.stock_qty}
+                        className="btn-icon-sm disabled:opacity-30"><Plus size={12}/></button>
+                      <button onClick={() => removeItem(item.product_id)} className="btn-icon-sm text-red-500 ml-1"><Trash2 size={12}/></button>
                     </div>
-                    <button onClick={() => removeItem(idx)}
-                      className="w-6 h-6 rounded-lg hover:bg-red-100 dark:hover:bg-red-950 flex items-center justify-center text-[var(--text-muted)] hover:text-red-500 flex-shrink-0">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -380,98 +466,89 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        {/* RIGHT — summary */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Summary */}
-          <div className="card-sm space-y-3">
-            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Ringkasan</p>
+        {/* ── RIGHT COLUMN ──────────────────────────────────── */}
+        <div className="space-y-4">
+          {/* Ringkasan */}
+          <div className="card p-5">
+            <p className="field-label mb-3">RINGKASAN</p>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">Subtotal ({items.length} produk)</span><span className="font-semibold">{toRp(subtotal)}</span></div>
 
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-[var(--text-secondary)]">Subtotal ({items.length} produk)</span>
-                <span className="font-semibold">{toRp(subtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[var(--text-secondary)]">Diskon</span>
-                <div className="relative w-28">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">Rp</span>
-                  <input type="number" value={discount} onChange={e => setDiscount(e.target.value)}
-                    className="input-base pl-7 text-xs h-7 w-full text-right" />
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-[var(--text-muted)] flex-shrink-0">Diskon</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-[var(--text-muted)]">Rp</span>
+                  <input type="number" value={discount} onChange={e=>setDiscount(e.target.value)} min={0} className="input-base h-8 w-28 text-sm text-right"/>
                 </div>
               </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-[var(--text-muted)] flex-shrink-0">Ongkir</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-[var(--text-muted)]">Rp</span>
+                  <input type="number" value={shipping} onChange={e=>setShipping(e.target.value)} min={0} className="input-base h-8 w-28 text-sm text-right"/>
+                </div>
+              </div>
+
               {channel === 'marketplace' && (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[var(--text-secondary)]">Biaya Admin</span>
-                    <p className="text-[10px] text-[var(--text-muted)]">Fee marketplace</p>
-                  </div>
-                  <div className="relative w-28">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">Rp</span>
-                    <input type="number" value={adminFee} onChange={e => setAdminFee(e.target.value)}
-                      placeholder="0" className="input-base pl-7 text-xs h-7 w-full text-right" />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-[var(--text-muted)] flex-shrink-0">Biaya Admin<br/><span className="text-[10px]">Fee marketplace</span></span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-[var(--text-muted)]">Rp</span>
+                    <input type="number" value={adminFee} onChange={e=>setAdminFee(e.target.value)} min={0} className="input-base h-8 w-28 text-sm text-right"/>
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <span className="text-[var(--text-secondary)]">Ongkir</span>
-                <div className="relative w-28">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">Rp</span>
-                  <input type="number" value={shippingCost} onChange={e => setShipping(e.target.value)}
-                    className="input-base pl-7 text-xs h-7 w-full text-right" />
-                </div>
-              </div>
-              <div className="border-t border-[var(--border)] pt-2 flex justify-between font-bold">
-                <span className="text-[var(--text-primary)]">Total</span>
-                <span className="text-brand-600 dark:text-brand-400 text-base">{toRp(totalAmount)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[var(--text-muted)]">Estimasi Profit</span>
-                <span className={`font-semibold ${totalProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{toRp(totalProfit)}</span>
+
+              <div className="border-t border-[var(--border)] pt-3">
+                <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-[var(--brand-600)]">{toRp(total)}</span></div>
+                <div className="flex justify-between text-xs text-emerald-600 mt-1"><span>Estimasi Profit</span><span>{toRp(estProfit)}</span></div>
               </div>
             </div>
           </div>
 
-          {/* Payment */}
-          <div className="card-sm space-y-3">
-            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Pembayaran</p>
+          {/* Pembayaran */}
+          <div className="card p-5">
+            <p className="field-label mb-3">PEMBAYARAN</p>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(PAYMENT_METHODS).map(([k,v]) => (
-                <button key={k} onClick={() => setPay(k)}
-                  className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${payMethod===k ? 'bg-brand-500 text-white border-brand-500' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
-                  {v.icon} {v.label}
+                <button key={k} onClick={() => setPayMethod(k)}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-all ${paymentMethod===k ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
+                  <span>{v.icon}</span> {v.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="card-sm">
-            <label className="field-label">Catatan Order</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)}
-              rows={2} placeholder="Catatan tambahan..."
-              className="input-base text-sm resize-none" />
+          {/* Catatan */}
+          <div className="card p-5">
+            <p className="field-label mb-2">CATATAN ORDER</p>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)}
+              placeholder="Catatan tambahan..."
+              rows={3} className="input-base resize-none text-sm"/>
           </div>
 
-          {/* Submit buttons */}
-          <div className="space-y-2">
-            <button onClick={() => handleSubmit(true)} disabled={saving || !items.length}
-              className="btn-primary w-full h-12 text-sm font-bold disabled:opacity-50">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Konfirmasi Order & Kurangi Stok
-            </button>
-            <button onClick={() => handleSubmit(false)} disabled={saving || !items.length}
-              className="btn-secondary w-full h-10 text-sm disabled:opacity-50">
-              Simpan sebagai Draft
-            </button>
-          </div>
-
-          {items.length > 0 && (
-            <p className="text-[10px] text-[var(--text-muted)] text-center">
-              {channel !== 'direct' ? '✓ Order akan otomatis sync ke sistem insentif' : 'Channel direct tidak sync ke insentif'}
+          {/* Actions */}
+          <button onClick={() => handleSubmit('confirmed')} disabled={saving || !items.length}
+            className="btn-primary w-full h-12 text-base gap-2 disabled:opacity-50">
+            {saving ? <Loader2 size={18} className="animate-spin"/> : <CheckCircle2 size={18}/>}
+            Konfirmasi Order & Kurangi Stok
+          </button>
+          <button onClick={() => handleSubmit('draft')} disabled={saving || !items.length}
+            className="btn-ghost w-full text-sm text-[var(--text-muted)] disabled:opacity-50">
+            Simpan sebagai Draft
+          </button>
+          {channel === 'wa' && subChannelName && (
+            <p className="text-xs text-center text-emerald-600 font-semibold">
+              ✓ Order akan otomatis sync ke sistem insentif · {subChannelName}
             </p>
           )}
         </div>
       </div>
+
+      {showAddCust && (
+        <AddCustomerModal onClose={() => setAddCust(false)} onAdd={c => { setCustomer(c); setCustSearch(''); }}/>
+      )}
     </div>
   );
 }

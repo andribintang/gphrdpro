@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  MessageCircle, Star, Plus,
+  RefreshCw, MessageCircle, Star, Plus,
   Trash2, X, Loader2, ChevronLeft, AlertTriangle,
   CheckCircle2, Calculator
 } from 'lucide-react';
@@ -25,6 +25,7 @@ const WaTab = ({ periodId, branches, employees, channel, periodLocked }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [syncing, setSyncing]    = useState(false);
   const [filterBranch, setFB] = useState('');
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -65,11 +66,24 @@ const WaTab = ({ periodId, branches, employees, channel, periodLocked }) => {
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, name, amount) => {
+    if (!window.confirm(`Hapus data penjualan WA\n${name} — Rp ${new Intl.NumberFormat('id-ID').format(amount)}?\n\nData yang dihapus tidak bisa dikembalikan.`)) return;
     setDeleting(id);
     try { await incentiveService.deleteWaSale(id); toast.success('Transaksi dihapus'); fetch(); }
     catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
     finally { setDeleting(null); }
+  };
+
+  const handleSync = async () => {
+    if (!window.confirm(`Sinkronisasi data penjualan dari ERP ke periode ini?\n\n• Hanya order berstatus "Selesai" yang akan ditarik\n• Data retur akan mengurangi nilai penjualan\n• Data yang sudah ada tidak akan terduplikasi`)) return;
+    setSyncing(true);
+    try {
+      const res = await incentiveService.syncFromERP(periodId);
+      const d = res.data.data;
+      toast.success(`Sinkronisasi selesai!\nWA: +${d.wa.added} baru, ${d.wa.updated} update\nMarketplace: +${d.mp.added} baru`);
+      fetch();
+    } catch(e) { toast.error(e.response?.data?.message || 'Gagal sinkronisasi'); }
+    finally { setSyncing(false); }
   };
 
   const totalSales     = sales.reduce((s, r) => s + parseFloat(r.sale_amount), 0);
@@ -107,9 +121,15 @@ const WaTab = ({ periodId, branches, employees, channel, periodLocked }) => {
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         {!periodLocked && (
-          <button onClick={() => setShowAdd(true)} className="btn-primary h-10 px-3 text-xs flex-shrink-0">
-            <Plus className="w-3.5 h-3.5" /> Tambah
-          </button>
+          <>
+            <button onClick={handleSync} disabled={syncing} className="btn-secondary h-10 px-3 text-xs flex-shrink-0 gap-1.5">
+              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <RefreshCw className="w-3.5 h-3.5"/>}
+              Sync ERP
+            </button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary h-10 px-3 text-xs flex-shrink-0">
+              <Plus className="w-3.5 h-3.5" /> Tambah
+            </button>
+          </>
         )}
       </div>
 
@@ -137,7 +157,7 @@ const WaTab = ({ periodId, branches, employees, channel, periodLocked }) => {
                 </div>
               </div>
               {!periodLocked && (
-                <button onClick={() => handleDelete(s.id)} disabled={deleting === s.id}
+                <button onClick={() => handleDelete(s.id, s.employee?.name || '', s.sale_amount)} disabled={deleting === s.id}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950 flex-shrink-0">
                   {deleting === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 </button>

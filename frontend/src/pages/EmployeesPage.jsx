@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Users, Search, Plus, X, ChevronRight, Filter,
+  Users, Search, Plus, X, ChevronRight, Filter, Eye,
   Loader2, RefreshCw, Phone, MapPin, AlertTriangle,
   Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
@@ -91,7 +91,16 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
 
   useEffect(() => {
     Promise.all([
-      employeeService.getDepartments().then(r => setDepts(r.data.data.departments)).catch(() => {}),
+      // Try master departments table first, fallback to employee departments
+      import('../utils/api').then(({default: api}) => {
+        api.get('/departments', { params: { is_active: true } })
+          .then(r => {
+            const names = (r.data.data.departments || []).map(d => d.name);
+            if (names.length) setDepts(names);
+            else employeeService.getDepartments().then(r2 => setDepts(r2.data.data.departments || [])).catch(() => {});
+          })
+          .catch(() => employeeService.getDepartments().then(r2 => setDepts(r2.data.data.departments || [])).catch(() => {}));
+      }),
       incentiveService.getBranches().then(r => setBranches(r.data.data.branches)).catch(() => {}),
     ]);
   }, []);
@@ -195,7 +204,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
   // This prevents React from unmounting/remounting the input on re-render
   const renderF = (label, field, type = 'text', placeholder, required = false, disabled = false) => (
     <div key={field}>
-      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+      <label className="block text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       <input
@@ -205,9 +214,14 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
-        className={`input-base text-sm ${errors[field] ? 'border-red-400' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`w-full h-10 px-3.5 rounded-xl border text-[13.5px] text-[var(--text-primary)]
+          bg-[var(--bg-secondary)] placeholder:text-[var(--text-muted)]
+          focus:outline-none focus:ring-2 focus:ring-[var(--brand-600)]/20 focus:border-[var(--brand-600)]/60
+          transition-all duration-150
+          ${errors[field] ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-[var(--border)]'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       />
-      {errors[field] && <p className="text-xs text-red-500 mt-1">{errors[field]}</p>}
+      {errors[field] && <p className="text-[11px] text-red-500 mt-1 flex items-center gap-1">⚠ {errors[field]}</p>}
     </div>
   );
 
@@ -215,7 +229,7 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
-      <div className="relative w-full sm:max-w-lg bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
+      <div className="relative w-full sm:max-w-2xl bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-[var(--border2)]" />
@@ -245,10 +259,14 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
           {step === 1 && (
             <>
-              {renderF("Nama Lengkap", "name", "text", "Ahmad Fauzi", true, false)}
-              {renderF("Email", "email", "email", "ahmad@perusahaan.com", true, false)}
-              {!isEdit && renderF("Password Default", "password", "password", "Min 6 karakter", true, false)}
-              {renderF("NIP", "nip", "text", "NIP-005", true, false)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderF("Nama Lengkap", "name", "text", "Ahmad Fauzi", true, false)}
+                {renderF("Email", "email", "email", "ahmad@perusahaan.com", true, false)}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {!isEdit && renderF("Password Default", "password", "password", "Min 6 karakter", true, false)}
+                {renderF("NIP", "nip", "text", "NIP-005", true, false)}
+              </div>
 
               {/* Role */}
               <div>
@@ -267,7 +285,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {renderF("Jabatan", "position", "text", "Staff IT", true, false)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderF("Jabatan", "position", "text", "Staff IT", true, false)}
+                {renderF("Telepon", "phone", "tel", "08xxxxxxxxxx", false, false)}
+              </div>
 
               {/* Departemen */}
               <div>
@@ -285,7 +306,6 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
                 {errors.department && <p className="text-xs text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              {renderF("Telepon", "phone", "tel", "08xxxxxxxxxx", false, false)}
             </>
           )}
 
@@ -340,8 +360,10 @@ const EmployeeForm = ({ employee, onClose, onSuccess }) => {
               </div>
 
               {renderF("Alamat", "address", "text", "Jl. Contoh No.1, Jakarta", false, false)}
-              {renderF("Kontak Darurat", "emergency_contact", "text", "Nama kontak darurat", false, false)}
-              {renderF("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx", false, false)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {renderF("Kontak Darurat", "emergency_contact", "text", "Nama kontak darurat", false, false)}
+                {renderF("Telepon Darurat", "emergency_phone", "tel", "08xxxxxxxxxx", false, false)}
+              </div>
 
               {/* ── Sync ke Sistem Insentif ─────────────────── */}
               {(!isEdit || (isEdit && !isLinked)) && (
@@ -737,7 +759,7 @@ export default function EmployeesPage() {
   };
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full">
       <div className="page-header">
         <div>
           <h1 className="page-title">Karyawan</h1>
@@ -815,32 +837,94 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* List */}
+      {/* Employee Table */}
       {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-[72px] rounded-2xl" />)}</div>
+        <div className="table-wrapper divide-y divide-[var(--border-subtle)]">
+          {[...Array(6)].map((_,i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4">
+              <div className="skeleton w-9 h-9 rounded-xl flex-shrink-0"/>
+              <div className="flex-1 space-y-2"><div className="skeleton h-3.5 w-40 rounded"/><div className="skeleton h-3 w-28 rounded opacity-60"/></div>
+              <div className="skeleton h-6 w-16 rounded-full"/>
+              <div className="skeleton h-3 w-24 rounded hidden md:block"/>
+              <div className="skeleton h-3 w-20 rounded hidden lg:block"/>
+            </div>
+          ))}
+        </div>
       ) : employees.length === 0 ? (
-        <div className="text-center py-14">
+        <div className="table-wrapper text-center py-16">
           <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium text-[var(--text-muted)]">Tidak ada karyawan ditemukan</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">Tidak ada karyawan ditemukan</p>
+          <p className="text-xs text-[var(--text-muted)]">Coba ubah filter atau tambah karyawan baru</p>
+          {canManage && <button onClick={() => setShowAddForm(true)} className="btn-primary mt-4 text-sm"><Plus className="w-4 h-4"/> Tambah Karyawan</button>}
         </div>
       ) : (
         <div className="table-wrapper">
-          {employees.map(emp => (
-            <button key={emp.id} onClick={() => setProfileId(emp.id)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors text-left">
-              <Avatar name={emp.name} size="md" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-bold text-[var(--text-primary)] truncate">{emp.name}</p>
-                  <RoleBadge role={emp.role} />
-                </div>
-                <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{emp.employee?.position} · {emp.employee?.department}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <StatusBadge status={emp.employee?.status} />
+          {/* Desktop header */}
+          <div className="hidden md:grid grid-cols-[minmax(200px,1fr)_120px_140px_120px_100px_auto] gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]/70">
+            {['KARYAWAN','JABATAN','DEPARTEMEN','STATUS','BERGABUNG','AKSI'].map(h=>(
+              <p key={h} className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{h}</p>
+            ))}
+          </div>
+          {employees.map((emp,idx) => (
+            <div key={emp.id}
+              className={`flex flex-col md:grid md:grid-cols-[minmax(200px,1fr)_120px_140px_120px_100px_auto] md:gap-4 px-5 py-3.5 transition-colors hover:bg-[var(--bg-secondary)]/50 cursor-pointer border-b border-[var(--border-subtle)] last:border-0 group ${idx%2===0?'':'bg-[var(--bg-secondary)]/20'}`}
+              onClick={() => setProfileId(emp.id)}>
+              {/* Karyawan */}
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar name={emp.name} size="md"/>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{emp.name}</p>
+                    <RoleBadge role={emp.role}/>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] truncate">{emp.email}</p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
-            </button>
+              {/* Jabatan */}
+              <div className="hidden md:flex items-center">
+                <p className="text-[13px] text-[var(--text-secondary)] truncate">{emp.employee?.position || '—'}</p>
+              </div>
+              {/* Departemen */}
+              <div className="hidden md:flex items-center">
+                <span className="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-full">
+                  {emp.employee?.department || '—'}
+                </span>
+              </div>
+              {/* Status */}
+              <div className="hidden md:flex items-center">
+                <StatusBadge status={emp.employee?.status}/>
+              </div>
+              {/* Bergabung */}
+              <div className="hidden lg:flex items-center">
+                <p className="text-[12px] text-[var(--text-muted)]">
+                  {emp.employee?.join_date ? new Date(emp.employee.join_date).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}
+                </p>
+              </div>
+              {/* Aksi */}
+              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" onClick={e=>e.stopPropagation()}>
+                <button onClick={()=>setProfileId(emp.id)} title="Lihat Detail"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand-600)] hover:bg-[var(--brand-600)]/8 transition-all">
+                  <Eye className="w-3.5 h-3.5"/>
+                </button>
+                {canManage && (
+                  <button onClick={()=>setEditEmployee(emp)} title="Edit"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all">
+                    <Edit3 className="w-3.5 h-3.5"/>
+                  </button>
+                )}
+                {canManage && emp.employee?.status === 'active' && (
+                  <button onClick={()=>setDeactivateTarget(emp)} title="Nonaktifkan"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all">
+                    <UserX className="w-3.5 h-3.5"/>
+                  </button>
+                )}
+              </div>
+              {/* Mobile: info tambahan */}
+              <div className="flex md:hidden items-center gap-2 mt-2">
+                <StatusBadge status={emp.employee?.status}/>
+                <span className="text-[11px] text-[var(--text-muted)]">{emp.employee?.position} · {emp.employee?.department}</span>
+              </div>
+            </div>
           ))}
         </div>
       )}

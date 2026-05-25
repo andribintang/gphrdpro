@@ -1,297 +1,280 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Truck, Package, Search, Filter, RefreshCw, Check, Copy, ExternalLink } from 'lucide-react';
+import {
+  Truck, RefreshCw, Copy, Check, CheckCircle2,
+  Download, MessageCircle, Calendar, Search, X,
+  Package, ChevronRight, Filter
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable, { StatusBadge } from '../../components/DataTable';
-import { erpService, toRpShort, CHANNELS, COURIERS } from '../../utils/erp/erpService';
-
-const SHIPMENT_STATUS = {
-  pending:   { label:'Belum Kirim', color:'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700' },
-  packed:    { label:'Packing',     color:'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-  shipped:   { label:'Dikirim',     color:'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-  delivered: { label:'Terkirim',    color:'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-  returned:  { label:'Return',      color:'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800' },
-};
-
-// ── Input Resi Modal ──────────────────────────────────────────
-const ResiModal = ({ order, onClose, onSuccess }) => {
-  const [form, setForm] = useState({
-    courier:'JNE', service:'REG', tracking_no:'', weight:'', notes:''
-  });
-  const [saving, setSaving] = useState(false);
-  const sf = (k,v) => setForm(f=>({...f,[k]:v}));
-
-  const handle = async () => {
-    if (!form.tracking_no.trim()) { toast.error('Nomor resi wajib diisi'); return; }
-    setSaving(true);
-    try {
-      await erpService.addShipment(order.id, {
-        ...form, shipped_at: new Date().toISOString(), status:'shipped',
-      });
-      toast.success(`Resi ${form.tracking_no} disimpan`);
-      onSuccess(); onClose();
-    } catch (e) { toast.error(e.response?.data?.message||'Gagal'); }
-    finally { setSaving(false); }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-backdrop" />
-      <div className="modal-box max-w-sm" onClick={e=>e.stopPropagation()}>
-        <div className="modal-header">
-          <div>
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Input Resi</h3>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">{order.order_no} · {order.customer_name||'—'}</p>
-          </div>
-          <button onClick={onClose} className="btn-icon-sm">✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="field-label">Ekspedisi</label>
-              <select value={form.courier} onChange={e=>sf('courier',e.target.value)} className="input-base text-sm">
-                {COURIERS.map(c=><option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="field-label">Layanan</label>
-              <select value={form.service} onChange={e=>sf('service',e.target.value)} className="input-base text-sm">
-                {['REG','YES','OKE','EXPRESS','CARGO','SAME DAY'].map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="field-label">Nomor Resi *</label>
-            <input value={form.tracking_no} onChange={e=>sf('tracking_no',e.target.value.toUpperCase())}
-              placeholder="JD0001234567890" className="input-base font-mono" autoFocus />
-          </div>
-          <div>
-            <label className="field-label">Berat (kg)</label>
-            <input type="number" step="0.1" value={form.weight} onChange={e=>sf('weight',e.target.value)}
-              placeholder="1.0" className="input-base" />
-          </div>
-          <div>
-            <label className="field-label">Catatan</label>
-            <input value={form.notes} onChange={e=>sf('notes',e.target.value)}
-              placeholder="Catatan pengiriman" className="input-base" />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
-          <button onClick={handle} disabled={saving} className="btn-primary flex-1">
-            <Truck size={15} /> {saving ? 'Menyimpan...' : 'Simpan Resi'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { erpService, toRpShort } from '../../utils/erp/erpService';
 
 export default function ShipmentsPage() {
-  const [shipments, setShipments]   = useState([]);
-  const [pendingOrders, setPending] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [tab, setTab]               = useState('pending'); // pending | all
-  const [resiOrder, setResiOrder]   = useState(null);
-  const [dateRange, setDate]        = useState(() => {
-    const now = new Date();
-    return {
-      from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
-      to:   now.toISOString().split('T')[0],
-    };
-  });
+  const [shipments, setShipments] = useState([]);
+  const [loading, setLoad]        = useState(true);
+  const [copied, setCopied]       = useState(false);
+  const [tab, setTab]             = useState('report'); // 'report' | 'all'
+
+  const today = new Date().toISOString().split('T')[0];
+  const [dateRange, setDate] = useState({ from: today, to: today });
 
   const fetch = useCallback(async () => {
-    setLoading(true);
+    setLoad(true);
     try {
-      const [shipRes, orderRes] = await Promise.all([
-        erpService.getShipmentReport({ date_from: dateRange.from, date_to: dateRange.to }),
-        // Orders confirmed/processing without shipment — need resi
-        erpService.getOrders({ status:'confirmed', limit:200 }),
-      ]);
-      setShipments(shipRes.data.data.shipments || []);
-      // Filter: marketplace orders that need resi
-      const orders = orderRes.data.data.orders || [];
-      setPending(orders.filter(o =>
-        (o.channel === 'marketplace' || o.channel === 'wa') && !o.shipment
-      ));
-    } catch { toast.error('Gagal memuat data'); }
-    finally { setLoading(false); }
+      const res = await erpService.getShipmentReport({
+        date_from: dateRange.from,
+        date_to:   dateRange.to,
+      });
+      setShipments(res.data.data.shipments || res.data.data.orders || []);
+    } catch { toast.error('Gagal memuat data pengiriman'); }
+    finally { setLoad(false); }
   }, [dateRange]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const copyResi = (resi) => {
-    navigator.clipboard.writeText(resi);
-    toast.success('Resi disalin!');
+  // ── Format laporan untuk copy ke WA ──────────────────────
+  const generateReport = () => {
+    const from = new Date(dateRange.from).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+    const to   = new Date(dateRange.to).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+    const title = from === to
+      ? `Info Resi Pengiriman BRT ${from}`
+      : `Info Resi Pengiriman BRT ${from} - ${to}`;
+
+    const shipped = shipments.filter(s => s.shipment?.tracking_no || s.tracking_no);
+
+    if (!shipped.length) return null;
+
+    const lines = shipped.map((s, idx) => {
+      const name     = s.customer_name || s.recipient_name || '—';
+      const resi     = s.shipment?.tracking_no || s.tracking_no || '—';
+      const courier  = s.shipment?.courier || s.courier || '';
+      return `${idx + 1}.${name} : ${courier}${resi}`;
+    });
+
+    return `${title}\n${lines.join('\n')}`;
   };
 
-  const markDelivered = async (shipmentId, orderId) => {
-    try {
-      await erpService.updateShipment(orderId, shipmentId, {
-        status:'delivered', delivered_at: new Date().toISOString()
-      });
-      toast.success('Status diupdate: Terkirim');
-      fetch();
-    } catch (e) { toast.error('Gagal'); }
+  const handleCopy = () => {
+    const text = generateReport();
+    if (!text) { toast.error('Tidak ada data resi untuk disalin'); return; }
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      toast.success(`${shipments.filter(s=>s.shipment?.tracking_no||s.tracking_no).length} resi disalin ke clipboard!`);
+      setTimeout(() => setCopied(false), 3000);
+    }).catch(() => toast.error('Gagal menyalin'));
   };
 
-  // ── Pending orders columns ──────────────────────────────────
-  const pendingColumns = [
-    {
-      key:'order_no', label:'No. Order', nowrap:true,
-      render: v => <span className="font-mono text-xs font-semibold">{v}</span>,
-    },
-    {
-      key:'order_date', label:'Tanggal', nowrap:true,
-      render: v => <span className="text-[var(--text-secondary)]">{v}</span>,
-    },
-    {
-      key:'customer_name', label:'Pelanggan',
-      render: v => <span className="font-medium">{v||'—'}</span>,
-    },
-    {
-      key:'customer_city', label:'Kota',
-      render: v => <span className="text-[var(--text-secondary)]">{v||'—'}</span>,
-    },
-    {
-      key:'channel', label:'Channel', nowrap:true,
-      render: v => {
-        const ch = CHANNELS[v]||CHANNELS.direct;
-        return <StatusBadge label={ch.label} color={`${ch.bg} ${ch.color} border-transparent`} />;
-      },
-    },
-    {
-      key:'total_amount', label:'Total', align:'right', nowrap:true,
-      render: v => <span className="font-semibold">{toRpShort(v)}</span>,
-    },
-  ];
+  const shippedCount  = shipments.filter(s => s.shipment?.tracking_no || s.tracking_no).length;
+  const pendingCount  = shipments.filter(s => !(s.shipment?.tracking_no || s.tracking_no)).length;
 
-  // ── All shipments columns ───────────────────────────────────
-  const shipmentColumns = [
-    {
-      key:'order', label:'Order', nowrap:true,
-      render: (v) => <span className="font-mono text-xs font-semibold">{v?.order_no||'—'}</span>,
-    },
-    {
-      key:'order', label:'Pelanggan',
-      render: (v) => <span className="font-medium">{v?.customer_name||'—'}</span>,
-    },
-    {
-      key:'courier', label:'Ekspedisi', nowrap:true,
-      render: (v, row) => <span className="font-semibold">{v} {row.service}</span>,
-    },
-    {
-      key:'tracking_no', label:'Nomor Resi', nowrap:true,
-      render: (v) => v ? (
+  const columns = [
+    { key:'_no', label:'No', width:'48px', render:(_,row,idx)=><span className="text-[var(--text-muted)] font-mono text-xs">{idx+1}</span> },
+    { key:'customer_name', label:'Nama Customer', render:(v,row)=>(
+      <div>
+        <p className="font-semibold text-sm">{v || row.recipient_name || '—'}</p>
+        <p className="text-[11px] text-[var(--text-muted)]">{row.order_no || ''}</p>
+      </div>
+    )},
+    { key:'order_date', label:'Tanggal', nowrap:true, render:v=><span className="text-[var(--text-secondary)]">{v}</span> },
+    { key:'shipment', label:'Ekspedisi', nowrap:true, render:(v,row)=>{
+      const courier = v?.courier || row.courier;
+      return courier
+        ? <span className="px-2 py-0.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-xs font-bold">{courier}</span>
+        : <span className="text-[var(--text-muted)]">—</span>;
+    }},
+    { key:'shipment', label:'Nomor Resi', nowrap:true, render:(v,row)=>{
+      const resi = v?.tracking_no || row.tracking_no;
+      return resi ? (
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-semibold text-[var(--brand-600)] dark:text-[var(--brand-500)]">{v}</span>
-          <button onClick={() => copyResi(v)} className="btn-icon-sm" title="Salin resi">
-            <Copy size={12} />
-          </button>
+          <span className="font-mono text-sm font-bold text-[var(--brand-600)]">{resi}</span>
+          <button onClick={()=>{navigator.clipboard.writeText(resi);toast.success('Resi disalin!');}}
+            className="btn-icon-sm"><Copy size={12}/></button>
         </div>
-      ) : <span className="text-[var(--text-muted)]">—</span>,
-    },
-    {
-      key:'shipped_at', label:'Tgl Kirim', nowrap:true,
-      render: v => <span className="text-[var(--text-secondary)]">{v?.split('T')[0]||'—'}</span>,
-    },
-    {
-      key:'status', label:'Status', nowrap:true,
-      render: v => {
-        const st = SHIPMENT_STATUS[v]||SHIPMENT_STATUS.pending;
-        return <StatusBadge label={st.label} color={st.color} />;
-      },
-    },
+      ) : <span className="text-[11px] text-amber-600 font-semibold">Belum ada resi</span>;
+    }},
+    { key:'shipment', label:'Status', nowrap:true, render:(v,row)=>{
+      const status = v?.status || row.shipment_status;
+      const colors = {
+        delivered: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200',
+        shipped:   'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200',
+        pending:   'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200',
+      };
+      const labels = { delivered:'Terkirim', shipped:'Dalam Pengiriman', pending:'Menunggu' };
+      const s = status || 'pending';
+      return <StatusBadge label={labels[s]||s} color={colors[s]||colors.pending}/>;
+    }},
   ];
+
+  // Render numbered list for preview
+  const reportText = generateReport();
+  const reportLines = reportText ? reportText.split('\n') : [];
 
   return (
     <div className="section animate-fade-in">
-      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
-        <span>ERP</span><span>›</span>
-        <span className="font-semibold text-[var(--text-primary)]">Pengiriman</span>
-      </nav>
-
       <div className="page-header">
         <div>
-          <h1 className="page-title">Pengiriman & Resi</h1>
-          <p className="body-sm text-[var(--text-muted)]">Kelola resi pengiriman marketplace & WA</p>
+          <h1 className="page-title">Pengiriman</h1>
+          <p className="body-sm text-[var(--text-muted)]">Laporan resi & status pengiriman</p>
         </div>
-        <button onClick={fetch} className="btn-icon"><RefreshCw size={16} /></button>
+        <button onClick={fetch} disabled={loading} className="btn-icon">
+          <RefreshCw size={16} className={loading?'animate-spin':''}/>
+        </button>
+      </div>
+
+      {/* Date filter */}
+      <div className="card-sm mb-5 flex items-center gap-3 flex-wrap">
+        <Calendar size={15} className="text-[var(--text-muted)] flex-shrink-0"/>
+        <input type="date" value={dateRange.from}
+          onChange={e=>setDate(r=>({...r,from:e.target.value}))}
+          className="input-base h-9 text-sm flex-1 min-w-32"/>
+        <span className="text-xs text-[var(--text-muted)]">s/d</span>
+        <input type="date" value={dateRange.to}
+          onChange={e=>setDate(r=>({...r,to:e.target.value}))}
+          className="input-base h-9 text-sm flex-1 min-w-32"/>
+        <div className="flex gap-2 ml-auto">
+          {/* Quick filters */}
+          {[
+            { l:'Hari Ini', f:()=>setDate({from:today,to:today}) },
+            { l:'7 Hari',   f:()=>{ const d=new Date(); d.setDate(d.getDate()-6); setDate({from:d.toISOString().split('T')[0],to:today}); }},
+          ].map(q=>(
+            <button key={q.l} onClick={q.f}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-all">
+              {q.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {[
+          {l:'Total Order',        v:shipments.length,  color:'text-[var(--text-primary)]'},
+          {l:'Sudah Ada Resi',     v:shippedCount,      color:'text-emerald-600'},
+          {l:'Belum Ada Resi',     v:pendingCount,      color:'text-amber-600'},
+        ].map(s=>(
+          <div key={s.l} className="card p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">{s.l}</p>
+            <p className={`text-2xl font-black ${s.color}`}>{s.v}</p>
+          </div>
+        ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
-        {[
-          { k:'pending', l:'Perlu Resi', count: pendingOrders.length },
-          { k:'all',     l:'Semua Pengiriman' },
-        ].map(t => (
-          <button key={t.k} onClick={() => setTab(t.k)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${
-              tab===t.k ? 'bg-[var(--brand-600)] text-white' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
+      <div className="flex gap-1 p-1 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] mb-5 max-w-xs">
+        {[{k:'report',l:'Laporan WA'},{k:'all',l:'Semua Data'}].map(t=>(
+          <button key={t.k} onClick={()=>setTab(t.k)}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${tab===t.k?'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]':'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             {t.l}
-            {t.count > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${tab===t.k ? 'bg-white/20 text-white' : 'bg-red-500 text-white'}`}>
-                {t.count}
-              </span>
-            )}
           </button>
         ))}
       </div>
 
-      {tab === 'pending' ? (
+      {/* ── Tab: Laporan WA ─────────────────────────────── */}
+      {tab === 'report' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Preview */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={15} className="text-emerald-600"/>
+                <h3 className="text-sm font-bold">Preview Laporan WA</h3>
+              </div>
+              <span className="text-xs text-[var(--text-muted)]">{shippedCount} resi</span>
+            </div>
+            <div className="p-5">
+              {loading ? (
+                <div className="space-y-2">{[...Array(5)].map((_,i)=><div key={i} className="skeleton h-4 rounded"/>)}</div>
+              ) : !reportText ? (
+                <div className="text-center py-8">
+                  <Truck size={32} className="mx-auto mb-2 text-[var(--text-muted)] opacity-30"/>
+                  <p className="text-sm text-[var(--text-muted)]">Tidak ada resi pada periode ini</p>
+                </div>
+              ) : (
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-4 font-mono text-[12px] space-y-0.5 max-h-80 overflow-y-auto scrollbar-thin">
+                  {reportLines.map((line, i) => (
+                    <div key={i} className={`${i===0?'font-bold text-[var(--text-primary)] mb-2':'text-[var(--text-secondary)]'}`}>
+                      {i===0 ? (
+                        <span className="text-[var(--brand-600)]">{line}</span>
+                      ) : line}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {reportText && (
+              <div className="px-5 pb-5">
+                <button onClick={handleCopy}
+                  className={`w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${
+                    copied
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}>
+                  {copied ? <><CheckCircle2 size={16}/> Disalin!</> : <><Copy size={16}/> Copy untuk WA</>}
+                </button>
+                <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">
+                  Paste langsung ke grup WhatsApp
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Detail resi list */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)]">
+              <h3 className="text-sm font-bold">Detail Resi</h3>
+            </div>
+            <div className="divide-y divide-[var(--border-subtle)] max-h-[480px] overflow-y-auto scrollbar-thin">
+              {loading ? (
+                [...Array(5)].map((_,i)=><div key={i} className="px-5 py-4"><div className="skeleton h-10 rounded"/></div>)
+              ) : shipments.filter(s=>s.shipment?.tracking_no||s.tracking_no).length === 0 ? (
+                <div className="text-center py-12 text-[var(--text-muted)]">
+                  <Package size={28} className="mx-auto mb-2 opacity-30"/>
+                  <p className="text-sm">Tidak ada resi pada periode ini</p>
+                </div>
+              ) : (
+                shipments.filter(s=>s.shipment?.tracking_no||s.tracking_no).map((s,idx)=>{
+                  const resi    = s.shipment?.tracking_no || s.tracking_no;
+                  const courier = s.shipment?.courier || s.courier || '';
+                  const name    = s.customer_name || s.recipient_name || '—';
+                  return (
+                    <div key={s.id||idx} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors">
+                      <span className="text-[11px] font-bold text-[var(--text-muted)] w-6 flex-shrink-0">{idx+1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold truncate">{name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {courier && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{courier}</span>}
+                          <span className="font-mono text-[11px] text-[var(--brand-600)] font-bold">{resi}</span>
+                        </div>
+                      </div>
+                      <button onClick={()=>{navigator.clipboard.writeText(resi);toast.success('Resi disalin!');}}
+                        className="btn-icon-sm flex-shrink-0"><Copy size={12}/></button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Semua Data ──────────────────────────────── */}
+      {tab === 'all' && (
         <DataTable
-          columns={pendingColumns}
-          data={pendingOrders}
+          columns={columns.map((col, idx) => ({
+            ...col,
+            render: col.render
+              ? (v, row) => col.render(v, row, shipments.indexOf(row))
+              : undefined,
+          }))}
+          data={shipments}
           loading={loading}
-          searchKeys={['order_no','customer_name','customer_city']}
-          searchPlaceholder="Cari order, pelanggan, kota..."
-          emptyIcon={<Package size={40} />}
-          emptyText="Semua order sudah memiliki resi"
-          actions={(row) => (
-            <button onClick={() => setResiOrder(row)}
-              className="btn-primary text-xs px-3 h-7 gap-1.5">
-              <Truck size={12} /> Input Resi
-            </button>
-          )}
+          searchKeys={['customer_name','order_no']}
+          searchPlaceholder="Cari nama customer, no. order..."
+          emptyIcon={<Truck size={40}/>}
+          emptyText="Tidak ada data pengiriman"
           pageSize={25}
           zebra
         />
-      ) : (
-        <>
-          {/* Date filter for all shipments */}
-          <div className="card-sm mb-4 flex items-center gap-3 flex-wrap">
-            <input type="date" value={dateRange.from} onChange={e=>setDate(r=>({...r,from:e.target.value}))}
-              className="input-base h-9 text-sm flex-1 min-w-28" />
-            <span className="text-xs text-[var(--text-muted)]">s/d</span>
-            <input type="date" value={dateRange.to} onChange={e=>setDate(r=>({...r,to:e.target.value}))}
-              className="input-base h-9 text-sm flex-1 min-w-28" />
-          </div>
-
-          <DataTable
-            columns={shipmentColumns}
-            data={shipments}
-            loading={loading}
-            searchKeys={['tracking_no']}
-            searchPlaceholder="Cari nomor resi..."
-            filters={[
-              { key:'status', label:'Status', options: Object.entries(SHIPMENT_STATUS).map(([k,v])=>({value:k,label:v.label})) },
-              { key:'courier', label:'Ekspedisi', options: COURIERS.map(c=>({value:c,label:c})) },
-            ]}
-            emptyIcon={<Truck size={40} />}
-            emptyText="Belum ada data pengiriman"
-            actions={(row) => row.status === 'shipped' ? (
-              <button onClick={() => markDelivered(row.id, row.order_id)}
-                className="btn-secondary text-xs px-2.5 h-7 gap-1">
-                <Check size={12} /> Terkirim
-              </button>
-            ) : null}
-            pageSize={25}
-            zebra
-          />
-        </>
       )}
-
-      {resiOrder && <ResiModal order={resiOrder} onClose={() => setResiOrder(null)} onSuccess={fetch} />}
     </div>
   );
 }

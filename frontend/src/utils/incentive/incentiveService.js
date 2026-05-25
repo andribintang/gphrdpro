@@ -58,6 +58,7 @@ export const incentiveService = {
   getWaSales:    (params) => api.get(`${BASE}/sales/wa`, { params }),
   createWaSale:  (data)   => api.post(`${BASE}/sales/wa`, data),
   updateWaSale:  (id, d)  => api.put(`${BASE}/sales/wa/${id}`, d),
+  syncFromERP:     (periodId) => api.post(`${BASE}/sync-erp/${periodId}`),
   deleteWaSale:  (id)     => api.delete(`${BASE}/sales/wa/${id}`),
 
   // Marketplace

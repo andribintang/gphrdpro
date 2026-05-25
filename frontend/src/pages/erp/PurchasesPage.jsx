@@ -1,179 +1,240 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  ShoppingBag, Plus, ChevronRight, RefreshCw,
-  Loader2, X, CheckCircle2, Trash2, Search,
-  Package, ChevronLeft, AlertTriangle
+  ShoppingBag, Plus, Eye, Edit3, X, Loader2, CheckCircle2,
+  RefreshCw, Package, Printer, Search, ChevronDown, Truck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DataTable, { StatusBadge } from '../../components/DataTable';
+import PeriodFilter from '../../components/PeriodFilter';
 import { erpService, toRp, toRpShort, PURCHASE_STATUS } from '../../utils/erp/erpService';
 
-// ── New PO Modal ──────────────────────────────────────────────
-const NewPoModal = ({ onClose, onSuccess }) => {
-  const [branch, setBranch]     = useState(1);
-  const [supplier, setSupplier] = useState({ name:'', phone:'' });
-  const [items, setItems]       = useState([]);
-  const [prodSearch, setProdSearch] = useState('');
-  const [prodResults, setProdResults] = useState([]);
-  const [shippingCost, setShipping] = useState(0);
-  const [notes, setNotes]       = useState('');
-  const [saving, setSaving]     = useState(false);
+const STATUS_COLORS = {
+  draft:    'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200',
+  ordered:  'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200',
+  partial:  'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200',
+  received: 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200',
+  cancelled:'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200',
+};
 
+// ── Supplier Autocomplete ────────────────────────────────────
+const SupplierInput = ({ value, onChange, onSelect }) => {
+  const [results, setResults] = useState([]);
+  const [show, setShow]       = useState(false);
 
   useEffect(() => {
-    if (!prodSearch.trim()) { setProdResults([]); return; }
-    const t = setTimeout(async () => {
-      const res = await erpService.getProducts({ search: prodSearch, branch_id: branch, limit: 6 });
-      setProdResults(res.data.data.products);
+    if (!value?.trim()) { setResults([]); return; }
+    const t = setTimeout(() => {
+      erpService.getSuppliers({ search: value })
+        .then(r => setResults(r.data.data.suppliers || []))
+        .catch(() => {});
     }, 300);
     return () => clearTimeout(t);
-  }, [prodSearch, branch]);
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <input value={value} onChange={e => { onChange(e.target.value); setShow(true); }}
+        onFocus={() => setShow(true)} onBlur={() => setTimeout(() => setShow(false), 200)}
+        placeholder="Nama supplier..." className="input-base" autoFocus/>
+      {show && results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
+          {results.map((s, i) => (
+            <button key={i} onMouseDown={() => { onSelect(s); setShow(false); }}
+              className="w-full text-left px-4 py-3 hover:bg-[var(--bg-secondary)] transition-colors">
+              <p className="text-sm font-semibold">{s.supplier_name}</p>
+              {s.supplier_phone && <p className="text-xs text-[var(--text-muted)]">{s.supplier_phone}</p>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Product Search ───────────────────────────────────────────
+const ProductSearch = ({ onAdd, branch_id }) => {
+  const [q, setQ]         = useState('');
+  const [results, setRes] = useState([]);
+  const [show, setShow]   = useState(false);
+
+  useEffect(() => {
+    if (!q.trim()) { setRes([]); return; }
+    const t = setTimeout(() => {
+      erpService.getProducts({ search: q, branch_id, limit: 8 })
+        .then(r => setRes(r.data.data.products || []))
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, branch_id]);
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <Search size={14} className="absolute left-3 text-[var(--text-muted)]"/>
+        <input value={q} onChange={e => { setQ(e.target.value); setShow(true); }}
+          onFocus={() => setShow(true)} onBlur={() => setTimeout(() => setShow(false), 200)}
+          placeholder="Cari produk untuk ditambahkan..." className="input-base pl-9 text-sm"/>
+      </div>
+      {show && results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto scrollbar-thin">
+          {results.map(p => (
+            <button key={p.id} onMouseDown={() => { onAdd(p); setQ(''); setRes([]); setShow(false); }}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-secondary)] transition-colors text-left">
+              <Package size={14} className="text-[var(--text-muted)] flex-shrink-0"/>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{p.name}</p>
+                <p className="text-xs text-[var(--text-muted)]">SKU: {p.sku||'—'} · Harga Beli: {toRpShort(p.buy_price)}</p>
+              </div>
+              <span className="text-xs text-[var(--brand-600)] font-semibold flex-shrink-0">Stok: {p.stock?.qty||0}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── PO Form Modal (Create/Edit) ───────────────────────────────
+const POFormModal = ({ po, onClose, onSuccess }) => {
+  const isEdit = !!po;
+  const today  = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({
+    branch_id:         po?.branch_id      || 1,
+    supplier_name:     po?.supplier_name  || '',
+    supplier_phone:    po?.supplier_phone || '',
+    supplier_email:    po?.supplier_email || '',
+    supplier_address:  po?.supplier_address || '',
+    order_date:        po?.order_date     || today,
+    expected_date:     po?.expected_date  || '',
+    shipping_cost:     po?.shipping_cost  || 0,
+    notes:             po?.notes          || '',
+  });
+  const [items, setItems] = useState(
+    po?.items?.map(i => ({ product_id: i.product_id, product_name: i.product_name, qty_ordered: i.qty_ordered, buy_price: i.buy_price })) ||
+    []
+  );
+  const [saving, setSaving] = useState(false);
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const addProduct = (p) => {
-    setItems(prev => {
-      const ex = prev.find(i => i.product_id === p.id);
-      if (ex) return prev.map(i => i.product_id === p.id ? {...i, qty: i.qty+1} : i);
-      return [...prev, { product_id: p.id, product_name: p.name, qty: 1, buy_price: parseFloat(p.buy_price)||0 }];
-    });
-    setProdSearch(''); setProdResults([]);
+    if (items.find(i => i.product_id === p.id)) { toast('Produk sudah ada di list'); return; }
+    setItems(prev => [...prev, { product_id: p.id, product_name: p.name, qty_ordered: 1, buy_price: parseFloat(p.buy_price||0) }]);
   };
+  const updateItem = (idx, k, v) => setItems(p => p.map((it, i) => i===idx ? { ...it, [k]: v } : it));
+  const removeItem = (idx) => setItems(p => p.filter((_, i) => i !== idx));
 
-  const subtotal    = items.reduce((s,i) => s + (i.buy_price * i.qty), 0);
-  const totalAmount = subtotal + parseFloat(shippingCost||0);
+  const subtotal = items.reduce((s, i) => s + (parseFloat(i.buy_price)||0) * (parseInt(i.qty_ordered)||0), 0);
+  const total    = subtotal + (parseFloat(form.shipping_cost)||0);
 
   const handle = async () => {
-    if (!items.length) { toast.error('Tambahkan minimal 1 produk'); return; }
+    if (!form.supplier_name.trim()) { toast.error('Nama supplier wajib'); return; }
+    if (!items.length) { toast.error('Minimal 1 produk'); return; }
     setSaving(true);
     try {
-      await erpService.createPurchase({
-        branch_id: branch, supplier_name: supplier.name||null,
-        supplier_phone: supplier.phone||null,
-        order_date: new Date().toISOString().split('T')[0],
-        items: items.map(i => ({ product_id: i.product_id, qty: i.qty, buy_price: i.buy_price })),
-        shipping_cost: parseFloat(shippingCost||0), notes,
-      });
-      toast.success('PO berhasil dibuat');
+      const payload = { ...form, items };
+      if (isEdit) await erpService.updatePurchase(po.id, payload);
+      else        await erpService.createPurchase(payload);
+      toast.success(isEdit ? 'PO diperbarui' : `PO berhasil dibuat`);
       onSuccess(); onClose();
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    } catch(e) { toast.error(e.response?.data?.message || 'Gagal'); }
     finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      {/* ERP Breadcrumb */}
-      <nav className="flex items-center gap-1.5 mb-5 text-xs text-[var(--text-muted)] select-none">
-        <span>ERP</span><span>›</span>
-        <span>Inventory</span><span>›</span>
-        <span className="font-semibold text-[var(--text-primary)]">Pembelian</span>
-      </nav>
-
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full sm:max-w-lg bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[92vh] flex flex-col"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Buat Purchase Order</h3>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]"><X className="w-4 h-4" /></button>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop"/>
+      <div className="modal-box max-w-2xl" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="text-sm font-bold">{isEdit ? `Edit PO: ${po.po_no}` : 'Buat Purchase Order'}</h3>
+          <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
-          {/* Branch */}
-          <div className="grid grid-cols-2 gap-2">
-            {[{id:1,name:'GP Racing'},{id:2,name:'GP Distro'}].map(b => (
-              <button key={b.id} onClick={() => { setBranch(b.id); setItems([]); }}
-                className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${branch===b.id ? 'bg-brand-500 text-white border-brand-500' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'}`}>
-                {b.name}
-              </button>
-            ))}
+        <div className="modal-body">
+          {/* Header info */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Cabang</label>
+              <select value={form.branch_id} onChange={e=>sf('branch_id',parseInt(e.target.value))} className="input-base text-sm" disabled={isEdit}>
+                <option value={1}>GP Racing</option><option value={2}>GP Distro</option>
+              </select>
+            </div>
+            <div><label className="field-label">Tanggal PO</label><input type="date" value={form.order_date} onChange={e=>sf('order_date',e.target.value)} className="input-base"/></div>
           </div>
 
-          {/* Supplier */}
-          <div className="space-y-2">
-            <label className="field-label">Supplier</label>
-            <input value={supplier.name} onChange={e => setSupplier(s=>({...s,name:e.target.value}))}
-              placeholder="Nama supplier" className="input-base text-sm" />
-            <input value={supplier.phone} onChange={e => setSupplier(s=>({...s,phone:e.target.value}))}
-              placeholder="No. HP supplier" className="input-base text-sm" />
+          {/* Supplier section */}
+          <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Informasi Supplier</p>
+            <div>
+              <label className="field-label">Nama Supplier *</label>
+              <SupplierInput
+                value={form.supplier_name}
+                onChange={v => sf('supplier_name', v)}
+                onSelect={s => setForm(f => ({ ...f, supplier_name: s.supplier_name, supplier_phone: s.supplier_phone||'', supplier_email: s.supplier_email||'', supplier_address: s.supplier_address||'' }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="field-label">No. HP</label><input value={form.supplier_phone} onChange={e=>sf('supplier_phone',e.target.value)} className="input-base text-sm" placeholder="08xxx"/></div>
+              <div><label className="field-label">Email</label><input type="email" value={form.supplier_email} onChange={e=>sf('supplier_email',e.target.value)} className="input-base text-sm" placeholder="supplier@email.com"/></div>
+            </div>
+            <div><label className="field-label">Alamat</label><textarea value={form.supplier_address} onChange={e=>sf('supplier_address',e.target.value)} rows={2} className="input-base resize-none text-sm" placeholder="Alamat supplier (opsional)"/></div>
           </div>
 
           {/* Products */}
           <div>
-            <label className="field-label">Produk</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-              <input value={prodSearch} onChange={e => setProdSearch(e.target.value)}
-                placeholder="Cari produk..." className="input-base pl-9 text-sm" />
-            </div>
-            {prodResults.length > 0 && (
-              <div className="mt-1 border border-[var(--border)] rounded-xl overflow-hidden">
-                {prodResults.map(p => (
-                  <button key={p.id} onClick={() => addProduct(p)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--bg-secondary)] text-left border-b border-[var(--border-subtle)] last:border-0">
-                    <Package className="w-4 h-4 text-[var(--text-muted)]" />
+            <label className="field-label mb-2">Produk</label>
+            <ProductSearch onAdd={addProduct} branch_id={form.branch_id}/>
+            {items.length > 0 && (
+              <div className="mt-2 space-y-2 max-h-52 overflow-y-auto scrollbar-thin">
+                {items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{p.name}</p>
-                      <p className="text-[10px] text-[var(--text-muted)]">HPP: {toRp(p.buy_price)} · Stok: {p.stock?.qty||0}</p>
+                      <p className="text-xs font-semibold truncate">{item.product_name}</p>
                     </div>
-                    <Plus className="w-4 h-4 text-brand-500" />
-                  </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-[var(--text-muted)]">Qty</span>
+                        <input type="number" min={1} value={item.qty_ordered}
+                          onChange={e=>updateItem(idx,'qty_ordered',parseInt(e.target.value)||1)}
+                          className="input-base h-7 w-16 text-xs text-center"/>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-[var(--text-muted)]">Harga Beli</span>
+                        <input type="number" min={0} value={item.buy_price}
+                          onChange={e=>updateItem(idx,'buy_price',parseFloat(e.target.value)||0)}
+                          className="input-base h-7 w-28 text-xs text-right"/>
+                      </div>
+                      <span className="text-xs font-bold text-[var(--brand-600)] min-w-16 text-right">{toRpShort((item.buy_price||0)*(item.qty_ordered||0))}</span>
+                      <button onClick={()=>removeItem(idx)} className="btn-icon-sm text-red-500"><X size={12}/></button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Items */}
-          {items.length > 0 && (
-            <div className="space-y-2">
-              {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{item.product_name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input type="number" value={item.qty} min={1}
-                        onChange={e => setItems(p => p.map((i,n) => n===idx ? {...i,qty:parseInt(e.target.value)||1} : i))}
-                        className="input-base text-xs h-7 w-16 text-center" />
-                      <span className="text-xs text-[var(--text-muted)]">×</span>
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)]">Rp</span>
-                        <input type="number" value={item.buy_price}
-                          onChange={e => setItems(p => p.map((i,n) => n===idx ? {...i,buy_price:parseFloat(e.target.value)||0} : i))}
-                          className="input-base pl-6 text-xs h-7 w-28" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-[var(--text-primary)]">{toRp(item.buy_price * item.qty)}</p>
-                    <button onClick={() => setItems(p => p.filter((_,n) => n!==idx))}
-                      className="text-[10px] text-red-500 hover:underline">hapus</button>
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)]">
-                <span className="text-xs text-[var(--text-secondary)]">Ongkir</span>
-                <div className="relative w-32">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">Rp</span>
-                  <input type="number" value={shippingCost} onChange={e => setShipping(e.target.value)}
-                    className="input-base pl-7 text-xs h-8 w-full text-right" />
-                </div>
-              </div>
-              <div className="flex justify-between font-bold p-2">
-                <span className="text-sm text-[var(--text-primary)]">Total</span>
-                <span className="text-base text-brand-600 dark:text-brand-400">{toRp(totalAmount)}</span>
-              </div>
-            </div>
-          )}
+          {/* Footer info */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="field-label">Estimasi Tiba</label><input type="date" value={form.expected_date} onChange={e=>sf('expected_date',e.target.value)} className="input-base"/></div>
+            <div><label className="field-label">Biaya Kirim</label><input type="number" value={form.shipping_cost} onChange={e=>sf('shipping_cost',e.target.value)} className="input-base" min={0}/></div>
+          </div>
+          <div><label className="field-label">Catatan</label><textarea value={form.notes} onChange={e=>sf('notes',e.target.value)} rows={2} className="input-base resize-none text-sm" placeholder="Catatan untuk supplier..."/></div>
 
-          <div>
-            <label className="field-label">Catatan</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="input-base text-sm resize-none" />
+          {/* Total */}
+          <div className="flex justify-between items-center p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border)]">
+            <div className="text-sm space-y-0.5">
+              <div className="flex gap-8"><span className="text-[var(--text-muted)]">Subtotal</span><span className="font-semibold">{toRp(subtotal)}</span></div>
+              {parseFloat(form.shipping_cost) > 0 && <div className="flex gap-8"><span className="text-[var(--text-muted)]">Ongkir</span><span className="font-semibold">{toRp(form.shipping_cost)}</span></div>}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[var(--text-muted)]">TOTAL</p>
+              <p className="text-xl font-black text-[var(--brand-600)]">{toRp(total)}</p>
+            </div>
           </div>
         </div>
-
-        <div className="px-5 py-4 border-t border-[var(--border)] flex gap-2 flex-shrink-0">
+        <div className="modal-footer">
           <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
           <button onClick={handle} disabled={saving} className="btn-primary flex-1">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Buat PO
+            {saving?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>}
+            {isEdit?'Simpan Perubahan':'Buat PO'}
           </button>
         </div>
       </div>
@@ -181,54 +242,270 @@ const NewPoModal = ({ onClose, onSuccess }) => {
   );
 };
 
-// ── Receive PO Modal ──────────────────────────────────────────
-const ReceivePoModal = ({ po, onClose, onSuccess }) => {
-  const [received, setReceived] = useState(
-    po.items.map(i => ({ item_id: i.id, qty_received: i.qty_ordered - i.qty_received, product_name: i.product_name, qty_ordered: i.qty_ordered, qty_received_before: i.qty_received }))
-  );
+// ── Receive Modal (Partial) ───────────────────────────────────
+const ReceiveModal = ({ po, onClose, onSuccess }) => {
+  const today = new Date().toISOString().split('T')[0];
+  const [receivedDate, setDate] = useState(today);
+  const [qtys, setQtys]         = useState(() => {
+    const init = {};
+    (po.items||[]).forEach(i => { init[i.id] = i.qty_ordered - (i.qty_received||0); });
+    return init;
+  });
   const [saving, setSaving] = useState(false);
 
   const handle = async () => {
+    const items = Object.entries(qtys)
+      .filter(([_, qty]) => parseInt(qty) > 0)
+      .map(([id, qty]) => ({ purchase_item_id: parseInt(id), qty_received: parseInt(qty) }));
+    if (!items.length) { toast.error('Masukkan qty yang diterima'); return; }
     setSaving(true);
     try {
-      await erpService.receivePurchase(po.id, { received_items: received });
-      toast.success('Barang diterima — stok bertambah!');
+      await erpService.receivePurchase(po.id, { items, received_date: receivedDate });
+      toast.success('Penerimaan berhasil — stok bertambah');
       onSuccess(); onClose();
-    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    } catch(e) { toast.error(e.response?.data?.message||'Gagal'); }
     finally { setSaving(false); }
   };
 
+  const totalReceiving = (po.items||[]).reduce((s,i) => s + (toNum(i.buy_price) * (parseInt(qtys[i.id])||0)), 0);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-bold text-[var(--text-primary)] mb-1">Terima Barang</h3>
-        <p className="text-xs text-[var(--text-muted)] mb-4">PO: {po.po_no} — {po.supplier_name}</p>
-        <div className="space-y-3 mb-4 max-h-64 overflow-y-auto scrollbar-thin">
-          {received.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{item.product_name}</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Dipesan: {item.qty_ordered} · Sudah terima: {item.qty_received_before}</p>
-              </div>
-              <div>
-                <label className="field-label text-center">Terima</label>
-                <input type="number" value={item.qty_received} min={0} max={item.qty_ordered - item.qty_received_before}
-                  onChange={e => setReceived(p => p.map((r,n) => n===idx ? {...r,qty_received:parseInt(e.target.value)||0} : r))}
-                  className="input-base text-sm h-9 w-20 text-center" />
-              </div>
-            </div>
-          ))}
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop"/>
+      <div className="modal-box max-w-lg" onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <div><h3 className="text-sm font-bold">Terima Barang — {po.po_no}</h3><p className="text-xs text-[var(--text-muted)]">{po.supplier_name}</p></div>
+          <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
         </div>
-        <div className="flex gap-2">
-          <button onClick={onClose} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
-          <button onClick={handle} disabled={saving} className="btn-primary flex-1 h-10 text-sm">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Konfirmasi Terima
+        <div className="modal-body">
+          <div><label className="field-label">Tanggal Penerimaan</label><input type="date" value={receivedDate} onChange={e=>setDate(e.target.value)} className="input-base"/></div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="field-label">Item yang Diterima</label>
+              <button onClick={()=>setQtys(q=>{const n={...q};(po.items||[]).forEach(i=>{n[i.id]=i.qty_ordered-(i.qty_received||0);});return n;})}
+                className="text-xs text-[var(--brand-600)] font-semibold">Pilih Semua</button>
+            </div>
+            <div className="space-y-2">
+              {(po.items||[]).map(item => {
+                const remaining = item.qty_ordered - (item.qty_received||0);
+                return (
+                  <div key={item.id} className={`p-3 rounded-xl border ${remaining===0?'opacity-50 bg-[var(--bg-secondary)]':'bg-[var(--bg-secondary)] border-[var(--border)]'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate">{item.product_name}</p>
+                        <p className="text-[10px] text-[var(--text-muted)]">
+                          Pesan: {item.qty_ordered} · Sudah terima: {item.qty_received||0} · Sisa: {remaining}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-[var(--text-muted)]">Qty terima:</span>
+                        <input type="number" min={0} max={remaining} value={qtys[item.id]||0}
+                          onChange={e=>setQtys(q=>({...q,[item.id]:Math.min(remaining,Math.max(0,parseInt(e.target.value)||0))}))}
+                          disabled={remaining===0}
+                          className="input-base h-8 w-20 text-sm text-center"/>
+                        <span className="text-xs text-[var(--text-muted)]">/ {remaining}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex justify-between p-3 rounded-xl bg-[var(--brand-50)] dark:bg-[var(--brand-100)] border border-[var(--brand-600)]/20">
+            <span className="text-sm font-semibold">Nilai Penerimaan</span>
+            <span className="text-lg font-bold text-[var(--brand-600)]">{toRp(totalReceiving)}</span>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handle} disabled={saving} className="btn-primary flex-1">
+            {saving?<Loader2 size={15} className="animate-spin"/>:<Truck size={15}/>} Konfirmasi Penerimaan
           </button>
         </div>
       </div>
     </div>
+  );
+};
+
+// ── Print PO ─────────────────────────────────────────────────
+const printPO = (po) => {
+  const items = (po.items||[]).map((i,idx) => `
+    <tr>
+      <td>${idx+1}</td>
+      <td>${i.product_name}</td>
+      <td style="text-align:center">${i.qty_ordered}</td>
+      <td style="text-align:right">${new Intl.NumberFormat('id-ID').format(i.buy_price)}</td>
+      <td style="text-align:right">${new Intl.NumberFormat('id-ID').format(i.subtotal)}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>PO ${po.po_no}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, sans-serif; font-size: 12px; padding: 30px; color: #111; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:2px solid #111; padding-bottom:16px; }
+    .company { font-size:20px; font-weight:bold; color:#e11d48; }
+    .po-info { text-align:right; }
+    .po-number { font-size:18px; font-weight:bold; }
+    .section { margin-bottom:16px; }
+    .section-title { font-weight:bold; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#666; margin-bottom:6px; border-bottom:1px solid #eee; padding-bottom:4px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+    th { background:#111; color:#fff; padding:8px 10px; text-align:left; font-size:11px; }
+    td { padding:7px 10px; border-bottom:1px solid #eee; }
+    tr:nth-child(even) td { background:#f9f9f9; }
+    .totals { margin-left:auto; width:280px; }
+    .total-row { display:flex; justify-content:space-between; padding:4px 0; }
+    .total-final { font-weight:bold; font-size:14px; border-top:2px solid #111; padding-top:8px; margin-top:4px; }
+    .footer { margin-top:40px; display:flex; justify-content:space-between; }
+    .sign-box { text-align:center; width:180px; }
+    .sign-line { border-top:1px solid #333; margin-top:60px; padding-top:6px; font-size:11px; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:bold; background:#fff3cd; color:#856404; }
+    @media print { body { padding:15px; } }
+  </style>
+  </head><body>
+  <div class="header">
+    <div>
+      <div class="company">GPDISTRO</div>
+      <div style="font-size:11px;color:#666;margin-top:2px">GP Racing & GP Distro</div>
+    </div>
+    <div class="po-info">
+      <div style="font-size:11px;color:#666;font-weight:bold;text-transform:uppercase;">Purchase Order</div>
+      <div class="po-number">${po.po_no}</div>
+      <div style="font-size:11px;color:#666;margin-top:4px">Tanggal: ${po.order_date}</div>
+      ${po.expected_date?`<div style="font-size:11px;color:#666;">Estimasi tiba: ${po.expected_date}</div>`:''}
+    </div>
+  </div>
+
+  <div style="display:flex;gap:40px;margin-bottom:20px;">
+    <div class="section" style="flex:1">
+      <div class="section-title">Kepada / Supplier</div>
+      <div style="font-weight:bold;font-size:13px;">${po.supplier_name||'—'}</div>
+      ${po.supplier_phone?`<div>${po.supplier_phone}</div>`:''}
+      ${po.supplier_email?`<div>${po.supplier_email}</div>`:''}
+      ${po.supplier_address?`<div style="color:#666;margin-top:4px;">${po.supplier_address}</div>`:''}
+    </div>
+    <div class="section" style="flex:1">
+      <div class="section-title">Dari</div>
+      <div style="font-weight:bold;font-size:13px;">GPDISTRO</div>
+      <div>GP Racing / GP Distro</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:30px">No</th><th>Nama Produk</th><th style="width:70px;text-align:center">Qty</th><th style="width:110px;text-align:right">Harga Beli</th><th style="width:120px;text-align:right">Subtotal</th></tr></thead>
+    <tbody>${items}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="total-row"><span>Subtotal</span><span>Rp ${new Intl.NumberFormat('id-ID').format(po.subtotal)}</span></div>
+    ${parseFloat(po.shipping_cost)>0?`<div class="total-row"><span>Biaya Kirim</span><span>Rp ${new Intl.NumberFormat('id-ID').format(po.shipping_cost)}</span></div>`:''}
+    <div class="total-row total-final"><span>TOTAL</span><span>Rp ${new Intl.NumberFormat('id-ID').format(po.total_amount)}</span></div>
+  </div>
+
+  ${po.notes?`<div class="section" style="margin-top:16px;"><div class="section-title">Catatan</div><div>${po.notes}</div></div>`:''}
+
+  <div class="footer">
+    <div class="sign-box"><div class="sign-line">Supplier</div></div>
+    <div class="sign-box"><div class="sign-line">Dibuat oleh</div></div>
+    <div class="sign-box"><div class="sign-line">Disetujui oleh</div></div>
+  </div>
+  </body></html>`;
+
+  const w = window.open('', '_blank', 'width=800,height=600');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 500);
+};
+
+// ── Detail Modal ──────────────────────────────────────────────
+const DetailModal = ({ poId, onClose, onSuccess }) => {
+  const [po, setPo]         = useState(null);
+  const [loading, setLoad]  = useState(true);
+  const [showReceive, setRec] = useState(false);
+
+  useEffect(() => {
+    erpService.getPurchase(poId)
+      .then(r => setPo(r.data.data.purchase))
+      .catch(() => toast.error('Gagal'))
+      .finally(() => setLoad(false));
+  }, [poId]);
+
+  if (loading) return <div className="modal-overlay"><div className="modal-backdrop"/><div className="modal-box max-w-md items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-[var(--text-muted)] mx-auto"/></div></div>;
+  if (!po) return null;
+
+  const st = PURCHASE_STATUS[po.status] || PURCHASE_STATUS.draft;
+
+  return (
+    <>
+      <div className="modal-overlay" onClick={onClose}><div className="modal-backdrop"/>
+        <div className="modal-box max-w-lg" onClick={e=>e.stopPropagation()}>
+          <div className="modal-header">
+            <div>
+              <h3 className="text-sm font-bold font-mono">{po.po_no}</h3>
+              <p className="text-xs text-[var(--text-muted)]">{po.supplier_name} · {po.order_date}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => printPO(po)} className="btn-secondary h-7 px-2.5 text-xs gap-1.5"><Printer size={13}/> Print PO</button>
+              <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
+            </div>
+          </div>
+          <div className="modal-body">
+            <div className="flex gap-2 flex-wrap">
+              <StatusBadge label={st.label} color={STATUS_COLORS[po.status]}/>
+              {po.received_date && <StatusBadge label={`Diterima: ${po.received_date}`} color="bg-emerald-50 text-emerald-700 border-emerald-200"/>}
+              {po.expected_date && <StatusBadge label={`Estimasi: ${po.expected_date}`} color="bg-blue-50 text-blue-700 border-blue-200"/>}
+            </div>
+
+            {/* Supplier info */}
+            <div className="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+              <p className="text-xs font-bold text-[var(--text-muted)] mb-1">SUPPLIER</p>
+              <p className="font-semibold">{po.supplier_name}</p>
+              {po.supplier_phone && <p className="text-xs text-[var(--text-muted)]">📱 {po.supplier_phone}</p>}
+              {po.supplier_email && <p className="text-xs text-[var(--text-muted)]">✉ {po.supplier_email}</p>}
+              {po.supplier_address && <p className="text-xs text-[var(--text-muted)] mt-1">📍 {po.supplier_address}</p>}
+            </div>
+
+            {/* Items */}
+            <div>
+              <p className="field-label mb-2">Item ({po.items?.length||0})</p>
+              <div className="space-y-1.5">
+                {(po.items||[]).map(item => {
+                  const remaining = item.qty_ordered - (item.qty_received||0);
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)]">
+                      <div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate">{item.product_name}</p>
+                        <p className="text-[10px] text-[var(--text-muted)]">{toRp(item.buy_price)} × {item.qty_ordered}
+                          {item.qty_received>0 && <span className="text-emerald-600"> · Terima: {item.qty_received}</span>}
+                          {remaining>0 && <span className="text-amber-600"> · Sisa: {remaining}</span>}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-[var(--brand-600)] flex-shrink-0">{toRpShort(item.subtotal)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Totals */}
+            <div className="p-3 rounded-xl bg-[var(--bg-tertiary)] space-y-1">
+              <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">Subtotal</span><span>{toRp(po.subtotal)}</span></div>
+              {parseFloat(po.shipping_cost)>0 && <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">Biaya Kirim</span><span>{toRp(po.shipping_cost)}</span></div>}
+              <div className="flex justify-between font-bold border-t border-[var(--border)] pt-1"><span>Total</span><span className="text-[var(--brand-600)]">{toRp(po.total_amount)}</span></div>
+            </div>
+
+            {po.notes && <div className="p-3 rounded-xl bg-[var(--bg-secondary)]"><p className="text-xs text-[var(--text-muted)] mb-0.5">Catatan:</p><p className="text-sm">{po.notes}</p></div>}
+          </div>
+
+          {['ordered','partial'].includes(po.status) && (
+            <div className="modal-footer">
+              <button onClick={() => setRec(true)} className="btn-primary w-full gap-2"><Truck size={15}/> Terima Barang</button>
+            </div>
+          )}
+        </div>
+      </div>
+      {showReceive && <ReceiveModal po={po} onClose={() => setRec(false)} onSuccess={() => { onSuccess(); onClose(); }}/>}
+    </>
   );
 };
 
@@ -236,86 +513,96 @@ const ReceivePoModal = ({ po, onClose, onSuccess }) => {
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════
 export default function PurchasesPage() {
-  const [purchases, setPurchases] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [showNew, setShowNew]     = useState(false);
-  const [receivePo, setReceive]   = useState(null);
-  const [statusFilter, setSF]     = useState('');
+  const [purchases, setPO]  = useState([]);
+  const [loading, setLoad]  = useState(true);
+  const [showForm, setForm] = useState(null); // null | 'new' | po obj
+  const [detailId, setDetail] = useState(null);
+  const [dateRange, setDate]= useState(()=>{
+    const n=new Date();
+    return {from:`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`,to:n.toISOString().split('T')[0]};
+  });
+  const [branch, setBranch] = useState('');
 
   const fetch = useCallback(async () => {
-    setLoading(true);
+    setLoad(true);
     try {
-      const res = await erpService.getPurchases({ status: statusFilter||undefined, limit:50 });
-      setPurchases(res.data.data.purchases);
-    } catch { toast.error('Gagal memuat PO'); }
-    finally { setLoading(false); }
-  }, [statusFilter]);
+      const r = await erpService.getPurchases({ limit:200, branch_id:branch||undefined, date_from:dateRange.from, date_to:dateRange.to });
+      setPO(r.data.data.purchases||[]);
+    } catch { toast.error('Gagal memuat pembelian'); }
+    finally { setLoad(false); }
+  }, [branch, dateRange]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  const totalValue = purchases.reduce((s, p) => s + parseFloat(p.total_amount||0), 0);
+  const pendingCount = purchases.filter(p => ['ordered','partial'].includes(p.status)).length;
+
+  const columns = [
+    { key:'po_no', label:'No. PO', nowrap:true, render:v=><span className="font-mono text-xs font-semibold">{v}</span> },
+    { key:'order_date', label:'Tanggal', sortable:true, nowrap:true, render:v=><span className="text-[var(--text-secondary)]">{v}</span> },
+    { key:'supplier_name', label:'Supplier', render:v=><span className="font-medium">{v||'—'}</span> },
+    { key:'expected_date', label:'Est. Tiba', nowrap:true, render:v=>v?<span className="text-blue-600 text-xs">{v}</span>:<span className="text-[var(--text-muted)]">—</span> },
+    { key:'status', label:'Status', nowrap:true, render:v=>{const s=PURCHASE_STATUS[v]||PURCHASE_STATUS.draft;return <StatusBadge label={s.label} color={STATUS_COLORS[v]||STATUS_COLORS.draft}/>;} },
+    { key:'total_amount', label:'Total', sortable:true, align:'right', nowrap:true, render:v=><span className="font-bold">{toRpShort(v)}</span> },
+  ];
+
   return (
     <div className="section animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Pembelian</h1>
-          <p className="body-sm text-[var(--text-secondary)]">Purchase Order</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={fetch} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><RefreshCw className="w-4 h-4" /></button>
-          <button onClick={() => setShowNew(true)} className="btn-primary"><Plus className="w-4 h-4" /> Buat PO</button>
-        </div>
+      {/* Filters */}
+      <div className="card-sm mb-5 space-y-3">
+        <PeriodFilter value={dateRange} onChange={setDate}/>
+        <select value={branch} onChange={e=>setBranch(e.target.value)} className="input-base h-9 text-sm">
+          <option value="">Semua Cabang</option><option value="1">GP Racing</option><option value="2">GP Distro</option>
+        </select>
       </div>
 
-      <div className="flex gap-1.5 mb-4 flex-wrap">
-        {[{v:'',l:'Semua'},...Object.entries(PURCHASE_STATUS).map(([v,c])=>({v,l:c.label}))].map(f => (
-          <button key={f.v} onClick={() => setSF(f.v)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${statusFilter===f.v ? 'bg-brand-500 text-white border-brand-500' : 'bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--text-secondary)]'}`}>
-            {f.l}
-          </button>
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        {[
+          {l:'Total PO',v:purchases.length,fmt:false,color:'text-[var(--text-primary)]'},
+          {l:'Menunggu Penerimaan',v:pendingCount,fmt:false,color:'text-amber-600'},
+          {l:'Total Nilai',v:totalValue,fmt:true,color:'text-[var(--brand-600)]'},
+        ].map(s=>(
+          <div key={s.l} className="card p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">{s.l}</p>
+            <p className={`text-lg font-bold ${s.color}`}>{s.fmt?toRpShort(s.v):s.v}</p>
+          </div>
         ))}
       </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(4)].map((_,i) => <div key={i} className="skeleton h-20" />)}</div>
-      ) : purchases.length === 0 ? (
-        <div className="text-center py-14">
-          <ShoppingBag className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
-          <p className="text-sm text-[var(--text-muted)]">Belum ada purchase order</p>
-          <button onClick={() => setShowNew(true)} className="btn-primary mt-4">Buat PO Pertama</button>
+      <div className="page-header">
+        <div><h1 className="page-title">Pembelian</h1><p className="body-sm text-[var(--text-muted)]">{purchases.length} purchase order</p></div>
+        <div className="flex gap-2">
+          <button onClick={fetch} className="btn-icon"><RefreshCw size={16}/></button>
+          <button onClick={()=>setForm('new')} className="btn-primary"><Plus size={16}/> Buat PO</button>
         </div>
-      ) : (
-        <div className="table-wrapper">
-          {purchases.map(po => {
-            const st = PURCHASE_STATUS[po.status] || PURCHASE_STATUS.draft;
-            return (
-              <div key={po.id} className="flex items-center gap-3 px-4 py-3.5">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${st.bg}`}>
-                  <ShoppingBag className={`w-4.5 h-4.5 ${st.color}`} size={18} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-bold text-[var(--text-primary)]">{po.po_no}</p>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${st.bg} ${st.color}`}>{st.label}</span>
-                  </div>
-                  <p className="text-xs text-[var(--text-muted)]">{po.supplier_name || 'Tanpa supplier'} · {po.order_date}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold text-[var(--text-primary)]">{toRpShort(po.total_amount)}</p>
-                  {['draft','ordered','partial'].includes(po.status) && (
-                    <button onClick={async () => {
-                      const res = await erpService.getPurchase(po.id);
-                      setReceive(res.data.data.purchase);
-                    }} className="text-[10px] text-brand-500 hover:underline font-semibold">Terima Barang</button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      </div>
 
-      {showNew && <NewPoModal onClose={() => setShowNew(false)} onSuccess={fetch} />}
-      {receivePo && <ReceivePoModal po={receivePo} onClose={() => setReceive(null)} onSuccess={fetch} />}
+      <DataTable columns={columns} data={purchases} loading={loading}
+        searchKeys={['po_no','supplier_name']} searchPlaceholder="Cari no. PO, supplier..."
+        filters={[{key:'status',label:'Status',options:Object.entries(PURCHASE_STATUS).map(([k,v])=>({value:k,label:v.label}))}]}
+        emptyIcon={<ShoppingBag size={40}/>} emptyText="Belum ada purchase order"
+        emptyAction={<button onClick={()=>setForm('new')} className="btn-primary">Buat PO Pertama</button>}
+        actions={(row) => (
+          <div className="flex gap-1">
+            <button onClick={()=>setDetail(row.id)} className="btn-icon-sm" title="Lihat detail"><Eye size={13}/></button>
+            {['ordered','partial'].includes(row.status) && (
+              <button onClick={()=>setForm(row)} className="btn-icon-sm" title="Edit"><Edit3 size={13}/></button>
+            )}
+            <button onClick={()=>printPO(row)} className="btn-icon-sm" title="Print PO"><Printer size={13}/></button>
+          </div>
+        )}
+        pageSize={25} zebra/>
+
+      {showForm && (
+        <POFormModal
+          po={showForm==='new'?null:showForm}
+          onClose={()=>setForm(null)}
+          onSuccess={fetch}/>
+      )}
+      {detailId && (
+        <DetailModal poId={detailId} onClose={()=>setDetail(null)} onSuccess={fetch}/>
+      )}
     </div>
   );
 }

@@ -930,7 +930,7 @@ export default function PayrollEnginePage() {
   const [activeTab, setActiveTab] = useState(canManage ? 'runs' : 'myslip');
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="w-full animate-fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Penggajian Pro</h1>

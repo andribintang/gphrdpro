@@ -3,7 +3,7 @@ const router  = express.Router();
 const { body, param, query } = require('express-validator');
 const {
   getAll, getOne, create, update,
-  deactivate, reactivate, getStats, getDepartments,
+  deactivate, reactivate, resetPassword, getStats, getDepartments,
 } = require('../controllers/employeeController');
 const { authenticate, authorize } = require('../middleware/auth');
 
@@ -34,6 +34,7 @@ router.patch('/:id/deactivate', authorize('admin', 'hr'), [
   body('status').optional().isIn(['inactive', 'terminated', 'on_leave']),
 ], deactivate);
 
-router.patch('/:id/reactivate', authorize('admin', 'hr'), [param('id').isInt()], reactivate);
+router.patch('/:id/reactivate',     authorize('admin', 'hr'), [param('id').isInt()], reactivate);
+router.put  ('/:id/reset-password', authorize('admin', 'hr'), [param('id').isInt()], resetPassword);
 
 module.exports = router;
