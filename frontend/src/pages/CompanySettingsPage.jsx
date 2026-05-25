@@ -1,4 +1,91 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, 
+      {/* ── Tampilan Sidebar & Header ─────────────────────── */}
+      <div className="card p-5 space-y-5">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-base">🎨</span>
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Tampilan Antarmuka</h3>
+        </div>
+
+        {/* Sidebar Color */}
+        <div>
+          <label className="field-label mb-3">Warna Sidebar</label>
+          <div className="grid grid-cols-5 gap-2">
+            {[
+              { key:'default', label:'Default', bg:'#ffffff', border:'#e5e7eb', preview:'bg-white border border-gray-200' },
+              { key:'brand',   label:'Brand',   style:{ background: form.primary_color } },
+              { key:'dark',    label:'Gelap',   style:{ background: '#18181b' } },
+              { key:'slate',   label:'Slate',   style:{ background: '#1e293b' } },
+              { key:'navy',    label:'Navy',    style:{ background: '#0f172a' } },
+            ].map(opt => (
+              <button key={opt.key} type="button"
+                onClick={() => { sf('sidebar_color', opt.key); import('../context/CompanyContext').catch(()=>{}); }}
+                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${
+                  form.sidebar_color === opt.key
+                    ? 'border-[var(--brand-600)] bg-[var(--brand-600)]/5'
+                    : 'border-transparent hover:border-[var(--border)]'
+                }`}>
+                <div className="w-full h-12 rounded-lg overflow-hidden border border-[var(--border)] flex"
+                  style={opt.style || {}}>
+                  {/* Mini sidebar preview */}
+                  <div className="w-8 h-full flex flex-col gap-1 p-1"
+                    style={ opt.key==='default' ? {background:'#f9fafb'} : opt.style }>
+                    {[...Array(3)].map((_,i)=>(
+                      <div key={i} className="h-1.5 rounded-full opacity-40"
+                        style={{background: opt.key==='default'?'#9ca3af':'rgba(255,255,255,0.6)', width: i===0?'80%':'60%'}}/>
+                    ))}
+                  </div>
+                  <div className="flex-1 h-full" style={{background:'#f9fafb'}}/>
+                </div>
+                <span className="text-[10px] font-semibold text-[var(--text-secondary)]">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Topbar Color */}
+        <div>
+          <label className="field-label mb-3">Warna Header / Topbar</label>
+          <div className="grid grid-cols-5 gap-2">
+            {[
+              { key:'default', label:'Putih'  },
+              { key:'brand',   label:'Brand'  },
+              { key:'dark',    label:'Gelap'  },
+              { key:'slate',   label:'Slate'  },
+              { key:'glass',   label:'Glass'  },
+            ].map(opt => {
+              const bgs = {
+                default:'#ffffff', brand: form.primary_color,
+                dark:'#18181b', slate:'#1e293b', glass:'rgba(255,255,255,0.85)'
+              };
+              return (
+                <button key={opt.key} type="button"
+                  onClick={() => sf('topbar_color', opt.key)}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all ${
+                    form.topbar_color === opt.key
+                      ? 'border-[var(--brand-600)] bg-[var(--brand-600)]/5'
+                      : 'border-transparent hover:border-[var(--border)]'
+                  }`}>
+                  <div className="w-full h-12 rounded-lg overflow-hidden border border-[var(--border)] flex flex-col">
+                    {/* Mini topbar */}
+                    <div className="h-4 w-full flex items-center px-2 gap-1"
+                      style={{background: bgs[opt.key] || '#fff'}}>
+                      <div className="w-3 h-1.5 rounded-full opacity-50"
+                        style={{background: ['dark','slate','brand'].includes(opt.key)?'rgba(255,255,255,0.8)':'#9ca3af'}}/>
+                    </div>
+                    <div className="flex-1" style={{background:'#f9fafb'}}/>
+                  </div>
+                  <span className="text-[10px] font-semibold text-[var(--text-secondary)]">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <p className="text-[11px] text-[var(--text-muted)]">
+          💡 Perubahan tampilan akan diterapkan setelah klik Simpan dan refresh halaman
+        </p>
+      </div>
+useCallback } from 'react';
 import {
   Building2, Upload, Save, Loader2, Image,
   Phone, Mail, Globe, MapPin, Palette,
