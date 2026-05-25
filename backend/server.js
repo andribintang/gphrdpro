@@ -123,6 +123,9 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE inc_sales_channels ADD COLUMN eligible_statuses JSON`,
       // Add logo_url as TEXT in company_settings (was VARCHAR(500))
       `ALTER TABLE company_settings MODIFY COLUMN logo_url TEXT`,
+      // Add theme color columns for sidebar & topbar
+      `ALTER TABLE company_settings ADD COLUMN sidebar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
+      `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Create inc_channel_rates if not exists
       `CREATE TABLE IF NOT EXISTS inc_channel_rates (
         id INT AUTO_INCREMENT PRIMARY KEY,
