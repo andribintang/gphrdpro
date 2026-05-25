@@ -14,39 +14,20 @@ import useAutoLogout from '../hooks/useAutoLogout';
 import { useTheme } from '../context/ThemeContext';
 
 const NAV = [
+  // ── 1. Dashboard ERP ──────────────────────────────────────────
   {
     group: null,
     items: [
-      { to:'/dashboard', icon:Home, label:'Dashboard', roles:['admin','hr','supervisor','employee'] },
+      { to:'/erp', icon:Home, label:'Dashboard ERP', roles:['admin','hr','supervisor','employee'] },
     ],
   },
-  {
-    group: 'HRD',
-    items: [
-      { to:'/employees',   icon:Users,           label:'Karyawan',    roles:['admin','hr','supervisor'] },
-      { to:'/attendance',       icon:Clock,        label:'Absensi',         roles:['admin','hr','supervisor','employee'] },
-      { to:'/attendance-admin', icon:ClipboardList, label:'Data Absensi',    roles:['admin','hr'] },
-      { to:'/leaves',      icon:CalendarOff,     label:'Cuti',        roles:['admin','hr','supervisor','employee'] },
-      { to:'/departments',  icon:Building2,       label:'Departemen',  roles:['admin','hr'] },
-      { to:'/payroll-pro', icon:DollarSign,      label:'Gaji',        roles:['admin','hr'] },
-      { to:'/reports',     icon:BarChart3,       label:'Laporan HRD', roles:['admin','hr'] },
-    ],
-  },
-  {
-    group: 'Insentif',
-    items: [
-      { to:'/incentive',         icon:TrendingUp, label:'Dashboard',  roles:['admin','hr'] },
-      { to:'/incentive/master',  icon:Layers,     label:'Master Data',roles:['admin','hr'] },
-      { to:'/incentive/periods', icon:Target,     label:'Periode',    roles:['admin','hr'] },
-    ],
-  },
+  // ── 2. ERP ────────────────────────────────────────────────────
   {
     group: 'ERP',
     children: [
       {
         label:'Penjualan', icon:ShoppingCart, key:'sales',
         items:[
-          { to:'/erp',           icon:Home,        label:'Dashboard', roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/orders',    icon:ShoppingCart,label:'Order',     roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/shipments',  icon:Truck,       label:'Pengiriman',  roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/customers', icon:Users,       label:'Pelanggan', roles:['admin','hr','supervisor','employee'] },
@@ -75,6 +56,30 @@ const NAV = [
       },
     ],
   },
+  // ── 3. HRD ────────────────────────────────────────────────────
+  {
+    group: 'HRD',
+    items: [
+      { to:'/dashboard',        icon:Home,          label:'Dashboard HRD',  roles:['admin','hr','supervisor','employee'] },
+      { to:'/employees',        icon:Users,         label:'Karyawan',        roles:['admin','hr','supervisor'] },
+      { to:'/attendance',       icon:Clock,         label:'Absensi',         roles:['admin','hr','supervisor','employee'] },
+      { to:'/attendance-admin', icon:ClipboardList, label:'Data Absensi',    roles:['admin','hr'] },
+      { to:'/leaves',           icon:CalendarOff,   label:'Cuti',            roles:['admin','hr','supervisor','employee'] },
+      { to:'/departments',      icon:Building2,     label:'Departemen',      roles:['admin','hr'] },
+      { to:'/payroll-pro',      icon:DollarSign,    label:'Gaji',            roles:['admin','hr'] },
+      { to:'/reports',          icon:BarChart3,     label:'Laporan HRD',     roles:['admin','hr'] },
+    ],
+  },
+  // ── 4. Insentif ───────────────────────────────────────────────
+  {
+    group: 'Insentif',
+    items: [
+      { to:'/incentive',         icon:TrendingUp, label:'Dashboard',  roles:['admin','hr'] },
+      { to:'/incentive/master',  icon:Layers,     label:'Master Data',roles:['admin','hr'] },
+      { to:'/incentive/periods', icon:Target,     label:'Periode',    roles:['admin','hr'] },
+    ],
+  },
+  // ── 5. Pengaturan ─────────────────────────────────────────────
   {
     group: 'Pengaturan',
     items: [
