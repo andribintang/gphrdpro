@@ -196,7 +196,7 @@ const ErpGroup = ({ section, collapsed, role, onClose }) => {
       <button onClick={() => setErpOpen(v => !v)}
         className="w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg hover:bg-[var(--sidebar-item-hover)] transition-all group cursor-pointer">
         <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors select-none">
-          ERP
+          {section.group}
         </span>
         <ChevronDown size={11} className={`text-[var(--text-muted)] transition-transform duration-200 ${erpOpen ? 'rotate-180' : ''}`} />
       </button>
