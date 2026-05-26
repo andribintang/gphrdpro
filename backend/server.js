@@ -797,6 +797,17 @@ app.post('/check-store', async (req, res) => {
     return res.json({ total: cnt[0].total, products, columns: cols.map(c=>c.COLUMN_NAME) });
   } catch (e) { return res.json({ error: e.message }); }
 });
+// Simple no-param store test
+app.get('/store-test', async (req, res) => {
+  try {
+    const { sequelize } = require('./config/database');
+    const [all]   = await sequelize.query('SELECT id, name, brand FROM store_products LIMIT 5');
+    const [[cnt]] = await sequelize.query('SELECT COUNT(*) as n FROM store_products');
+    const [cols]  = await sequelize.query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_NAME='store_products' AND TABLE_SCHEMA=DATABASE()");
+    res.json({ total: cnt.n, rows: all, columns: cols.map(c=>c.COLUMN_NAME) });
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 app.use('/api/departments', departmentRoutes);
 app.use('/api/reports',       reportsRoutes);
 app.use('/api/payroll-engine', payrollEngineRoutes);
