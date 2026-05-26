@@ -51,25 +51,23 @@ const getProducts = async (req, res, next) => {
     const limitNum = parseInt(limit) || 20;
     const offset   = (pageNum - 1) * limitNum;
 
-    // Build WHERE clause manually (safe — values are validated)
-    const conditions = ['1=1'];
-    if (brand)    conditions.push(`brand = ${sequelize.escape(brand)}`);
-    if (category) conditions.push(`category_id = ${sequelize.escape(category)}`);
+    // Build safe WHERE using sequelize.escape()
+    const conds = ['1=1'];
+    if (brand)    conds.push(`brand = ${sequelize.escape(brand)}`);
+    if (category) conds.push(`category_id = ${sequelize.escape(parseInt(category))}`);
     if (search) {
-      const s = sequelize.escape('%' + search + '%');
-      conditions.push(`(name LIKE ${s} OR sku LIKE ${s})`);
+      const esc = sequelize.escape('%' + search + '%');
+      conds.push(`(name LIKE ${esc} OR sku LIKE ${esc})`);
     }
-    const WHERE = conditions.join(' AND ');
+    const W = conds.join(' AND ');
 
-    const [[{ total }]] = await sequelize.query(
-      `SELECT COUNT(*) as total FROM store_products WHERE ${WHERE}`
-    );
-
+    const [[cntRow]] = await sequelize.query(`SELECT COUNT(*) as n FROM store_products WHERE ${W}`);
+    const total = parseInt(cntRow.n) || 0;
     const [rows] = await sequelize.query(
-      `SELECT * FROM store_products WHERE ${WHERE} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`
+      `SELECT * FROM store_products WHERE ${W} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`
     );
 
-    // Get ERP categories for name lookup
+    // ERP category lookup
     const branchId = brand === 'gpdistro' ? 2 : 1;
     const [erpCats] = await sequelize.query(
       `SELECT id, name FROM erp_categories WHERE branch_id = ${branchId} AND is_active = 1`
@@ -79,16 +77,13 @@ const getProducts = async (req, res, next) => {
     );
 
     const products = rows.map(p => {
-      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images   = []; }
+      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images = []; }
       try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch { p.variants = {}; }
-      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags     = []; }
+      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags = []; }
       return { ...p, category: p.category_id ? (catMap[p.category_id] || null) : null };
     });
 
-    return res.json({
-      success: true,
-      data: { products, total: parseInt(total), page: pageNum, total_pages: Math.ceil(total / limitNum) }
-    });
+    return res.json({ success: true, data: { products, total, page: pageNum, total_pages: Math.ceil(total / limitNum) } });
   } catch (err) { next(err); }
 };
 const createProduct = async (req, res, next) => {
