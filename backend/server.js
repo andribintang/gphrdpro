@@ -831,6 +831,20 @@ app.get('/store-test', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
+// Truncate store_products and re-enable
+app.post('/store-reset', async (req, res) => {
+  try {
+    const { secret } = req.body || {};
+    if (secret !== process.env.MIGRATE_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    const { sequelize } = require('./config/database');
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    await sequelize.query('TRUNCATE TABLE store_products');
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    const [[{ n }]] = await sequelize.query('SELECT COUNT(*) as n FROM store_products');
+    res.json({ success: true, remaining: n });
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 app.use('/api/departments', departmentRoutes);
 app.use('/api/reports',       reportsRoutes);
 app.use('/api/payroll-engine', payrollEngineRoutes);
