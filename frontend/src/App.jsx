@@ -40,6 +40,10 @@ import ReturnsPage     from './pages/erp/ReturnsPage';
 import ErpMasterPage   from './pages/erp/MasterDataPage';
 import DailyReportPage  from './pages/erp/DailyReportPage';
 import ChannelReportPage from './pages/erp/ChannelReportPage';
+import StoreDashboard     from './pages/store/StoreDashboard';
+import StoreProductsPage  from './pages/store/StoreProductsPage';
+import StoreOrdersPage    from './pages/store/StoreOrdersPage';
+import StoreCatalogPage   from './pages/store/StoreCatalogPage';
 
 
 // ── Device-aware default redirect ────────────────────────────
@@ -169,6 +173,20 @@ export default function App() {
                 } />
                 <Route path="erp/report-channel" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ChannelReportPage /></ProtectedRoute>
+                } />
+
+                {/* ── Store Management ──────────────────── */}
+                <Route path="store" element={
+                  <ProtectedRoute roles={['admin','hr']}><StoreDashboard /></ProtectedRoute>
+                } />
+                <Route path="store/:brand/products" element={
+                  <ProtectedRoute roles={['admin','hr']}><StoreProductsPage /></ProtectedRoute>
+                } />
+                <Route path="store/:brand/orders" element={
+                  <ProtectedRoute roles={['admin','hr']}><StoreOrdersPage /></ProtectedRoute>
+                } />
+                <Route path="store/:brand/catalog" element={
+                  <ProtectedRoute roles={['admin','hr']}><StoreCatalogPage /></ProtectedRoute>
                 } />
 
                 {/* 404 */}

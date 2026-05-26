@@ -6,7 +6,7 @@ import {
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
-  RotateCcw, LayoutList, Layers, Target, Zap, Plus,
+  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store,
   PanelLeftClose, PanelLeftOpen, Shield
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
@@ -79,7 +79,29 @@ const NAV = [
       { to:'/incentive/periods', icon:Target,     label:'Periode',    roles:['admin','hr'] },
     ],
   },
-  // ── 5. Pengaturan ─────────────────────────────────────────────
+  // ── 5. Toko Online ────────────────────────────────────────────
+  {
+    group: 'Toko Online',
+    children: [
+      {
+        label: 'GPDISTRO', icon: Store, key: 'gpdistro',
+        items: [
+          { to:'/store/gpdistro/products', icon:Package,      label:'Produk',    roles:['admin','hr'] },
+          { to:'/store/gpdistro/orders',   icon:ShoppingBag,  label:'Order',     roles:['admin','hr'] },
+          { to:'/store/gpdistro/catalog',  icon:LayoutList,   label:'Kategori & Voucher', roles:['admin','hr'] },
+        ],
+      },
+      {
+        label: 'GP RACING', icon: Zap, key: 'gpracing',
+        items: [
+          { to:'/store/gpracing/products', icon:Package,      label:'Produk',    roles:['admin','hr'] },
+          { to:'/store/gpracing/orders',   icon:ShoppingBag,  label:'Order',     roles:['admin','hr'] },
+          { to:'/store/gpracing/catalog',  icon:LayoutList,   label:'Kategori & Voucher', roles:['admin','hr'] },
+        ],
+      },
+    ],
+  },
+  // ── 6. Pengaturan ─────────────────────────────────────────────
   {
     group: 'Pengaturan',
     items: [
