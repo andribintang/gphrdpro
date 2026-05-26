@@ -48,57 +48,49 @@ const getProducts = async (req, res, next) => {
     const { brand, search, category, page = 1, limit = 20 } = req.query;
     const { sequelize } = require('../../config/database');
     const { QueryTypes } = require('sequelize');
-    const pageNum  = parseInt(page)  || 1;
-    const limitNum = parseInt(limit) || 20;
+    const pageNum  = Math.max(1, parseInt(page)  || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 20);
     const offset   = (pageNum - 1) * limitNum;
 
-    // Use Sequelize replacements with :name syntax (MySQL compatible)
-    const replacements = {};
-    const conds = ['1=1'];
+    // Build WHERE with :name replacements (MySQL compatible)
+    const where  = [];
+    const rpl    = {};
+    if (brand)    { where.push('brand = :brand');                           rpl.brand    = String(brand); }
+    if (category) { where.push('category_id = :cat');                      rpl.cat      = parseInt(category); }
+    if (search)   { where.push('(name LIKE :srch OR sku LIKE :srch)');     rpl.srch     = '%' + search + '%'; }
+    const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
-    if (brand) {
-      conds.push('brand = :brand');
-      replacements.brand = brand;
-    }
-    if (category) {
-      conds.push('category_id = :category');
-      replacements.category = parseInt(category);
-    }
-    if (search) {
-      conds.push('(name LIKE :search OR sku LIKE :search)');
-      replacements.search = '%' + search + '%';
-    }
-    const W = conds.join(' AND ');
-
-    const cntResult = await sequelize.query(
-      `SELECT COUNT(*) as n FROM store_products WHERE ${W}`,
-      { replacements, type: QueryTypes.SELECT }
+    const cntRows = await sequelize.query(
+      `SELECT COUNT(*) as n FROM store_products ${W}`,
+      { replacements: rpl, type: QueryTypes.SELECT }
     );
-    const total = parseInt(cntResult[0]?.n || 0);
+    const total = parseInt((cntRows[0] || {}).n || 0);
 
     const rows = await sequelize.query(
-      `SELECT * FROM store_products WHERE ${W} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`,
-      { replacements, type: QueryTypes.SELECT }
+      `SELECT * FROM store_products ${W} ORDER BY created_at DESC LIMIT :lim OFFSET :off`,
+      { replacements: { ...rpl, lim: limitNum, off: offset }, type: QueryTypes.SELECT }
     );
 
     // ERP category lookup
     const branchId = brand === 'gpdistro' ? 2 : 1;
-    const [erpCats] = await sequelize.query(
-      `SELECT id, name FROM erp_categories WHERE branch_id = ${branchId} AND is_active = 1`
+    const erpCats = await sequelize.query(
+      'SELECT id, name FROM erp_categories WHERE branch_id = :bid AND is_active = 1',
+      { replacements: { bid: branchId }, type: QueryTypes.SELECT }
     );
-    const catMap = Object.fromEntries(
-      (erpCats || []).map(cat => [cat.id, { id: cat.id, name: cat.name, slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }])
-    );
+    const catMap = {};
+    (erpCats || []).forEach(cat => {
+      catMap[cat.id] = { id: cat.id, name: cat.name, slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') };
+    });
 
-    const products = (Array.isArray(rows) ? rows : []).map(p => {
-      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images   = []; }
-      try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch { p.variants = {}; }
-      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags     = []; }
+    const products = (rows || []).map(p => {
+      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch(e) { p.images   = []; }
+      try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch(e) { p.variants = {}; }
+      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch(e) { p.tags     = []; }
       return { ...p, category: p.category_id ? (catMap[p.category_id] || null) : null };
     });
 
     return res.json({ success: true, data: { products, total, page: pageNum, total_pages: Math.ceil(total / limitNum) } });
-  } catch (err) { next(err); }
+  } catch (err) { return res.json({ success: false, message: err.message, stack: err.stack?.split('\n')[0] }); }
 };
 const createProduct = async (req, res, next) => {
   try {
