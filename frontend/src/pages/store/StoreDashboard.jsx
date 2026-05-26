@@ -94,8 +94,9 @@ export default function StoreDashboard() {
         <h2 className="font-semibold text-sm uppercase tracking-widest mb-5 text-[var(--text-muted)]">Aksi Cepat</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: '+ Produk GPDISTRO', to: '/store/gpdistro/products/new', color: '#1a1a2e' },
-            { label: '+ Produk GPRACING', to: '/store/gpracing/products/new', color: '#dc2626' },
+            { label: '+ Tambah Produk',   to: '/erp/products',           color: '#059669', sub: 'Via ERP → Tab Toko Online' },
+            { label: 'Produk GPDISTRO',   to: '/store/gpdistro/products', color: '#1a1a2e' },
+            { label: 'Produk GPRACING',   to: '/store/gpracing/products', color: '#dc2626' },
             { label: 'Order GPDISTRO',    to: '/store/gpdistro/orders' },
             { label: 'Order GPRACING',    to: '/store/gpracing/orders' },
           ].map(a => (

@@ -143,7 +143,7 @@ function ProductModal({ brand, categories, product, onClose, onSaved }) {
       <div className="bg-[var(--bg-card)] w-full max-w-2xl my-8 border border-[var(--border)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="font-semibold">{product ? 'Edit Produk' : `Tambah Produk ${BRAND_LABEL[brand]}`}</h2>
+          <h2 className="font-semibold">Edit Produk {BRAND_LABEL[brand]}</h2>
           <button onClick={onClose}><X size={20} /></button>
         </div>
 
@@ -346,9 +346,11 @@ export default function StoreProductsPage() {
           <h1 className="page-title">Produk — {BRAND_LABEL[brand] || brand}</h1>
           <p className="body-sm text-[var(--text-muted)]">{total} produk total</p>
         </div>
-        <button onClick={() => setModal('add')} className="btn-primary gap-2">
-          <Plus size={16} /> Tambah Produk
-        </button>
+        <a href="/erp/products"
+          className="btn-outline gap-2 text-sm"
+          onClick={e => { e.preventDefault(); window.location.href='/erp/products'; }}>
+          <Plus size={16} /> Tambah via ERP
+        </a>
       </div>
 
       {/* Filters */}
@@ -390,7 +392,13 @@ export default function StoreProductsPage() {
                   <td colSpan={6} className="px-4 py-12 text-center text-[var(--text-muted)]">
                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                     <p>Belum ada produk</p>
-                    <button onClick={() => setModal('add')} className="btn-primary mt-3 text-xs py-2 px-4">+ Tambah Produk</button>
+                    <div className="text-center mt-3">
+                      <p className="text-xs text-[var(--text-muted)] mb-2">Tambah produk melalui menu ERP → Produk → Tab "Toko Online"</p>
+                      <a href="/erp/products" onClick={e => { e.preventDefault(); window.location.href='/erp/products'; }}
+                        className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1">
+                        <Plus size={13}/> Ke Halaman Produk ERP
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ) : products.map(p => (
@@ -465,7 +473,7 @@ export default function StoreProductsPage() {
         <ProductModal
           brand={brand}
           categories={categories}
-          product={modal === 'add' ? null : modal}
+          product={modal}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); load(); }}
         />
