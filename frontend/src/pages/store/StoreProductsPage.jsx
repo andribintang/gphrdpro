@@ -311,24 +311,20 @@ export default function StoreProductsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Use direct backend URL with store-test endpoint
-      const backendUrl = 'https://backend-gphrdpro.up.railway.app';
-      let url = `${backendUrl}/store-test`;
-      const r = await fetch(url);
+      const r = await fetch('https://backend-gphrdpro.up.railway.app/store-test');
       const data = await r.json();
-      // Filter by brand, search, category client-side
       let products = (data.rows || []).map(p => {
-        try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch(e) { p.images = []; }
+        try { p.images = typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []); } catch(e) { p.images = []; }
         try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch(e) { p.variants = {}; }
         return p;
       });
-      if (brand)     products = products.filter(p => p.brand === brand);
+      if (brand) products = products.filter(p => p.brand === brand);
       if (catFilter) products = products.filter(p => String(p.category_id) === String(catFilter));
-      if (search)    products = products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()) || p.sku?.toLowerCase().includes(search.toLowerCase()));
+      if (search) products = products.filter(p => (p.name||'').toLowerCase().includes(search.toLowerCase()) || (p.sku||'').toLowerCase().includes(search.toLowerCase()));
       setProducts(products);
       setTotal(products.length);
     } catch (e) {
-      toast.error('Gagal memuat produk: ' + e.message);
+      toast.error('Gagal memuat: ' + e.message);
     } finally { setLoading(false); }
   }, [brand, search, catFilter, page]);
 
