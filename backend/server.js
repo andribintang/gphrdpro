@@ -755,6 +755,18 @@ app.use('/api/leaves',     leaveRoutes);
 app.use('/api/payroll',    payrollRoutes);
 app.use('/api/employees',  employeeRoutes);
 app.use('/api/store', storeRoutes);               // di bagian app.use
+
+// ── Debug: check store_products table ────────────────────────
+app.get('/debug-store', async (req, res) => {
+  try {
+    const secret = req.headers['x-migrate-secret'];
+    if (!secret || secret !== process.env.MIGRATE_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    const [products]    = await sequelize.query('SELECT id, name, brand, is_active, created_at FROM store_products ORDER BY created_at DESC LIMIT 20');
+    const [cnt]         = await sequelize.query('SELECT COUNT(*) as total FROM store_products');
+    const [tbl]         = await sequelize.query("SELECT COUNT(*) as c FROM information_schema.tables WHERE table_name='store_products' AND table_schema=DATABASE()");
+    return res.json({ tableExists: tbl[0].c > 0, total: cnt[0].total, products });
+  } catch (e) { return res.json({ error: e.message }); }
+});
 app.use('/api/departments', departmentRoutes);
 app.use('/api/reports',       reportsRoutes);
 app.use('/api/payroll-engine', payrollEngineRoutes);

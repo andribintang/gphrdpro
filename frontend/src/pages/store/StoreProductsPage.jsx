@@ -312,9 +312,11 @@ export default function StoreProductsPage() {
     setLoading(true);
     try {
       const r = await getStoreProducts({ brand, search, category: catFilter, page, limit: LIMIT });
-      setProducts(r.data.data.products);
-      setTotal(r.data.data.total);
-    } catch { } finally { setLoading(false); }
+      setProducts(r.data.data.products || []);
+      setTotal(r.data.data.total || 0);
+    } catch (e) {
+      toast.error('Gagal memuat produk: ' + (e.response?.data?.message || e.message || 'Unknown error'));
+    } finally { setLoading(false); }
   }, [brand, search, catFilter, page]);
 
   useEffect(() => { load(); }, [load]);
