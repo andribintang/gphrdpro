@@ -610,12 +610,297 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
   );
 }
 
+// ── Bulk Publish Modal ─────────────────────────────────────────
+const BRAND_INFO = {
+  gpdistro: { label: 'GPDISTRO',       sub: 'Fashion & Digital Printing', color: '#1a1a2e' },
+  gpracing: { label: 'GP RACING STORE', sub: 'Spare Part Motor Racing',    color: '#dc2626' },
+};
+
+function BulkPublishModal({ products, onClose, onDone }) {
+  const [brand,    setBrand]    = useState('gpracing');
+  const [rows,     setRows]     = useState(() =>
+    products.map(p => ({
+      id:            p.id,
+      name:          p.name,
+      sku:           p.sku,
+      buy_price:     p.buy_price || 0,
+      weight:        p.weight || 0.5,
+      stock:         p.stock?.qty || 0,
+      unit:          p.unit,
+      branch_id:     p.branch_id,
+      // editable per-row
+      store_price:   p.sell_price_mp || p.sell_price || '',
+      price_compare: '',
+      category_id:   '',
+      skip:          false,
+    }))
+  );
+  const [storeCategories, setStoreCategories] = useState([]);
+  const [publishing, setPublishing] = useState(false);
+  const [done,       setDone]       = useState([]); // ids that succeeded
+  const [failed,     setFailed]     = useState([]); // ids that failed
+
+  useEffect(() => {
+    getStoreCategories(brand)
+      .then(r => setStoreCategories(r.data.data.categories || []))
+      .catch(() => {});
+  }, [brand]);
+
+  // Auto-set brand from majority branch_id
+  useEffect(() => {
+    const gpd = products.filter(p => p.branch_id === 2).length;
+    const gpr = products.filter(p => p.branch_id === 1).length;
+    setBrand(gpd >= gpr ? 'gpdistro' : 'gpracing');
+  }, []);
+
+  const setRow = (id, k, v) =>
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [k]: v } : r));
+
+  const activeRows = rows.filter(r => !r.skip);
+  const margin = (sell, buy) => {
+    if (!sell || !buy || buy <= 0) return null;
+    return Math.round(((sell - buy) / buy) * 100);
+  };
+
+  const handlePublish = async () => {
+    const targets = rows.filter(r => !r.skip && r.store_price);
+    if (!targets.length) { toast.error('Tidak ada produk yang dipilih / harga belum diisi'); return; }
+
+    setPublishing(true);
+    const ok = [], fail = [];
+
+    for (const r of targets) {
+      try {
+        await createStoreProduct({
+          brand,
+          erp_product_id: r.id,
+          name:           r.name,
+          slug:           toSlug(r.name) + '-' + r.id + '-' + Date.now().toString().slice(-4),
+          sku:            r.sku || '',
+          short_desc:     r.name,
+          price:          parseFloat(r.store_price),
+          price_compare:  parseFloat(r.price_compare) || 0,
+          weight:         Math.round((parseFloat(r.weight) || 0.5) * 1000),
+          stock:          r.stock || 0,
+          category_id:    r.category_id || null,
+          images:         [],
+          variants:       {},
+          is_active:      true,
+          is_featured:    false,
+        });
+        ok.push(r.id);
+      } catch (e) {
+        const msg = e.response?.data?.message || '';
+        // Skip duplicate slug — product already published
+        if (msg.includes('slug') || msg.includes('Duplicate')) ok.push(r.id);
+        else fail.push({ id: r.id, name: r.name, msg });
+      }
+    }
+
+    setDone(ok);
+    setFailed(fail);
+    setPublishing(false);
+
+    if (fail.length === 0) {
+      toast.success(`${ok.length} produk berhasil dipublish ke ${BRAND_INFO[brand].label}!`);
+      setTimeout(onDone, 1500);
+    } else {
+      toast.error(`${fail.length} produk gagal dipublish`);
+    }
+  };
+
+  const info = BRAND_INFO[brand];
+  const isFinished = done.length > 0 || failed.length > 0;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop"/>
+      <div className="modal-box max-w-3xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="modal-header">
+          <div className="flex items-center gap-2">
+            <Store size={16} className="text-[var(--brand-600)]"/>
+            <h3 className="text-sm font-bold">
+              Bulk Publish ke Toko Online
+              <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                {activeRows.length} produk dipilih
+              </span>
+            </h3>
+          </div>
+          <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
+        </div>
+
+        {/* Result screen */}
+        {isFinished && (
+          <div className="modal-body">
+            <div className="text-center py-6">
+              <CheckCircle2 size={48} className="mx-auto text-green-500 mb-3"/>
+              <h3 className="font-bold text-lg mb-1">
+                {done.length} Produk Berhasil Dipublish
+              </h3>
+              <p className="text-sm text-[var(--text-muted)] mb-4">
+                ke toko <span className="font-bold" style={{ color: info.color }}>{info.label}</span>
+              </p>
+              {failed.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
+                  <p className="text-xs font-bold text-red-700 mb-2">{failed.length} Gagal:</p>
+                  {failed.map(f => (
+                    <p key={f.id} className="text-xs text-red-600">• {f.name} — {f.msg}</p>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-[var(--text-muted)]">
+                Lengkapi foto & deskripsi di Toko Online → {brand === 'gpdistro' ? 'GPDISTRO' : 'GP RACING'} → Produk
+              </p>
+              <button onClick={onDone} className="btn-primary mt-5 px-8">Selesai</button>
+            </div>
+          </div>
+        )}
+
+        {!isFinished && (
+          <>
+            <div className="modal-body space-y-4">
+              {/* Brand picker */}
+              <div>
+                <p className="field-label mb-2">Publish Semua ke Toko</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(BRAND_INFO).map(([key, b]) => (
+                    <button key={key} type="button" onClick={() => setBrand(key)}
+                      className={`p-3 border-2 rounded-lg text-left transition-all ${
+                        brand === key
+                          ? 'border-[var(--brand-600)] bg-[var(--brand-600)]/5'
+                          : 'border-[var(--border)] hover:border-[var(--brand-600)]/40'
+                      }`}>
+                      <div className="w-3 h-3 rounded-full mb-1.5" style={{ background: b.color }}/>
+                      <p className="text-xs font-bold">{b.label}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">{b.sub}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Per-product table */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="field-label">Atur Harga per Produk</p>
+                  <div className="flex gap-3 text-xs text-[var(--text-muted)]">
+                    <button type="button"
+                      onClick={() => setRows(r => r.map(x => ({ ...x, skip: false })))}
+                      className="hover:text-[var(--brand-600)]">Pilih Semua</button>
+                    <button type="button"
+                      onClick={() => setRows(r => r.map(x => ({ ...x, skip: true })))}
+                      className="hover:text-red-500">Hapus Semua</button>
+                  </div>
+                </div>
+
+                <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                  {/* Table head */}
+                  <div className="grid grid-cols-[24px_1fr_120px_120px_140px] gap-2 px-3 py-2 bg-[var(--bg)] border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                    <span/>
+                    <span>Produk</span>
+                    <span className="text-right">Harga Jual *</span>
+                    <span className="text-right">Harga Coret</span>
+                    <span>Kategori Toko</span>
+                  </div>
+
+                  {/* Rows */}
+                  <div className="divide-y divide-[var(--border)] max-h-64 overflow-y-auto">
+                    {rows.map(r => (
+                      <div key={r.id}
+                        className={`grid grid-cols-[24px_1fr_120px_120px_140px] gap-2 px-3 py-2.5 items-center transition-colors ${
+                          r.skip ? 'opacity-40 bg-[var(--bg)]' : ''
+                        }`}>
+                        {/* Checkbox */}
+                        <input type="checkbox" checked={!r.skip}
+                          onChange={e => setRow(r.id, 'skip', !e.target.checked)}
+                          className="w-3.5 h-3.5"/>
+
+                        {/* Product name */}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{r.name}</p>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">{r.sku || '—'}</p>
+                        </div>
+
+                        {/* Store price */}
+                        <div className="relative">
+                          <input type="number"
+                            value={r.store_price}
+                            onChange={e => setRow(r.id, 'store_price', e.target.value)}
+                            disabled={r.skip}
+                            className="input-base text-xs py-1 text-right w-full"
+                            placeholder="0"/>
+                          {margin(r.store_price, r.buy_price) !== null && (
+                            <span className={`absolute -bottom-4 right-0 text-[9px] font-bold ${
+                              margin(r.store_price, r.buy_price) >= 20 ? 'text-green-600'
+                              : margin(r.store_price, r.buy_price) >= 0 ? 'text-amber-500'
+                              : 'text-red-500'
+                            }`}>
+                              {margin(r.store_price, r.buy_price) >= 0 ? '+' : ''}
+                              {margin(r.store_price, r.buy_price)}%
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Price compare */}
+                        <input type="number"
+                          value={r.price_compare}
+                          onChange={e => setRow(r.id, 'price_compare', e.target.value)}
+                          disabled={r.skip}
+                          className="input-base text-xs py-1 text-right"
+                          placeholder="Opsional"/>
+
+                        {/* Category */}
+                        <select value={r.category_id}
+                          onChange={e => setRow(r.id, 'category_id', e.target.value)}
+                          disabled={r.skip}
+                          className="input-base text-xs py-1">
+                          <option value="">— Tanpa Kategori —</option>
+                          {storeCategories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] mt-2">
+                  * Harga sudah diisi otomatis dari harga marketplace ERP. Ubah sesuai kebutuhan.
+                </p>
+              </div>
+
+              {/* Info */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                <strong>Catatan:</strong> Foto produk belum tersedia — bisa dilengkapi setelah publish
+                melalui menu <strong>Toko Online → {brand === 'gpdistro' ? 'GPDISTRO' : 'GP RACING'} → Produk → Edit</strong>.
+                Produk yang sudah pernah dipublish akan di-skip otomatis.
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" onClick={onClose} className="btn-secondary">Batal</button>
+              <button type="button" onClick={handlePublish}
+                disabled={publishing || activeRows.length === 0}
+                className="btn-primary gap-2 disabled:opacity-60">
+                {publishing
+                  ? <><Loader2 size={15} className="animate-spin"/> Publishing {done.length}/{activeRows.length}...</>
+                  : <><Store size={15}/> Publish {activeRows.length} Produk ke {info.label}</>}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────
 export default function ProductsPage() {
-  const [products,  setProducts]  = useState([]);
-  const [categories,setCategories]= useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [modal,     setModal]     = useState(null); // null | 'new' | product
+  const [products,      setProducts]      = useState([]);
+  const [categories,    setCategories]    = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [modal,         setModal]         = useState(null);
+  const [selected,      setSelected]      = useState(new Set());
+  const [bulkPublish,   setBulkPublish]   = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -632,7 +917,40 @@ export default function ProductsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const toggleSelect = (id) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleAll = (filtered) => {
+    if (filtered.every(p => selected.has(p.id))) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(p => p.id)));
+    }
+  };
+
+  const selectedProducts = products.filter(p => selected.has(p.id));
+
   const columns = [
+    // Checkbox column
+    { key: 'id', label: (
+        <input type="checkbox"
+          className="w-3.5 h-3.5"
+          checked={products.length > 0 && products.every(p => selected.has(p.id))}
+          onChange={() => toggleAll(products)}/>
+      ),
+      width: '32px',
+      render: (v) => (
+        <input type="checkbox"
+          className="w-3.5 h-3.5"
+          checked={selected.has(v)}
+          onChange={() => toggleSelect(v)}
+          onClick={e => e.stopPropagation()}/>
+      ),
+    },
     { key: 'name', label: 'Nama Produk', sortable: true, render: (v, row) => (
       <div>
         <p className="font-semibold text-[var(--text-primary)] leading-tight">{v}</p>
@@ -663,10 +981,40 @@ export default function ProductsPage() {
           <h1 className="page-title">Produk</h1>
           <p className="body-sm text-[var(--text-muted)]">{products.length} produk</p>
         </div>
-        <button onClick={() => setModal('new')} className="btn-primary">
-          <Plus size={16}/> Tambah Produk
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bulk publish button — shows when items selected */}
+          {selected.size > 0 && (
+            <button onClick={() => setBulkPublish(true)}
+              className="btn-primary gap-2 animate-fade-in"
+              style={{ background: '#059669' }}>
+              <Store size={16}/>
+              Publish {selected.size} ke Toko
+            </button>
+          )}
+          <button onClick={() => setModal('new')} className="btn-primary">
+            <Plus size={16}/> Tambah Produk
+          </button>
+        </div>
       </div>
+
+      {/* Selection info bar */}
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between bg-[var(--brand-600)]/10 border border-[var(--brand-600)]/20 rounded-lg px-4 py-2.5 mb-4 animate-fade-in">
+          <p className="text-sm font-medium text-[var(--brand-600)]">
+            {selected.size} produk dipilih
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setSelected(new Set(products.map(p => p.id)))}
+              className="text-xs text-[var(--brand-600)] hover:underline">
+              Pilih Semua ({products.length})
+            </button>
+            <button onClick={() => setSelected(new Set())}
+              className="text-xs text-[var(--text-muted)] hover:text-red-500">
+              Batalkan Pilihan
+            </button>
+          </div>
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -690,12 +1038,26 @@ export default function ProductsPage() {
         zebra
       />
 
+      {/* Edit/Add modal */}
       {modal && (
         <ProductModal
           product={modal === 'new' ? null : modal}
           allCategories={categories}
           onClose={() => setModal(null)}
           onSuccess={load}
+        />
+      )}
+
+      {/* Bulk publish modal */}
+      {bulkPublish && selectedProducts.length > 0 && (
+        <BulkPublishModal
+          products={selectedProducts}
+          onClose={() => setBulkPublish(false)}
+          onDone={() => {
+            setBulkPublish(false);
+            setSelected(new Set());
+            load();
+          }}
         />
       )}
     </div>
