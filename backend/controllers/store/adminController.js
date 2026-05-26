@@ -47,39 +47,48 @@ const getProducts = async (req, res, next) => {
   try {
     const { brand, search, category, page = 1, limit = 20 } = req.query;
     const { sequelize } = require('../../config/database');
+    const pageNum  = parseInt(page)  || 1;
+    const limitNum = parseInt(limit) || 20;
+    const offset   = (pageNum - 1) * limitNum;
 
-    // Use raw SQL to bypass any Sequelize model issues
-    let sql = 'SELECT * FROM store_products WHERE 1=1';
-    const replacements = [];
-    if (brand)    { sql += ' AND brand = ?';        replacements.push(brand); }
-    if (category) { sql += ' AND category_id = ?';  replacements.push(category); }
-    if (search)   { sql += ' AND (name LIKE ? OR sku LIKE ?)'; replacements.push(`%${search}%`, `%${search}%`); }
-    sql += ' ORDER BY created_at DESC';
+    // Build WHERE clause manually (safe — values are validated)
+    const conditions = ['1=1'];
+    if (brand)    conditions.push(`brand = ${sequelize.escape(brand)}`);
+    if (category) conditions.push(`category_id = ${sequelize.escape(category)}`);
+    if (search) {
+      const s = sequelize.escape('%' + search + '%');
+      conditions.push(`(name LIKE ${s} OR sku LIKE ${s})`);
+    }
+    const WHERE = conditions.join(' AND ');
 
-    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
-    const [countResult] = await sequelize.query(countSql, { replacements, type: 'SELECT' });
-    const total = countResult.total || 0;
+    const [[{ total }]] = await sequelize.query(
+      `SELECT COUNT(*) as total FROM store_products WHERE ${WHERE}`
+    );
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    sql += ` LIMIT ${parseInt(limit)} OFFSET ${offset}`;
-    const [rows] = await sequelize.query(sql, { replacements });
+    const [rows] = await sequelize.query(
+      `SELECT * FROM store_products WHERE ${WHERE} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`
+    );
 
-    // Get ERP categories
+    // Get ERP categories for name lookup
     const branchId = brand === 'gpdistro' ? 2 : 1;
     const [erpCats] = await sequelize.query(
-      'SELECT id, name FROM erp_categories WHERE branch_id = ? AND is_active = 1',
-      { replacements: [branchId] }
+      `SELECT id, name FROM erp_categories WHERE branch_id = ${branchId} AND is_active = 1`
     );
-    const catMap = Object.fromEntries(erpCats.map(c => [c.id, { id: c.id, name: c.name, slug: c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-') }]));
+    const catMap = Object.fromEntries(
+      erpCats.map(c => [c.id, { id: c.id, name: c.name, slug: c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-') }])
+    );
 
     const products = rows.map(p => {
       try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images   = []; }
       try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch { p.variants = {}; }
       try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags     = []; }
-      return { ...p, category: p.category_id ? catMap[p.category_id] || null : null };
+      return { ...p, category: p.category_id ? (catMap[p.category_id] || null) : null };
     });
 
-    return res.json({ success: true, data: { products, total: parseInt(total), page: parseInt(page), total_pages: Math.ceil(total / parseInt(limit)) } });
+    return res.json({
+      success: true,
+      data: { products, total: parseInt(total), page: pageNum, total_pages: Math.ceil(total / limitNum) }
+    });
   } catch (err) { next(err); }
 };
 const createProduct = async (req, res, next) => {
