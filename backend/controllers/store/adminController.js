@@ -47,24 +47,38 @@ const getProducts = async (req, res, next) => {
   try {
     const { brand, search, category, page = 1, limit = 20 } = req.query;
     const { sequelize } = require('../../config/database');
+    const { QueryTypes } = require('sequelize');
     const pageNum  = parseInt(page)  || 1;
     const limitNum = parseInt(limit) || 20;
     const offset   = (pageNum - 1) * limitNum;
 
-    // Build safe WHERE using sequelize.escape()
+    // Use Sequelize QueryTypes and named bind params
+    const bind = {};
     const conds = ['1=1'];
-    if (brand)    conds.push(`brand = ${sequelize.escape(brand)}`);
-    if (category) conds.push(`category_id = ${sequelize.escape(parseInt(category))}`);
+
+    if (brand) {
+      conds.push('brand = $brand');
+      bind.brand = brand;
+    }
+    if (category) {
+      conds.push('category_id = $category');
+      bind.category = parseInt(category);
+    }
     if (search) {
-      const esc = sequelize.escape('%' + search + '%');
-      conds.push(`(name LIKE ${esc} OR sku LIKE ${esc})`);
+      conds.push('(name LIKE $search OR sku LIKE $search)');
+      bind.search = '%' + search + '%';
     }
     const W = conds.join(' AND ');
 
-    const [[cntRow]] = await sequelize.query(`SELECT COUNT(*) as n FROM store_products WHERE ${W}`);
-    const total = parseInt(cntRow.n) || 0;
+    const [[cntRow]] = await sequelize.query(
+      `SELECT COUNT(*) as n FROM store_products WHERE ${W}`,
+      { bind, type: QueryTypes.SELECT }
+    );
+    const total = parseInt(cntRow ? cntRow.n : 0) || 0;
+
     const [rows] = await sequelize.query(
-      `SELECT * FROM store_products WHERE ${W} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`
+      `SELECT * FROM store_products WHERE ${W} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`,
+      { bind }
     );
 
     // ERP category lookup
@@ -73,13 +87,13 @@ const getProducts = async (req, res, next) => {
       `SELECT id, name FROM erp_categories WHERE branch_id = ${branchId} AND is_active = 1`
     );
     const catMap = Object.fromEntries(
-      erpCats.map(c => [c.id, { id: c.id, name: c.name, slug: c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-') }])
+      (erpCats || []).map(cat => [cat.id, { id: cat.id, name: cat.name, slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }])
     );
 
-    const products = rows.map(p => {
-      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images = []; }
+    const products = (rows || []).map(p => {
+      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images   = []; }
       try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch { p.variants = {}; }
-      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags = []; }
+      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags     = []; }
       return { ...p, category: p.category_id ? (catMap[p.category_id] || null) : null };
     });
 
