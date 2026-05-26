@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
-const { StoreConfig, StoreCategory, StoreProduct, StoreBanner, StoreReview } = require('../../models/store');
+const { StoreConfig, StoreProduct, StoreBanner, StoreReview } = require('../../models/store');
+const { Category: ErpCategory } = require('../../models/erp');
 
 // GET /api/store/:brand/config
 const getConfig = async (req, res, next) => {
@@ -11,14 +12,27 @@ const getConfig = async (req, res, next) => {
 };
 
 // GET /api/store/:brand/categories
+// Ambil dari erp_categories berdasarkan branch_id
+// gpdistro = branch_id 2, gpracing = branch_id 1
 const getCategories = async (req, res, next) => {
   try {
-    const categories = await StoreCategory.findAll({
-      where: { brand: req.params.brand, is_active: true, parent_id: null },
-      include: [{ association: 'children', where: { is_active: true }, required: false }],
-      order: [['sort_order','ASC'], ['name','ASC']],
+    const branchId = req.params.brand === 'gpdistro' ? 2 : 1;
+    const categories = await ErpCategory.findAll({
+      where: { branch_id: branchId, is_active: true },
+      order: [['sort_order', 'ASC'], ['name', 'ASC']],
+      attributes: ['id', 'name', 'description', 'sort_order'],
     });
-    return res.json({ success: true, data: { categories } });
+    // Map ke format yang sama dengan sebelumnya agar frontend tidak perlu diubah
+    const mapped = categories.map(c => ({
+      id:          c.id,
+      name:        c.name,
+      slug:        c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: c.description,
+      sort_order:  c.sort_order,
+      is_active:   true,
+      children:    [],
+    }));
+    return res.json({ success: true, data: { categories: mapped } });
   } catch (err) { next(err); }
 };
 

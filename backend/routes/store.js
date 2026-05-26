@@ -71,10 +71,8 @@ router.use('/admin', authenticate, authorize('admin', 'hr'));
 router.get('/admin/stats',                   admin.getStats);
 router.get('/admin/config',                  admin.getConfig);
 router.post('/admin/config',                 admin.upsertConfig);
+// Categories — read-only from ERP (no create/update/delete here)
 router.get('/admin/categories',              admin.getCategories);
-router.post('/admin/categories',             admin.createCategory);
-router.put('/admin/categories/:id',          admin.updateCategory);
-router.delete('/admin/categories/:id',       admin.deleteCategory);
 router.get('/admin/products',                admin.getProducts);
 router.post('/admin/products',               admin.createProduct);
 router.put('/admin/products/:id',            admin.updateProduct);

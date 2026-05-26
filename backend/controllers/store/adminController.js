@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
 const {
-  StoreConfig, StoreCategory, StoreProduct, StoreBanner,
+  StoreConfig, StoreProduct, StoreBanner,
   StoreVoucher, StoreOrder, StoreOrderItem,
 } = require('../../models/store');
+const { Category: ErpCategory } = require('../../models/erp');
 
 // ── Config ────────────────────────────────────────────────────
 const getConfig    = async (req, res, next) => {
@@ -19,33 +20,25 @@ const upsertConfig = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── Categories ────────────────────────────────────────────────
+// ── Categories — read from ERP, no CRUD here ──────────────────
+// gpdistro = branch_id 2, gpracing = branch_id 1
 const getCategories = async (req, res, next) => {
   try {
     const { brand } = req.query;
-    const where = brand ? { brand } : {};
-    const cats = await StoreCategory.findAll({ where, order: [['brand','ASC'],['sort_order','ASC']] });
-    return res.json({ success: true, data: { categories: cats } });
-  } catch (err) { next(err); }
-};
-const createCategory = async (req, res, next) => {
-  try {
-    const cat = await StoreCategory.create(req.body);
-    return res.status(201).json({ success: true, data: { category: cat } });
-  } catch (err) { next(err); }
-};
-const updateCategory = async (req, res, next) => {
-  try {
-    const cat = await StoreCategory.findByPk(req.params.id);
-    if (!cat) return res.status(404).json({ success: false, message: 'Kategori tidak ditemukan' });
-    await cat.update(req.body);
-    return res.json({ success: true, data: { category: cat } });
-  } catch (err) { next(err); }
-};
-const deleteCategory = async (req, res, next) => {
-  try {
-    await StoreCategory.destroy({ where: { id: req.params.id } });
-    return res.json({ success: true, message: 'Kategori dihapus' });
+    const where = { is_active: true };
+    if (brand) where.branch_id = brand === 'gpdistro' ? 2 : 1;
+    const cats = await ErpCategory.findAll({
+      where,
+      order: [['branch_id', 'ASC'], ['sort_order', 'ASC'], ['name', 'ASC']],
+      attributes: ['id', 'branch_id', 'name', 'description', 'sort_order', 'is_active'],
+    });
+    // Map slug for frontend compatibility
+    const mapped = cats.map(c => ({
+      ...c.toJSON(),
+      slug: c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      brand: c.branch_id === 2 ? 'gpdistro' : 'gpracing',
+    }));
+    return res.json({ success: true, data: { categories: mapped } });
   } catch (err) { next(err); }
 };
 
@@ -198,7 +191,7 @@ const getStats = async (req, res, next) => {
 
 module.exports = {
   getConfig, upsertConfig,
-  getCategories, createCategory, updateCategory, deleteCategory,
+  getCategories,
   getProducts, createProduct, updateProduct, deleteProduct,
   getBanners, createBanner, updateBanner, deleteBanner,
   getVouchers, createVoucher, updateVoucher,
