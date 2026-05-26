@@ -371,6 +371,39 @@ app.post('/run-alter', async (req, res) => {
       // Add theme color columns for sidebar & topbar
       `ALTER TABLE company_settings ADD COLUMN sidebar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
+      // ── Merge store_products into erp_products ──────────────
+      `ALTER TABLE erp_products ADD COLUMN store_price DECIMAL(15,2) NULL`,
+      `ALTER TABLE erp_products ADD COLUMN store_price_compare DECIMAL(15,2) NULL`,
+      `ALTER TABLE erp_products ADD COLUMN store_active_gpd TINYINT(1) DEFAULT 0`,
+      `ALTER TABLE erp_products ADD COLUMN store_active_gpr TINYINT(1) DEFAULT 0`,
+      `ALTER TABLE erp_products ADD COLUMN store_images JSON`,
+      `ALTER TABLE erp_products ADD COLUMN store_variants JSON`,
+      `ALTER TABLE erp_products ADD COLUMN store_short_desc VARCHAR(500)`,
+      `ALTER TABLE erp_products ADD COLUMN store_description TEXT`,
+      `ALTER TABLE erp_products ADD COLUMN store_tags JSON`,
+      `ALTER TABLE erp_products ADD COLUMN store_meta_title VARCHAR(200)`,
+      `ALTER TABLE erp_products ADD COLUMN store_meta_desc TEXT`,
+      `ALTER TABLE erp_products ADD COLUMN store_slug VARCHAR(220)`,
+      `ALTER TABLE erp_products ADD COLUMN store_featured TINYINT(1) DEFAULT 0`,
+      `ALTER TABLE erp_products ADD COLUMN store_sold_count INT DEFAULT 0`,
+      `ALTER TABLE erp_products ADD COLUMN store_view_count INT DEFAULT 0`,
+      // Migrate existing store_products data into erp_products
+      `UPDATE erp_products ep
+       INNER JOIN store_products sp ON sp.erp_product_id = ep.id
+       SET
+         ep.store_price         = sp.price,
+         ep.store_price_compare = sp.price_compare,
+         ep.store_active_gpr    = IF(sp.brand='gpracing', sp.is_active, ep.store_active_gpr),
+         ep.store_active_gpd    = IF(sp.brand='gpdistro', sp.is_active, ep.store_active_gpd),
+         ep.store_images        = sp.images,
+         ep.store_variants      = sp.variants,
+         ep.store_short_desc    = sp.short_desc,
+         ep.store_description   = sp.description,
+         ep.store_tags          = sp.tags,
+         ep.store_meta_title    = sp.meta_title,
+         ep.store_meta_desc     = sp.meta_desc,
+         ep.store_slug          = sp.slug,
+         ep.store_featured      = sp.is_featured`,
       // Fix store_products — add missing columns (SKIP jika sudah ada)
       `ALTER TABLE store_products ADD COLUMN brand ENUM('gpdistro','gpracing') NOT NULL DEFAULT 'gpracing'`,
       `ALTER TABLE store_products ADD COLUMN erp_product_id INT NULL`,

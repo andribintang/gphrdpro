@@ -242,6 +242,20 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
         stock_min: parseInt(form.stock_min) || 0,
         weight: parseFloat(form.weight) || 0,
         notes: form.notes,
+        // Store fields — saved directly to erp_products
+        store_price:         parseFloat(form.store_price_gpracing || form.store_price_gpdistro || form.sell_price_mp || form.sell_price) || 0,
+        store_price_compare: parseFloat(form.store_price_compare_gpracing || form.store_price_compare_gpdistro) || 0,
+        store_active_gpd:    form.publish_gpdistro ? 1 : 0,
+        store_active_gpr:    form.publish_gpracing ? 1 : 0,
+        store_images:        form.images || [],
+        store_variants:      form.variants || {},
+        store_tags:          form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        store_short_desc:    form.short_desc || '',
+        store_description:   form.description || '',
+        store_meta_title:    form.meta_title || form.name,
+        store_meta_desc:     form.meta_desc || '',
+        store_slug:          toSlug(form.name) + '-' + (form.branch_id || 1),
+        store_featured:      form.publish_gpdistro || form.publish_gpracing ? (form.store_featured || false) : false,
       };
       if (isEdit) await erpService.updateProduct(erpId, erpPayload);
       else {
@@ -249,49 +263,8 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
         erpId = r.data.data?.product?.id || r.data.data?.id;
       }
 
-      // 2. Publish to stores if checked
-      const publishTargets = [
-        form.publish_gpdistro && 'gpdistro',
-        form.publish_gpracing && 'gpracing',
-      ].filter(Boolean);
-
-      for (const brand of publishTargets) {
-        const storePrice = parseFloat(form[`store_price_${brand}`]);
-        if (!storePrice) continue;
-        const storePayload = {
-          brand,
-          erp_product_id: erpId,
-          name: form.name,
-          slug: toSlug(form.name) + '-' + Date.now().toString().slice(-5),
-          sku: form.sku || '',
-          description: form.description || form.notes || '',
-          short_desc: form.short_desc || form.name,
-          price: storePrice,
-          price_compare: parseFloat(form[`store_price_compare_${brand}`]) || 0,
-          weight: Math.round((parseFloat(form.weight) || 0.5) * 1000),
-          stock: 0,
-          category_id: form[`store_category_${brand}`] || null,
-          images: form.images,
-          variants: form.variants,
-          tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-          is_active: true,
-          is_featured: false,
-          meta_title: form.meta_title || form.name,
-          meta_desc: form.meta_desc || '',
-        };
-        try {
-          await createStoreProduct(storePayload);
-        } catch (e) {
-          const msg = e.response?.data?.message || '';
-          if (!msg.includes('slug') && !msg.includes('Duplicate'))
-            toast.error(`Gagal publish ke ${brand}: ${msg}`);
-        }
-      }
-
-      const storeMsg = publishTargets.length
-        ? ` & dipublish ke ${publishTargets.map(b => b === 'gpdistro' ? 'GPDISTRO' : 'GP RACING').join(', ')}`
-        : '';
-      toast.success((isEdit ? 'Produk diperbarui' : 'Produk ditambahkan') + storeMsg);
+      // 2. Store fields sudah tersimpan di erp_products langsung
+      toast.success(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan');
       onSuccess();
       onClose();
     } catch (e) {
