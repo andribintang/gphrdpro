@@ -39,6 +39,22 @@ const Product = sequelize.define('ErpProduct', {
   weight:        { type: DataTypes.DECIMAL(8,2), defaultValue: 0 },
   notes:         { type: DataTypes.TEXT, allowNull: true },
   is_active:     { type: DataTypes.BOOLEAN, defaultValue: true },
+  // ── Store fields ──────────────────────────────────────────
+  store_price:         { type: DataTypes.DECIMAL(15,2), allowNull: true },
+  store_price_compare: { type: DataTypes.DECIMAL(15,2), allowNull: true },
+  store_active_gpd:    { type: DataTypes.BOOLEAN, defaultValue: false },
+  store_active_gpr:    { type: DataTypes.BOOLEAN, defaultValue: false },
+  store_images:        { type: DataTypes.JSON, defaultValue: [] },
+  store_variants:      { type: DataTypes.JSON, defaultValue: {} },
+  store_short_desc:    { type: DataTypes.STRING(500), allowNull: true },
+  store_description:   { type: DataTypes.TEXT, allowNull: true },
+  store_tags:          { type: DataTypes.JSON, defaultValue: [] },
+  store_meta_title:    { type: DataTypes.STRING(200), allowNull: true },
+  store_meta_desc:     { type: DataTypes.TEXT, allowNull: true },
+  store_slug:          { type: DataTypes.STRING(220), allowNull: true },
+  store_featured:      { type: DataTypes.BOOLEAN, defaultValue: false },
+  store_sold_count:    { type: DataTypes.INTEGER, defaultValue: 0 },
+  store_view_count:    { type: DataTypes.INTEGER, defaultValue: 0 },
 }, { tableName: 'erp_products', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
 
 // ── STOCK ─────────────────────────────────────────────────────
