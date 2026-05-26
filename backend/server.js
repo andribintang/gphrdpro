@@ -31,9 +31,18 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 // ── CORS — allow Railway frontend URL + localhost ─────────────
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://frontend-gphrdpro.up.railway.app',
   'https://gphrdpro-production.up.railway.app',
+  // Store frontends (Railway + custom domains)
+  process.env.FRONTEND_GPDISTRO_URL,
+  process.env.FRONTEND_GPRACING_URL,
+  'https://gpdistro.com',
+  'https://www.gpdistro.com',
+  'https://gpracingstore.com',
+  'https://www.gpracingstore.com',
   'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:3001',
   'http://localhost:4173',
 ].filter(Boolean);
 
