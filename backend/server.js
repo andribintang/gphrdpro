@@ -774,12 +774,27 @@ app.use('/api/store', storeRoutes);               // di bagian app.use
 // ── Debug: check store_products table ────────────────────────
 app.get('/debug-store', async (req, res) => {
   try {
-    const secret = req.headers['x-migrate-secret'];
+    const secret = req.headers['x-migrate-secret'] || req.query.secret;
     if (!secret || secret !== process.env.MIGRATE_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    const { sequelize } = require('./config/database');
     const [products]    = await sequelize.query('SELECT id, name, brand, is_active, created_at FROM store_products ORDER BY created_at DESC LIMIT 20');
     const [cnt]         = await sequelize.query('SELECT COUNT(*) as total FROM store_products');
     const [tbl]         = await sequelize.query("SELECT COUNT(*) as c FROM information_schema.tables WHERE table_name='store_products' AND table_schema=DATABASE()");
-    return res.json({ tableExists: tbl[0].c > 0, total: cnt[0].total, products });
+    const [cols]        = await sequelize.query("SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_name='store_products' AND table_schema=DATABASE() ORDER BY ORDINAL_POSITION");
+    return res.json({ tableExists: tbl[0].c > 0, total: cnt[0].total, products, columns: cols.map(c=>c.COLUMN_NAME) });
+  } catch (e) { return res.json({ error: e.message }); }
+});
+
+// check-store via POST with CORS-friendly approach
+app.post('/check-store', async (req, res) => {
+  try {
+    const { secret } = req.body || {};
+    if (!secret || secret !== process.env.MIGRATE_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    const { sequelize } = require('./config/database');
+    const [products] = await sequelize.query('SELECT id, name, brand, is_active, created_at FROM store_products ORDER BY created_at DESC LIMIT 20');
+    const [cnt]      = await sequelize.query('SELECT COUNT(*) as total FROM store_products');
+    const [cols]     = await sequelize.query("SELECT COLUMN_NAME FROM information_schema.columns WHERE table_name='store_products' AND table_schema=DATABASE() ORDER BY ORDINAL_POSITION");
+    return res.json({ total: cnt[0].total, products, columns: cols.map(c=>c.COLUMN_NAME) });
   } catch (e) { return res.json({ error: e.message }); }
 });
 app.use('/api/departments', departmentRoutes);
