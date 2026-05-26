@@ -46,24 +46,40 @@ const getCategories = async (req, res, next) => {
 const getProducts = async (req, res, next) => {
   try {
     const { brand, search, category, page = 1, limit = 20 } = req.query;
-    const where = {};
-    if (brand)    where.brand = brand;
-    if (category) where.category_id = category;
-    if (search)   where[Op.or] = [{ name: { [Op.like]: `%${search}%` } }, { sku: { [Op.like]: `%${search}%` } }];
-    const { count, rows } = await StoreProduct.findAndCountAll({
-      where,
-      order: [['created_at','DESC']],
-      limit: parseInt(limit), offset: (parseInt(page)-1)*parseInt(limit),
-    });
-    // Attach ERP category name if category_id present
+    const { sequelize } = require('../../config/database');
+
+    // Use raw SQL to bypass any Sequelize model issues
+    let sql = 'SELECT * FROM store_products WHERE 1=1';
+    const replacements = [];
+    if (brand)    { sql += ' AND brand = ?';        replacements.push(brand); }
+    if (category) { sql += ' AND category_id = ?';  replacements.push(category); }
+    if (search)   { sql += ' AND (name LIKE ? OR sku LIKE ?)'; replacements.push(`%${search}%`, `%${search}%`); }
+    sql += ' ORDER BY created_at DESC';
+
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
+    const [countResult] = await sequelize.query(countSql, { replacements, type: 'SELECT' });
+    const total = countResult.total || 0;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    sql += ` LIMIT ${parseInt(limit)} OFFSET ${offset}`;
+    const [rows] = await sequelize.query(sql, { replacements });
+
+    // Get ERP categories
     const branchId = brand === 'gpdistro' ? 2 : 1;
-    const erpCats  = await ErpCategory.findAll({ where: { branch_id: branchId }, attributes: ['id','name'] });
-    const catMap   = Object.fromEntries(erpCats.map(c => [c.id, c.name]));
-    const products = rows.map(p => ({
-      ...p.toJSON(),
-      category: p.category_id ? { id: p.category_id, name: catMap[p.category_id] || '—' } : null,
-    }));
-    return res.json({ success: true, data: { products, total: count } });
+    const [erpCats] = await sequelize.query(
+      'SELECT id, name FROM erp_categories WHERE branch_id = ? AND is_active = 1',
+      { replacements: [branchId] }
+    );
+    const catMap = Object.fromEntries(erpCats.map(c => [c.id, { id: c.id, name: c.name, slug: c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-') }]));
+
+    const products = rows.map(p => {
+      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images   = []; }
+      try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch { p.variants = {}; }
+      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags     = []; }
+      return { ...p, category: p.category_id ? catMap[p.category_id] || null : null };
+    });
+
+    return res.json({ success: true, data: { products, total: parseInt(total), page: parseInt(page), total_pages: Math.ceil(total / parseInt(limit)) } });
   } catch (err) { next(err); }
 };
 const createProduct = async (req, res, next) => {
