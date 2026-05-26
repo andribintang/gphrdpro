@@ -797,6 +797,29 @@ app.post('/check-store', async (req, res) => {
     return res.json({ total: cnt[0].total, products, columns: cols.map(c=>c.COLUMN_NAME) });
   } catch (e) { return res.json({ error: e.message }); }
 });
+// Fix store_products timestamps
+app.post('/fix-store-timestamps', async (req, res) => {
+  try {
+    const secret = req.body?.secret;
+    if (secret !== process.env.MIGRATE_SECRET) return res.status(403).json({error:'Forbidden'});
+    const { sequelize } = require('./config/database');
+    const fixes = [
+      "ALTER TABLE store_products MODIFY COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "ALTER TABLE store_products MODIFY COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ALTER TABLE store_products MODIFY COLUMN price DECIMAL(15,2) NOT NULL DEFAULT 0",
+      "ALTER TABLE store_products MODIFY COLUMN stock INT NOT NULL DEFAULT 0",
+      "ALTER TABLE store_products MODIFY COLUMN name VARCHAR(200) NOT NULL",
+      "ALTER TABLE store_products MODIFY COLUMN slug VARCHAR(220) NOT NULL",
+    ];
+    const results = [];
+    for (const sql of fixes) {
+      try { await sequelize.query(sql); results.push('OK: ' + sql.slice(0,60)); }
+      catch(e) { results.push('ERR: ' + e.message.slice(0,80)); }
+    }
+    res.json({ success: true, results });
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 // Simple no-param store test
 app.get('/store-test', async (req, res) => {
   try {

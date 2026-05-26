@@ -52,33 +52,33 @@ const getProducts = async (req, res, next) => {
     const limitNum = parseInt(limit) || 20;
     const offset   = (pageNum - 1) * limitNum;
 
-    // Use Sequelize QueryTypes and named bind params
-    const bind = {};
+    // Use Sequelize replacements with :name syntax (MySQL compatible)
+    const replacements = {};
     const conds = ['1=1'];
 
     if (brand) {
-      conds.push('brand = $brand');
-      bind.brand = brand;
+      conds.push('brand = :brand');
+      replacements.brand = brand;
     }
     if (category) {
-      conds.push('category_id = $category');
-      bind.category = parseInt(category);
+      conds.push('category_id = :category');
+      replacements.category = parseInt(category);
     }
     if (search) {
-      conds.push('(name LIKE $search OR sku LIKE $search)');
-      bind.search = '%' + search + '%';
+      conds.push('(name LIKE :search OR sku LIKE :search)');
+      replacements.search = '%' + search + '%';
     }
     const W = conds.join(' AND ');
 
-    const [[cntRow]] = await sequelize.query(
+    const cntResult = await sequelize.query(
       `SELECT COUNT(*) as n FROM store_products WHERE ${W}`,
-      { bind, type: QueryTypes.SELECT }
+      { replacements, type: QueryTypes.SELECT }
     );
-    const total = parseInt(cntRow ? cntRow.n : 0) || 0;
+    const total = parseInt(cntResult[0]?.n || 0);
 
-    const [rows] = await sequelize.query(
+    const rows = await sequelize.query(
       `SELECT * FROM store_products WHERE ${W} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`,
-      { bind }
+      { replacements, type: QueryTypes.SELECT }
     );
 
     // ERP category lookup
@@ -90,7 +90,7 @@ const getProducts = async (req, res, next) => {
       (erpCats || []).map(cat => [cat.id, { id: cat.id, name: cat.name, slug: cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }])
     );
 
-    const products = (rows || []).map(p => {
+    const products = (Array.isArray(rows) ? rows : []).map(p => {
       try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch { p.images   = []; }
       try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch { p.variants = {}; }
       try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch { p.tags     = []; }
