@@ -769,6 +769,35 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves',     leaveRoutes);
 app.use('/api/payroll',    payrollRoutes);
 app.use('/api/employees',  employeeRoutes);
+// ── STORE PRODUCTS — direct (must be BEFORE storeRoutes) ────
+app.get('/api/store/admin/products', async (req, res) => {
+  try {
+    const { brand, search, category, page = 1, limit = 20 } = req.query;
+    const { sequelize } = require('./config/database');
+    const pageNum  = Math.max(1, parseInt(page)  || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 20);
+    const offset   = (pageNum - 1) * limitNum;
+    let where = 'WHERE 1=1';
+    if (brand)    where += ` AND brand = ${sequelize.escape(brand)}`;
+    if (category) where += ` AND category_id = ${parseInt(category)}`;
+    if (search)   where += ` AND (name LIKE ${sequelize.escape('%'+search+'%')} OR sku LIKE ${sequelize.escape('%'+search+'%')})`;
+    const [[{ n }]] = await sequelize.query(`SELECT COUNT(*) as n FROM store_products ${where}`);
+    const total = parseInt(n) || 0;
+    const [rows] = await sequelize.query(`SELECT * FROM store_products ${where} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offset}`);
+    const branchId = brand === 'gpdistro' ? 2 : 1;
+    const [cats] = await sequelize.query(`SELECT id, name FROM erp_categories WHERE branch_id = ${branchId} AND is_active = 1`);
+    const catMap = {};
+    cats.forEach(cat => { catMap[cat.id] = { id: cat.id, name: cat.name }; });
+    const products = (rows || []).map(p => {
+      try { p.images   = typeof p.images   === 'string' ? JSON.parse(p.images)   : (p.images   || []); } catch(e) { p.images = []; }
+      try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch(e) { p.variants = {}; }
+      try { p.tags     = typeof p.tags     === 'string' ? JSON.parse(p.tags)     : (p.tags     || []); } catch(e) { p.tags = []; }
+      return { ...p, category: p.category_id ? (catMap[p.category_id] || null) : null };
+    });
+    return res.json({ success: true, data: { products, total, page: pageNum, total_pages: Math.ceil(total / limitNum) } });
+  } catch(e) { return res.status(500).json({ success: false, message: e.message }); }
+});
+
 app.use('/api/store', storeRoutes);               // di bagian app.use
 
 // ── Debug: check store_products table ────────────────────────
