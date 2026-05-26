@@ -52,11 +52,18 @@ const getProducts = async (req, res, next) => {
     if (search)   where[Op.or] = [{ name: { [Op.like]: `%${search}%` } }, { sku: { [Op.like]: `%${search}%` } }];
     const { count, rows } = await StoreProduct.findAndCountAll({
       where,
-      include: [{ association: 'category', attributes: ['id','name'] }],
       order: [['created_at','DESC']],
       limit: parseInt(limit), offset: (parseInt(page)-1)*parseInt(limit),
     });
-    return res.json({ success: true, data: { products: rows, total: count } });
+    // Attach ERP category name if category_id present
+    const branchId = brand === 'gpdistro' ? 2 : 1;
+    const erpCats  = await ErpCategory.findAll({ where: { branch_id: branchId }, attributes: ['id','name'] });
+    const catMap   = Object.fromEntries(erpCats.map(c => [c.id, c.name]));
+    const products = rows.map(p => ({
+      ...p.toJSON(),
+      category: p.category_id ? { id: p.category_id, name: catMap[p.category_id] || '—' } : null,
+    }));
+    return res.json({ success: true, data: { products, total: count } });
   } catch (err) { next(err); }
 };
 const createProduct = async (req, res, next) => {
