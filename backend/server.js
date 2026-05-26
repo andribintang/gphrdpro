@@ -371,6 +371,21 @@ app.post('/run-alter', async (req, res) => {
       // Add theme color columns for sidebar & topbar
       `ALTER TABLE company_settings ADD COLUMN sidebar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
+      // Fix store_products — add missing columns if table existed before store module
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS brand ENUM('gpdistro','gpracing') NOT NULL DEFAULT 'gpracing'`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS erp_product_id INT NULL`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS short_desc VARCHAR(500)`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS price_compare DECIMAL(15,2) DEFAULT 0`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS weight INT DEFAULT 500`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS images JSON`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS variants JSON`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS tags JSON`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS sold_count INT DEFAULT 0`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS view_count INT DEFAULT 0`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS is_active TINYINT(1) DEFAULT 1`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS is_featured TINYINT(1) DEFAULT 0`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS meta_title VARCHAR(200)`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS meta_desc TEXT`,
       // Create inc_channel_rates if not exists
       `CREATE TABLE IF NOT EXISTS inc_channel_rates (
         id INT AUTO_INCREMENT PRIMARY KEY,
