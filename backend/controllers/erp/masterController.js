@@ -92,26 +92,55 @@ const deleteCategory = async (req, res, next) => {
 const getProducts = async (req, res, next) => {
   try {
     const { branch_id, search, category_id, low_stock, limit=50, page=1 } = req.query;
-    const where = { is_active: true };
-    if (branch_id) where.branch_id = branch_id;
-    if (category_id) where.category_id = category_id;
-    if (search) where[Op.or] = [
-      { name: { [Op.like]: `%${search}%` } },
-      { sku:  { [Op.like]: `%${search}%` } },
-      { barcode: { [Op.like]: `%${search}%` } },
-    ];
-    const offset = (parseInt(page)-1)*parseInt(limit);
-    const { count, rows } = await Product.findAndCountAll({
-      where, limit: parseInt(limit), offset,
-      include: [
-        { model: Category, as:'category', attributes:['id','name'] },
-        { model: Stock, as:'stock', required:false },
-      ],
-      order: [['name','ASC']],
-    });
-    let products = rows;
-    if (low_stock === 'true') products = rows.filter(p => (p.stock?.qty||0) <= (p.stock_min||0));
-    return res.json({ success:true, data:{ products, total:count } });
+    const { sequelize } = require('../../config/database');
+    const pageNum  = Math.max(1, parseInt(page)  || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 50);
+    const offset   = (pageNum - 1) * limitNum;
+
+    let where = 'ep.is_active = 1';
+    if (branch_id)   where += ` AND ep.branch_id = ${parseInt(branch_id)}`;
+    if (category_id) where += ` AND ep.category_id = ${parseInt(category_id)}`;
+    if (search) {
+      const s = sequelize.escape('%' + search + '%');
+      where += ` AND (ep.name LIKE ${s} OR ep.sku LIKE ${s} OR ep.barcode LIKE ${s})`;
+    }
+
+    const [[{ total }]] = await sequelize.query(
+      `SELECT COUNT(*) as total FROM erp_products ep WHERE ${where}`
+    );
+
+    const [rows] = await sequelize.query(
+      `SELECT ep.id, ep.branch_id, ep.category_id, ep.sku, ep.barcode, ep.name,
+              ep.unit, ep.buy_price, ep.sell_price, ep.sell_price_mp, ep.sell_price_wa,
+              ep.stock_min, ep.weight, ep.notes, ep.is_active,
+              ep.store_price, ep.store_price_compare, ep.store_active_gpd, ep.store_active_gpr,
+              ep.store_short_desc, ep.store_description, ep.store_slug, ep.store_featured,
+              ep.store_sold_count, ep.store_view_count, ep.store_meta_title, ep.store_meta_desc,
+              ep.created_at, ep.updated_at,
+              ec.name as category_name,
+              COALESCE(s.qty, 0) as stock_qty
+       FROM erp_products ep
+       LEFT JOIN erp_categories ec ON ec.id = ep.category_id
+       LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
+       WHERE ${where}
+       ORDER BY ep.name ASC
+       LIMIT ${limitNum} OFFSET ${offset}`
+    );
+
+    // Parse JSON fields safely
+    const parse = (v, fb) => { try { return v ? (typeof v==='string' ? JSON.parse(v) : v) : fb; } catch { return fb; } };
+
+    let products = rows.map(p => ({
+      ...p,
+      store_images:   parse(p.store_images, []),
+      store_variants: parse(p.store_variants, {}),
+      store_tags:     parse(p.store_tags, []),
+      category:       p.category_id ? { id: p.category_id, name: p.category_name } : null,
+      stock:          { qty: parseInt(p.stock_qty || 0), branch_id: p.branch_id, product_id: p.id },
+    }));
+
+    if (low_stock === 'true') products = products.filter(p => (p.stock?.qty||0) <= (p.stock_min||0));
+    return res.json({ success: true, data: { products, total: parseInt(total) } });
   } catch (err) { next(err); }
 };
 
