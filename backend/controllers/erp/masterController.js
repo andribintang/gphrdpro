@@ -159,27 +159,48 @@ const createProduct = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const b = req.body;
-    // Use raw SQL to avoid Sequelize timestamp issues
+    const esc = (v) => sequelize.escape(v == null ? '' : String(v));
+    const num = (v, d=0) => { const n = parseFloat(v); return isNaN(n) ? d : n; };
+    const int = (v, d=0) => { const n = parseInt(v); return isNaN(n) ? d : n; };
+    const jsn = (v, d='[]') => esc(JSON.stringify(v && typeof v === 'object' ? v : JSON.parse(d)));
+
     const [result] = await sequelize.query(
       `INSERT INTO erp_products 
         (branch_id, category_id, name, sku, barcode, unit, buy_price, sell_price, 
-         sell_price_mp, sell_price_wa, stock_min, weight, notes, is_active, 
+         sell_price_mp, sell_price_wa, stock_min, weight, notes, is_active,
+         store_price, store_price_compare, store_active_gpd, store_active_gpr,
+         store_images, store_variants, store_tags, store_short_desc, store_description,
+         store_meta_title, store_meta_desc, store_slug, store_featured,
          created_at, updated_at)
        VALUES (
-        ${parseInt(b.branch_id)||1},
-        ${b.category_id ? parseInt(b.category_id) : 'NULL'},
-        ${sequelize.escape(b.name||'')},
-        ${sequelize.escape(b.sku||'')},
-        ${sequelize.escape(b.barcode||'')},
-        ${sequelize.escape(b.unit||'pcs')},
-        ${parseFloat(b.buy_price)||0},
-        ${parseFloat(b.sell_price)||0},
-        ${b.sell_price_mp ? parseFloat(b.sell_price_mp) : 'NULL'},
-        ${b.sell_price_wa ? parseFloat(b.sell_price_wa) : 'NULL'},
-        ${parseInt(b.stock_min)||0},
-        ${parseFloat(b.weight)||0},
-        ${sequelize.escape(b.notes||'')},
-        1, NOW(), NOW()
+        ${int(b.branch_id,1)},
+        ${b.category_id ? int(b.category_id) : 'NULL'},
+        ${esc(b.name)},
+        ${esc(b.sku)},
+        ${esc(b.barcode)},
+        ${esc(b.unit||'pcs')},
+        ${num(b.buy_price)},
+        ${num(b.sell_price)},
+        ${b.sell_price_mp != null && b.sell_price_mp !== '' ? num(b.sell_price_mp) : 'NULL'},
+        ${b.sell_price_wa != null && b.sell_price_wa !== '' ? num(b.sell_price_wa) : 'NULL'},
+        ${int(b.stock_min)},
+        ${num(b.weight)},
+        ${esc(b.notes)},
+        1,
+        ${num(b.store_price)},
+        ${num(b.store_price_compare)},
+        ${b.store_active_gpd ? 1 : 0},
+        ${b.store_active_gpr ? 1 : 0},
+        ${jsn(b.store_images,'[]')},
+        ${jsn(b.store_variants,'{}')},
+        ${jsn(b.store_tags,'[]')},
+        ${esc(b.store_short_desc)},
+        ${esc(b.store_description)},
+        ${esc(b.store_meta_title||b.name)},
+        ${esc(b.store_meta_desc)},
+        ${esc(b.store_slug||'')},
+        ${b.store_featured ? 1 : 0},
+        NOW(), NOW()
        )`,
       { transaction: t }
     );
