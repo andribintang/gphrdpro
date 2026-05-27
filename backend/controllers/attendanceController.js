@@ -350,4 +350,93 @@ const getAllAttendances = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getAllAttendances, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus };
+
+// ── Bulk Import Attendance ────────────────────────────────────
+const bulkImport = async (req, res, next) => {
+  try {
+    const { records } = req.body;
+    if (!Array.isArray(records) || !records.length)
+      return res.status(400).json({ success: false, message: 'Data kosong' });
+
+    const results = { success: 0, updated: 0, skipped: 0, errors: [] };
+
+    for (const row of records) {
+      try {
+        // Find user by name or email or employee_id
+        const userWhere = [];
+        if (row.email)       userWhere.push({ email: row.email.trim() });
+        if (row.employee_id) userWhere.push({ '$employee.employee_id$': row.employee_id.trim() });
+
+        let user = null;
+        if (row.email) {
+          user = await User.findOne({ where: { email: row.email.trim() } });
+        }
+        if (!user && row.employee_id) {
+          const emp = await Employee.findOne({ where: { employee_id: row.employee_id.trim() } });
+          if (emp) user = await User.findByPk(emp.user_id);
+        }
+        if (!user && row.name) {
+          user = await User.findOne({ where: { name: { [Op.like]: `%${row.name.trim()}%` } } });
+        }
+        if (!user) {
+          results.errors.push({ row, reason: 'Karyawan tidak ditemukan: ' + (row.email || row.name || row.employee_id) });
+          results.skipped++;
+          continue;
+        }
+
+        // Validate date
+        if (!row.date || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
+          results.errors.push({ row, reason: 'Format tanggal salah (harus YYYY-MM-DD): ' + row.date });
+          results.skipped++;
+          continue;
+        }
+
+        // Check if record exists
+        const existing = await Attendance.findOne({ where: { user_id: user.id, date: row.date } });
+
+        const checkIn  = row.check_in  || null;
+        const checkOut = row.check_out || null;
+        const status   = row.status || (checkIn ? 'present' : 'absent');
+        const notes    = row.notes || 'Import manual oleh admin';
+
+        // Calculate work hours
+        let workHours = null;
+        if (checkIn && checkOut) {
+          const [ih, im] = checkIn.split(':').map(Number);
+          const [oh, om] = checkOut.split(':').map(Number);
+          workHours = ((oh * 60 + om) - (ih * 60 + im)) / 60;
+          if (workHours < 0) workHours = null;
+        }
+
+        const data = {
+          user_id:     user.id,
+          date:        row.date,
+          check_in:    checkIn,
+          check_out:   checkOut,
+          status:      ['present','absent','late','half_day','leave','holiday'].includes(status) ? status : 'present',
+          work_hours:  workHours,
+          notes,
+        };
+
+        if (existing) {
+          await existing.update(data);
+          results.updated++;
+        } else {
+          await Attendance.create(data);
+          results.success++;
+        }
+      } catch (rowErr) {
+        results.errors.push({ row, reason: rowErr.message });
+        results.skipped++;
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Import selesai: ${results.success} ditambahkan, ${results.updated} diupdate, ${results.skipped} dilewati`,
+      data: results,
+    });
+  } catch (err) { next(err); }
+};
+
+module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getAllAttendances, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus, bulkImport };

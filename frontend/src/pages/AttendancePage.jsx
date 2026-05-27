@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Papa from 'papaparse';
 import {
   Clock, Camera, MapPin, CheckCircle2, LogIn, LogOut,
   Coffee, Play, ChevronLeft, ChevronRight, RefreshCw,
   AlertTriangle, Loader2, Navigation, Shield, ShieldCheck,
-  ShieldX, Map, Users, Eye, Settings, X, Info
+  ShieldX, Map, Users, Eye, Settings, X, Info,
+  Upload, Download, FileSpreadsheet, Check, History, Calendar,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -758,6 +760,295 @@ function HistoryTab() {
 // ════════════════════════════════════════════════════════════════
 // MONITORING TAB (HR/Admin)
 // ════════════════════════════════════════════════════════════════
+
+// ── Import Attendance Modal ───────────────────────────────────
+const STATUS_OPTIONS = ['present','late','absent','half_day','leave','holiday'];
+const STATUS_LABELS  = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
+
+function ImportAttendanceModal({ onClose, onDone }) {
+  const [step,     setStep]     = useState('upload'); // upload | preview | result
+  const [rows,     setRows]     = useState([]);
+  const [errors,   setErrors]   = useState([]);
+  const [importing,setImporting]= useState(false);
+  const [result,   setResult]   = useState(null);
+  const fileRef = useRef();
+
+  // Download template CSV
+  const downloadTemplate = () => {
+    const headers = ['date','email','employee_id','name','check_in','check_out','status','notes'];
+    const example = [
+      ['2026-01-15','john@example.com','EMP001','John Doe','08:00','17:00','present',''],
+      ['2026-01-15','','EMP002','Jane Smith','08:30','17:00','late','Terlambat 30 menit'],
+      ['2026-01-15','','EMP003','Bob Wilson','','','absent','Sakit'],
+    ];
+    const csv = [headers, ...example].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'template_import_absen.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Parse CSV
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: ({ data, errors: parseErrors }) => {
+        const errs = [];
+        const cleaned = data.map((row, i) => {
+          const r = {};
+          // Normalize keys (trim, lowercase)
+          Object.keys(row).forEach(k => { r[k.trim().toLowerCase()] = (row[k]||'').trim(); });
+          // Validate date
+          if (!r.date) errs.push(`Baris ${i+2}: kolom "date" kosong`);
+          else if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errs.push(`Baris ${i+2}: format date salah "${r.date}" (harus YYYY-MM-DD)`);
+          // Validate identifier
+          if (!r.email && !r.employee_id && !r.name) errs.push(`Baris ${i+2}: isi salah satu dari email / employee_id / name`);
+          // Validate time format
+          if (r.check_in  && !/^\d{2}:\d{2}(:\d{2})?$/.test(r.check_in))  errs.push(`Baris ${i+2}: format check_in salah "${r.check_in}"`);
+          if (r.check_out && !/^\d{2}:\d{2}(:\d{2})?$/.test(r.check_out)) errs.push(`Baris ${i+2}: format check_out salah "${r.check_out}"`);
+          if (r.status && !STATUS_OPTIONS.includes(r.status)) r.status = 'present';
+          return r;
+        });
+        if (parseErrors.length) errs.push(...parseErrors.map(e => e.message));
+        setErrors(errs);
+        setRows(cleaned);
+        setStep('preview');
+      },
+      error: (err) => toast.error('Gagal baca file: ' + err.message),
+    });
+    e.target.value = '';
+  };
+
+  const handleImport = async () => {
+    if (errors.length) { toast.error('Perbaiki error dulu sebelum import'); return; }
+    setImporting(true);
+    try {
+      const res = await fetch('/api/attendance/admin/bulk-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + localStorage.getItem('accessToken'),
+        },
+        body: JSON.stringify({ records: rows }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setResult(data.data);
+      setStep('result');
+    } catch(e) {
+      toast.error('Gagal import: ' + e.message);
+    } finally { setImporting(false); }
+  };
+
+  const F = "w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand-500)]";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-card)] w-full max-w-3xl my-6 rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <FileSpreadsheet size={20} className="text-blue-600"/>
+            </div>
+            <div>
+              <h2 className="font-bold text-base">Import Absensi Manual</h2>
+              <p className="text-xs text-[var(--text-muted)]">Upload file CSV untuk import data absensi karyawan</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg)] text-[var(--text-muted)]">
+            <X size={18}/>
+          </button>
+        </div>
+
+        <div className="p-6">
+          {/* Step: Upload */}
+          {step === 'upload' && (
+            <div className="space-y-5">
+              {/* Template download */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5"/>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-800 mb-1">Format File CSV</p>
+                    <p className="text-xs text-blue-700 mb-3">
+                      Download template CSV, isi data absensi, lalu upload kembali.
+                      Kolom <strong>date</strong> wajib format YYYY-MM-DD.
+                      Minimal isi satu dari: <strong>email</strong>, <strong>employee_id</strong>, atau <strong>name</strong>.
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs text-blue-700 mb-3">
+                      {['date','email','employee_id','name','check_in','check_out','status','notes'].map(col => (
+                        <span key={col} className="bg-blue-100 px-2 py-0.5 rounded font-mono">{col}</span>
+                      ))}
+                    </div>
+                    <div className="text-xs text-blue-700 mb-3">
+                      Status yang valid: {STATUS_OPTIONS.map(s => (
+                        <span key={s} className="inline-block bg-blue-100 px-1.5 py-0.5 rounded mr-1 font-mono">{s}</span>
+                      ))}
+                    </div>
+                    <button onClick={downloadTemplate}
+                      className="flex items-center gap-2 text-xs font-semibold text-blue-700 hover:text-blue-900 transition-colors">
+                      <Download size={13}/> Download Template CSV
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Drop zone */}
+              <label className="block border-2 border-dashed border-[var(--border)] rounded-xl p-10 text-center cursor-pointer hover:border-[var(--brand-500)] hover:bg-[var(--brand-500)]/5 transition-colors">
+                <Upload size={32} className="mx-auto text-[var(--text-muted)] mb-3"/>
+                <p className="font-semibold text-sm mb-1">Klik atau drag & drop file CSV</p>
+                <p className="text-xs text-[var(--text-muted)]">Format: .csv — Maks 500 baris</p>
+                <input ref={fileRef} type="file" accept=".csv" className="sr-only" onChange={handleFile}/>
+              </label>
+            </div>
+          )}
+
+          {/* Step: Preview */}
+          {step === 'preview' && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-green-700">{rows.length}</p>
+                  <p className="text-xs text-green-600">Total Baris</p>
+                </div>
+                <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-red-600">{errors.length}</p>
+                  <p className="text-xs text-red-500">Error Ditemukan</p>
+                </div>
+              </div>
+
+              {/* Errors */}
+              {errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-bold text-red-700 mb-2 flex items-center gap-1">
+                    <AlertTriangle size={13}/> Error — Perbaiki file dan upload ulang
+                  </p>
+                  {errors.map((e, i) => <p key={i} className="text-xs text-red-600 mb-0.5">• {e}</p>)}
+                </div>
+              )}
+
+              {/* Data preview table */}
+              <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                <div className="bg-[var(--bg)] px-4 py-2.5 border-b border-[var(--border)] flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">Preview Data</span>
+                  <button onClick={() => setStep('upload')}
+                    className="text-xs text-[var(--text-muted)] hover:text-[var(--brand-600)]">
+                    ← Ganti File
+                  </button>
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                        {['Tanggal','Email/ID/Nama','Check In','Check Out','Status','Catatan'].map(h => (
+                          <th key={h} className="px-3 py-2 text-left font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {rows.slice(0, 50).map((row, i) => (
+                        <tr key={i} className="hover:bg-[var(--bg)]">
+                          <td className="px-3 py-2 font-mono">{row.date}</td>
+                          <td className="px-3 py-2">{row.email || row.employee_id || row.name || '—'}</td>
+                          <td className="px-3 py-2 font-mono">{row.check_in || '—'}</td>
+                          <td className="px-3 py-2 font-mono">{row.check_out || '—'}</td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              row.status === 'present' ? 'bg-green-100 text-green-700' :
+                              row.status === 'late'    ? 'bg-yellow-100 text-yellow-700' :
+                              row.status === 'absent'  ? 'bg-red-100 text-red-600' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {STATUS_LABELS[row.status] || row.status || 'present'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-[var(--text-muted)] max-w-32 truncate">{row.notes || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {rows.length > 50 && (
+                    <p className="text-xs text-center text-[var(--text-muted)] py-2">
+                      Menampilkan 50 dari {rows.length} baris
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Result */}
+          {step === 'result' && result && (
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check size={32} className="text-green-600"/>
+                </div>
+                <h3 className="font-bold text-lg mb-1">Import Selesai!</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label:'Ditambahkan', value: result.success, color:'green' },
+                  { label:'Diupdate',    value: result.updated, color:'blue'  },
+                  { label:'Dilewati',    value: result.skipped, color:'red'   },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-4 text-center`}>
+                    <p className={`text-3xl font-bold text-${color}-700`}>{value}</p>
+                    <p className={`text-xs text-${color}-600 mt-1`}>{label}</p>
+                  </div>
+                ))}
+              </div>
+              {result.errors?.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-bold text-red-700 mb-2">Baris yang Dilewati:</p>
+                  {result.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-red-600 mb-0.5">
+                      • {e.row?.date} | {e.row?.email || e.row?.name} — {e.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)]">
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            {step === 'result' ? 'Tutup' : 'Batal'}
+          </button>
+          <div className="flex gap-3">
+            {step === 'preview' && errors.length === 0 && (
+              <button onClick={handleImport} disabled={importing}
+                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-600)] rounded-xl disabled:opacity-60 hover:opacity-90 transition-opacity">
+                {importing ? <Loader2 size={15} className="animate-spin"/> : <Upload size={15}/>}
+                {importing ? `Mengimport ${rows.length} data...` : `Import ${rows.length} Data`}
+              </button>
+            )}
+            {step === 'result' && (
+              <button onClick={() => { onDone(); onClose(); }}
+                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-600)] rounded-xl">
+                <Check size={15}/> Selesai & Refresh
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
 function MonitoringTab() {
   const [data, setData]     = useState(null);
   const [loading, setLoading] = useState(true);
@@ -850,9 +1141,10 @@ export default function AttendancePage() {
     ...(canMonitor ? [{ id: 'monitor', label: 'Monitor', icon: Users }] : []),
   ];
 
-  const [activeTab, setActiveTab] = useState('clock');
-  const [todayData, setTodayData] = useState(null);
-  const [loading, setLoading]     = useState(true);
+  const [activeTab,   setActiveTab]   = useState('clock');
+  const [todayData,   setTodayData]   = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [showImport,  setShowImport]  = useState(false);
 
   const fetchToday = useCallback(async () => {
     try { const res = await attendanceService.getToday(); setTodayData(res.data.data); }
@@ -873,9 +1165,16 @@ export default function AttendancePage() {
             <RefreshCw className="w-4 h-4" />
           </button>
           {isHR && (
-            <button onClick={() => setActiveTab('monitor')} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
-              <Users className="w-4 h-4" />
-            </button>
+            <>
+              <button onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">Import Absen</span>
+              </button>
+              <button onClick={() => setActiveTab('monitor')} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
+                <Users className="w-4 h-4" />
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -903,6 +1202,13 @@ export default function AttendancePage() {
           {activeTab === 'history' && <HistoryTab />}
           {activeTab === 'monitor' && <MonitoringTab />}
         </>
+      )}
+
+      {showImport && (
+        <ImportAttendanceModal
+          onClose={() => setShowImport(false)}
+          onDone={fetchToday}
+        />
       )}
     </div>
   );
