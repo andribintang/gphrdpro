@@ -158,10 +158,38 @@ const getProductByBarcode = async (req, res, next) => {
 const createProduct = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const now = new Date();
-    const product = await Product.create({ ...req.body, created_at: now, updated_at: now }, { transaction: t });
-    await Stock.create({ product_id: product.id, branch_id: product.branch_id, qty: 0 }, { transaction: t });
+    const b = req.body;
+    // Use raw SQL to avoid Sequelize timestamp issues
+    const [result] = await sequelize.query(
+      `INSERT INTO erp_products 
+        (branch_id, category_id, name, sku, barcode, unit, buy_price, sell_price, 
+         sell_price_mp, sell_price_wa, stock_min, weight, notes, is_active, 
+         created_at, updated_at)
+       VALUES (
+        ${parseInt(b.branch_id)||1},
+        ${b.category_id ? parseInt(b.category_id) : 'NULL'},
+        ${sequelize.escape(b.name||'')},
+        ${sequelize.escape(b.sku||'')},
+        ${sequelize.escape(b.barcode||'')},
+        ${sequelize.escape(b.unit||'pcs')},
+        ${parseFloat(b.buy_price)||0},
+        ${parseFloat(b.sell_price)||0},
+        ${b.sell_price_mp ? parseFloat(b.sell_price_mp) : 'NULL'},
+        ${b.sell_price_wa ? parseFloat(b.sell_price_wa) : 'NULL'},
+        ${parseInt(b.stock_min)||0},
+        ${parseFloat(b.weight)||0},
+        ${sequelize.escape(b.notes||'')},
+        1, NOW(), NOW()
+       )`,
+      { transaction: t }
+    );
+    const productId = result.insertId;
+    await sequelize.query(
+      `INSERT INTO erp_stock (product_id, branch_id, qty) VALUES (${productId}, ${parseInt(b.branch_id)||1}, 0)`,
+      { transaction: t }
+    );
     await t.commit();
+    const [[product]] = await sequelize.query(`SELECT * FROM erp_products WHERE id = ${productId}`);
     return res.status(201).json({ success:true, data:{ product } });
   } catch (err) { await t.rollback(); next(err); }
 };
