@@ -129,7 +129,8 @@ const getProductByBarcode = async (req, res, next) => {
 const createProduct = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const product = await Product.create(req.body, { transaction: t });
+    const now = new Date();
+    const product = await Product.create({ ...req.body, created_at: now, updated_at: now }, { transaction: t });
     await Stock.create({ product_id: product.id, branch_id: product.branch_id, qty: 0 }, { transaction: t });
     await t.commit();
     return res.status(201).json({ success:true, data:{ product } });
