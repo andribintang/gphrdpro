@@ -6,7 +6,7 @@ import {
   ToggleRight, Edit3, Eye, ArrowUpRight, ArrowDownRight,
   Calendar, TrendingUp, Banknote, Star, Moon,
   Percent, Clock, Info, CheckCheck, Wallet, UserCheck
-, Pencil, Lock} from 'lucide-react';
+, Pencil, Lock, Check} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -879,7 +879,7 @@ const EditComponentModal = ({ component: comp, onClose, onSave }) => {
         <div className="flex gap-2 pt-1">
           <button onClick={onClose} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm gap-2 disabled:opacity-60">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
           </button>
         </div>
