@@ -6,7 +6,7 @@ import {
   ToggleRight, Edit3, Eye, ArrowUpRight, ArrowDownRight,
   Calendar, TrendingUp, Banknote, Star, Moon,
   Percent, Clock, Info, CheckCheck, Wallet, UserCheck
-} from 'lucide-react';
+, Pencil, Lock} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -550,9 +550,13 @@ const MySlipTab = () => {
 const ComponentsTab = () => {
   const [components, setComponents] = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [showAdd, setShowAdd]       = useState(false);
   const [filterType, setFilterType] = useState('');
-  const [form, setForm]             = useState({ code:'', name:'', type:'income', category:'flat', default_value:'', applicable_to:['monthly'], description:'' });
+  const [editModal, setEditModal]   = useState(null); // null | component obj
+  const [showAdd, setShowAdd]       = useState(false);
+  const [form, setForm]             = useState({
+    code:'', name:'', type:'income', category:'flat',
+    default_value:'', applicable_to:['monthly'], description:'',
+  });
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -565,10 +569,20 @@ const ComponentsTab = () => {
   useEffect(() => { fetch(); }, [fetch]);
 
   const handleAdd = async () => {
+    if (!form.code || !form.name) { toast.error('Kode dan nama wajib diisi'); return; }
     try {
       await payrollEngineService.createComponent(form);
       toast.success('Komponen ditambahkan');
       setShowAdd(false);
+      fetch();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+  };
+
+  const handleEdit = async (comp, updated) => {
+    try {
+      await payrollEngineService.updateComponent(comp.id, updated);
+      toast.success('Komponen diperbarui');
+      setEditModal(null);
       fetch();
     } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
   };
@@ -578,16 +592,67 @@ const ComponentsTab = () => {
     catch { toast.error('Gagal'); }
   };
 
-  const setF = (k,v) => setForm(f => ({ ...f, [k]: v }));
-
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const incomes    = components.filter(c => c.type === 'income');
   const deductions = components.filter(c => c.type === 'deduction');
 
+  const ComponentRow = ({ c }) => {
+    const isIncome = c.type === 'income';
+    const color = isIncome ? 'text-emerald-600' : 'text-red-500';
+    return (
+      <div className={`flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0 transition-colors ${!c.is_active ? 'opacity-50' : ''}`}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className={`text-xs font-mono font-bold ${color}`}>{c.code}</p>
+            {c.is_system && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">SISTEM</span>}
+            {!c.is_active && <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-semibold">NONAKTIF</span>}
+          </div>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{c.name}</p>
+          <div className="flex items-center gap-3 mt-0.5">
+            <p className="text-[10px] text-[var(--text-muted)] capitalize">{c.category}</p>
+            {c.default_value > 0 && (
+              <p className="text-[10px] font-semibold text-[var(--text-secondary)]">
+                Default: {toRupiah(c.default_value)}
+              </p>
+            )}
+            {c.percentage_of_base && (
+              <p className="text-[10px] font-semibold text-blue-600">{c.percentage_of_base}% dari gaji pokok</p>
+            )}
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {(c.applicable_to || []).join(', ')}
+            </p>
+          </div>
+          {c.description && <p className="text-[10px] text-[var(--text-muted)] mt-0.5 italic">{c.description}</p>}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Edit button - all components */}
+          <button onClick={() => setEditModal(c)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--brand-600)] transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          {/* Toggle - non-system only */}
+          {!c.is_system ? (
+            <button onClick={() => handleToggle(c.id)} className="flex-shrink-0">
+              {c.is_active
+                ? <ToggleRight className="w-6 h-6 text-emerald-500" />
+                : <ToggleLeft  className="w-6 h-6 text-[var(--text-muted)]" />}
+            </button>
+          ) : (
+            <div className="w-6 h-6 flex items-center justify-center opacity-30">
+              <Lock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1.5">
-          {[{v:'',l:'Semua'},{v:'income',l:'Pendapatan'},{v:'deduction',l:'Potongan'}].map(t => (
+          {[{v:'',l:'Semua'},{v:'income',l:'💚 Pendapatan'},{v:'deduction',l:'❤️ Potongan'}].map(t => (
             <button key={t.v} onClick={() => setFilterType(t.v)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all
                 ${filterType === t.v ? 'bg-brand-500 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
@@ -600,99 +665,93 @@ const ComponentsTab = () => {
         </button>
       </div>
 
+      {/* Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700">
+        <strong>Info:</strong> Komponen <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold text-[10px]">SISTEM</span> tidak dapat dinonaktifkan,
+        namun nilai default-nya dapat diedit. Klik ✏️ untuk mengedit parameter.
+      </div>
+
       {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-12 rounded-xl" />)}</div>
+        <div className="space-y-2">{[...Array(5)].map((_,i) => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
       ) : (
-        <>
+        <div className="space-y-4">
           {(!filterType || filterType === 'income') && incomes.length > 0 && (
             <div>
-              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">💚 Komponen Pendapatan</p>
-              <div className="table-wrapper">
-                {incomes.map(c => (
-                  <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-mono text-brand-500 dark:text-brand-400">{c.code}</p>
-                        {c.is_system && <span className="text-[9px] bg-[var(--bg-tertiary)] text-[var(--text-muted)] px-1.5 py-0.5 rounded font-semibold">SISTEM</span>}
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{c.name}</p>
-                      <p className="text-[10px] text-[var(--text-muted)]">{c.category} · {c.default_value > 0 ? toRupiah(c.default_value) : '–'}</p>
-                    </div>
-                    {!c.is_system && (
-                      <button onClick={() => handleToggle(c.id)} className="flex-shrink-0">
-                        {c.is_active
-                          ? <ToggleRight className="w-5 h-5 text-emerald-500" />
-                          : <ToggleLeft  className="w-5 h-5 text-[var(--text-muted)]" />}
-                      </button>
-                    )}
-                  </div>
-                ))}
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">💚 Komponen Pendapatan ({incomes.length})</p>
+              <div className="table-wrapper divide-y-0">
+                {incomes.map(comp => <ComponentRow key={comp.id} c={comp} />)}
               </div>
             </div>
           )}
-
           {(!filterType || filterType === 'deduction') && deductions.length > 0 && (
             <div>
-              <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">❤️ Komponen Potongan</p>
-              <div className="table-wrapper">
-                {deductions.map(c => (
-                  <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-mono text-red-500 dark:text-red-400">{c.code}</p>
-                        {c.is_system && <span className="text-[9px] bg-[var(--bg-tertiary)] text-[var(--text-muted)] px-1.5 py-0.5 rounded font-semibold">SISTEM</span>}
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{c.name}</p>
-                      <p className="text-[10px] text-[var(--text-muted)]">{c.category}</p>
-                    </div>
-                    {!c.is_system && (
-                      <button onClick={() => handleToggle(c.id)} className="flex-shrink-0">
-                        {c.is_active ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-[var(--text-muted)]" />}
-                      </button>
-                    )}
-                  </div>
-                ))}
+              <p className="text-xs font-bold text-red-500 uppercase tracking-wider mb-2">❤️ Komponen Potongan ({deductions.length})</p>
+              <div className="table-wrapper divide-y-0">
+                {deductions.map(comp => <ComponentRow key={comp.id} c={comp} />)}
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* Add component modal */}
+      {/* ── Edit Modal ───────────────────────────────────── */}
+      {editModal && (
+        <EditComponentModal
+          component={editModal}
+          onClose={() => setEditModal(null)}
+          onSave={(updated) => handleEdit(editModal, updated)}
+        />
+      )}
+
+      {/* ── Add Modal ────────────────────────────────────── */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowAdd(false)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up p-5 space-y-4"
+          <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up p-5 space-y-4"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Tambah Komponen Baru</h3>
-              <button onClick={() => setShowAdd(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><X className="w-4 h-4" /></button>
+              <h3 className="text-sm font-bold">Tambah Komponen Baru</h3>
+              <button onClick={() => setShowAdd(false)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)]"><X className="w-4 h-4" /></button>
             </div>
-
-            {[
-              { label:'Kode (unik)', field:'code', placeholder:'TUNJANGAN_KHUSUS' },
-              { label:'Nama',       field:'name', placeholder:'Tunjangan Khusus' },
-            ].map(f => (
-              <div key={f.field}>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">{f.label}</label>
-                <input value={form[f.field]} onChange={e => setF(f.field, e.target.value)} placeholder={f.placeholder} className="input-base text-sm" />
-              </div>
-            ))}
-
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Tipe</label>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Kode *</label>
+                <input value={form.code} onChange={e => setF('code', e.target.value.toUpperCase())}
+                  placeholder="TUNJANGAN_KHUSUS" className="input-base text-sm font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Tipe *</label>
                 <select value={form.type} onChange={e => setF('type', e.target.value)} className="input-base text-sm">
                   <option value="income">Pendapatan</option>
                   <option value="deduction">Potongan</option>
                 </select>
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Nama *</label>
+              <input value={form.name} onChange={e => setF('name', e.target.value)}
+                placeholder="Tunjangan Khusus" className="input-base text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Nilai Default</label>
-                <input type="number" value={form.default_value} onChange={e => setF('default_value', e.target.value)} placeholder="0" className="input-base text-sm" />
+                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Nilai Default (Rp)</label>
+                <input type="number" value={form.default_value} onChange={e => setF('default_value', e.target.value)}
+                  placeholder="0" className="input-base text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Kategori</label>
+                <select value={form.category} onChange={e => setF('category', e.target.value)} className="input-base text-sm">
+                  <option value="flat">Flat</option>
+                  <option value="percentage">Persentase</option>
+                  <option value="attendance_based">Absensi</option>
+                </select>
               </div>
             </div>
-
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Keterangan</label>
+              <input value={form.description} onChange={e => setF('description', e.target.value)}
+                placeholder="Deskripsi komponen..." className="input-base text-sm" />
+            </div>
             <div className="flex gap-2">
               <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
               <button onClick={handleAdd} className="btn-primary flex-1 h-10 text-sm"><Plus className="w-4 h-4" /> Tambah</button>
@@ -700,6 +759,131 @@ const ComponentsTab = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ── Edit Component Modal ──────────────────────────────────────
+const EditComponentModal = ({ component: comp, onClose, onSave }) => {
+  const [form, setForm] = useState({
+    name:               comp.name || '',
+    default_value:      comp.default_value || 0,
+    percentage_of_base: comp.percentage_of_base || '',
+    description:        comp.description || '',
+    sort_order:         comp.sort_order || 0,
+    is_taxable:         comp.is_taxable !== false,
+  });
+  const [saving, setSaving] = useState(false);
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSave(form); }
+    finally { setSaving(false); }
+  };
+
+  const isIncome = comp.type === 'income';
+  const color    = isIncome ? '#059669' : '#dc2626';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up p-5 space-y-4"
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: color + '20' }}>
+              <Pencil className="w-4 h-4" style={{ color }} />
+            </div>
+            <div>
+              <p className="text-sm font-bold">Edit Komponen</p>
+              <p className="text-[10px] font-mono text-[var(--text-muted)]">{comp.code}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)]">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Badges */}
+        <div className="flex gap-2">
+          <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${isIncome ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+            {isIncome ? '💚 Pendapatan' : '❤️ Potongan'}
+          </span>
+          {comp.is_system && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">🔒 Sistem</span>}
+          <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-full capitalize">{comp.category}</span>
+        </div>
+
+        {/* Name - only editable for non-system */}
+        {!comp.is_system && (
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Nama Komponen</label>
+            <input value={form.name} onChange={e => sf('name', e.target.value)} className="input-base text-sm" />
+          </div>
+        )}
+
+        {/* Default value */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+            Nilai Default (Rp)
+          </label>
+          <input type="number" value={form.default_value} onChange={e => sf('default_value', parseFloat(e.target.value) || 0)}
+            className="input-base text-sm" placeholder="0" />
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">
+            Nilai ini digunakan sebagai default jika tidak ada override per karyawan.
+          </p>
+        </div>
+
+        {/* Percentage of base */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+            Persentase dari Gaji Pokok (%)
+          </label>
+          <input type="number" step="0.01" value={form.percentage_of_base}
+            onChange={e => sf('percentage_of_base', e.target.value === '' ? '' : parseFloat(e.target.value))}
+            className="input-base text-sm" placeholder="Kosongkan jika tidak pakai persentase" />
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">
+            Contoh: 1 = 1% dari gaji pokok. Jika diisi, nilai ini menggantikan nilai default.
+          </p>
+        </div>
+
+        {/* Sort order */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Urutan Tampil</label>
+            <input type="number" value={form.sort_order} onChange={e => sf('sort_order', parseInt(e.target.value) || 0)}
+              className="input-base text-sm" />
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer
+                ${form.is_taxable ? 'border-blue-500 bg-blue-500' : 'border-[var(--border)]'}`}
+                onClick={() => sf('is_taxable', !form.is_taxable)}>
+                {form.is_taxable && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
+              </div>
+              <span className="text-xs text-[var(--text-secondary)]">Kena Pajak</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Keterangan</label>
+          <input value={form.description} onChange={e => sf('description', e.target.value)}
+            className="input-base text-sm" placeholder="Keterangan komponen (opsional)" />
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm gap-2 disabled:opacity-60">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
