@@ -6,7 +6,7 @@ const {
   getToday, getHistory,
   getRealtimeMonitoring, getAdminMonthly, getAllAttendances,
   getOfficeSettingsApi, updateOfficeSettings,
-  registerFace, getFaceStatus,
+  registerFace, getFaceStatus, bulkImport,
 } = require('../controllers/attendanceController');
 const { authenticate, authorize } = require('../middleware/auth');
 
