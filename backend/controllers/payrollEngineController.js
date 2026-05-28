@@ -73,7 +73,7 @@ const generateRun = async (req, res, next) => {
         });
       }
       // Status calculated atau draft — hapus run lama dan regenerasi ulang
-      await PayrollItem.destroy({ where: { run_id: existing.id }, transaction: t });
+      await PayrollItem.destroy({ where: { payroll_run_id: existing.id }, transaction: t });
       await existing.destroy({ transaction: t });
     }
 

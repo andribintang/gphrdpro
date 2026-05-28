@@ -339,14 +339,14 @@ const RunsTab = () => {
         </div>
       )}
 
-      {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onSuccess={fetch} />}
+      {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onSuccess={fetch} existingRuns={runs} />}
       {selectedSlip && <SlipModal itemId={selectedSlip} onClose={() => setSelectedSlip(null)} />}
     </div>
   );
 };
 
 // ── Generate Modal ─────────────────────────────────────────────
-const GenerateModal = ({ onClose, onSuccess }) => {
+const GenerateModal = ({ onClose, onSuccess, existingRuns = [] }) => {
   const [form, setForm] = useState({ type:'monthly', period_month: currentMonth(), period_year: currentYear(), notes:'' });
   const [selectedParam, setSelectedParam] = useState('');
   const [loading, setLoading] = useState(false);
@@ -451,7 +451,18 @@ const GenerateModal = ({ onClose, onSuccess }) => {
           <button onClick={onClose} className="btn-secondary flex-1 h-11 text-sm">Batal</button>
           <button onClick={handleSubmit} disabled={loading}
             className="btn-primary flex-1 h-11 text-sm">
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Play className="w-4 h-4" /> Generate</>}
+            {(() => {
+              if (loading) return <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>;
+              const existing = existingRuns.find(r => 
+                r.type === form.type && 
+                r.period_month === parseInt(form.month) && 
+                r.period_year === parseInt(form.year)
+              );
+              if (existing && ['draft','calculated'].includes(existing.status)) {
+                return <><RefreshCw className="w-4 h-4" /> Re-Generate</>;
+              }
+              return <><Play className="w-4 h-4" /> Generate</>;
+            })()}
           </button>
         </div>
       </div>
