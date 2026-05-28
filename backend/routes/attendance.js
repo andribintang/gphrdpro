@@ -6,7 +6,7 @@ const {
   getToday, getHistory,
   getRealtimeMonitoring, getAdminMonthly, getAllAttendances,
   getOfficeSettingsApi, updateOfficeSettings,
-  registerFace, getFaceStatus, bulkImport,
+  registerFace, getFaceStatus, bulkImport, updateAttendance, deleteAttendance,
 } = require('../controllers/attendanceController');
 const { authenticate, authorize } = require('../middleware/auth');
 
@@ -41,6 +41,8 @@ router.get('/admin/realtime', authorize('admin', 'hr', 'supervisor'), getRealtim
 router.get('/admin/monthly',  authorize('admin', 'hr'),               getAdminMonthly);
 router.get('/admin/all',      authorize('admin', 'hr'),               getAllAttendances);
 
-router.post('/admin/bulk-import', authorize('admin', 'hr'), bulkImport);
+router.post('/admin/bulk-import',      authorize('admin', 'hr'), bulkImport);
+router.put('/admin/update/:id',        authorize('admin', 'hr'), updateAttendance);
+router.delete('/admin/delete/:id',     authorize('admin', 'hr'), deleteAttendance);
 
 module.exports = router;

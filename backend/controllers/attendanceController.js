@@ -351,6 +351,48 @@ const getAllAttendances = async (req, res, next) => {
 };
 
 
+
+// ── Admin: Update single attendance ──────────────────────────
+const updateAttendance = async (req, res, next) => {
+  try {
+    const att = await Attendance.findByPk(req.params.id);
+    if (!att) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+
+    const { date, check_in, check_out, status, notes } = req.body;
+    const validStatuses = ['present','absent','late','half_day','leave','holiday'];
+
+    // Calculate work hours
+    let work_hours = null;
+    if (check_in && check_out) {
+      const [ih, im] = check_in.split(':').map(Number);
+      const [oh, om] = check_out.split(':').map(Number);
+      work_hours = ((oh * 60 + om) - (ih * 60 + im)) / 60;
+      if (work_hours < 0) work_hours = null;
+    }
+
+    await att.update({
+      date:       date       || att.date,
+      check_in:   check_in  || null,
+      check_out:  check_out || null,
+      status:     validStatuses.includes(status) ? status : att.status,
+      work_hours,
+      notes:      notes !== undefined ? notes : att.notes,
+    });
+
+    return res.json({ success: true, message: 'Absensi diperbarui', data: { attendance: att } });
+  } catch (err) { next(err); }
+};
+
+// ── Admin: Delete single attendance ──────────────────────────
+const deleteAttendance = async (req, res, next) => {
+  try {
+    const att = await Attendance.findByPk(req.params.id);
+    if (!att) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+    await att.destroy();
+    return res.json({ success: true, message: 'Absensi dihapus' });
+  } catch (err) { next(err); }
+};
+
 // ── Bulk Import Attendance ────────────────────────────────────
 const bulkImport = async (req, res, next) => {
   try {
@@ -439,4 +481,4 @@ const bulkImport = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getAllAttendances, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus, bulkImport };
+module.exports = { checkIn, checkOut, breakStart, breakEnd, getToday, getHistory, getRealtimeMonitoring, getAdminMonthly, getAllAttendances, getOfficeSettingsApi, updateOfficeSettings, registerFace, getFaceStatus, bulkImport, updateAttendance, deleteAttendance };

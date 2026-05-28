@@ -390,7 +390,6 @@ const toggleComponent = async (req, res, next) => {
   try {
     const comp = await PayrollComponent.findByPk(req.params.id);
     if (!comp) return res.status(404).json({ success: false, message: 'Tidak ditemukan' });
-    if (comp.is_system) return res.status(400).json({ success: false, message: 'Komponen sistem tidak bisa dinonaktifkan' });
     await comp.update({ is_active: !comp.is_active });
     return res.json({ success: true, message: `Komponen ${comp.is_active ? 'diaktifkan' : 'dinonaktifkan'}`, data: { component: comp } });
   } catch (err) { next(err); }

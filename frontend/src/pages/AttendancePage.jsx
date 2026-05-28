@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
-  Clock, Camera, MapPin, CheckCircle2, LogIn, LogOut,
+  Clock, Camera, MapPin, CheckCircle2, LogIn, LogOut, Edit2, Trash2,
   Coffee, Play, ChevronLeft, ChevronRight, RefreshCw,
   AlertTriangle, Loader2, Navigation, Shield, ShieldCheck,
   ShieldX, Map, Users, Eye, Settings, X, Info,
@@ -1028,6 +1028,216 @@ function ImportAttendanceModal({ onClose, onDone }) {
 }
 
 
+// ── Admin Attendance Tab ─────────────────────────────────────
+function AdminAttendanceTab() {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [attendances, setAttendances] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [editModal,   setEditModal]   = useState(null);
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0,7)); // YYYY-MM
+  const [search,      setSearch]      = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [year, month] = filterMonth.split('-');
+      const r = await fetch(`${API}/attendance/admin/all?year=${year}&month=${month}&limit=200`, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      const d = await r.json();
+      setAttendances(d.data?.attendances || d.data || []);
+    } catch { toast.error('Gagal memuat data'); } finally { setLoading(false); }
+  }, [filterMonth]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDelete = async (id, name, date) => {
+    if (!confirm(`Hapus absensi ${name} tanggal ${date}?`)) return;
+    try {
+      const r = await fetch(`${API}/attendance/admin/delete/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message);
+      toast.success('Absensi dihapus');
+      load();
+    } catch(e) { toast.error(e.message); }
+  };
+
+  const STATUS_COLORS = {
+    present:  'bg-green-100 text-green-700',
+    late:     'bg-yellow-100 text-yellow-700',
+    absent:   'bg-red-100 text-red-600',
+    half_day: 'bg-orange-100 text-orange-600',
+    leave:    'bg-blue-100 text-blue-600',
+    holiday:  'bg-purple-100 text-purple-600',
+  };
+  const STATUS_LABELS = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
+
+  const filtered = attendances.filter(a =>
+    !search || a.user?.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap">
+        <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+          className="input-base text-sm flex-shrink-0 w-40" />
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Cari nama karyawan..." className="input-base text-sm flex-1 min-w-40" />
+        <button onClick={load} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)]">
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Count */}
+      <p className="text-xs text-[var(--text-muted)]">{filtered.length} data absensi</p>
+
+      {/* Table */}
+      {loading ? (
+        <div className="space-y-2">{[...Array(5)].map((_,i)=><div key={i} className="skeleton h-14 rounded-xl"/>)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-10 text-[var(--text-muted)]">
+          <p>Tidak ada data absensi</p>
+        </div>
+      ) : (
+        <div className="table-wrapper divide-y-0">
+          {filtered.map((a, i) => (
+            <div key={a.id || i} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold truncate">{a.user?.name || a.user_id}</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[a.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {STATUS_LABELS[a.status] || a.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-[var(--text-muted)]">
+                  <span>{a.date}</span>
+                  {a.check_in  && <span>Masuk: {a.check_in.slice(0,5)}</span>}
+                  {a.check_out && <span>Pulang: {a.check_out.slice(0,5)}</span>}
+                  {a.work_hours && <span>{parseFloat(a.work_hours).toFixed(1)} jam</span>}
+                </div>
+                {a.notes && <p className="text-[10px] text-[var(--text-muted)] italic mt-0.5">{a.notes}</p>}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button onClick={() => setEditModal(a)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-blue-50 text-blue-500 transition-colors">
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => handleDelete(a.id, a.user?.name, a.date)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModal && (
+        <EditAttendanceModal
+          attendance={editModal}
+          onClose={() => setEditModal(null)}
+          onSaved={() => { setEditModal(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Edit Attendance Modal ─────────────────────────────────────
+function EditAttendanceModal({ attendance: att, onClose, onSaved }) {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [form, setForm] = useState({
+    date:      att.date || '',
+    check_in:  att.check_in  ? att.check_in.slice(0,5)  : '',
+    check_out: att.check_out ? att.check_out.slice(0,5) : '',
+    status:    att.status || 'present',
+    notes:     att.notes || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const sf = (k,v) => setForm(f => ({...f, [k]: v}));
+
+  const STATUS_OPTIONS = ['present','late','absent','half_day','leave','holiday'];
+  const STATUS_LABELS  = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/attendance/admin/update/${att.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+localStorage.getItem('accessToken') },
+        body: JSON.stringify(form),
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message);
+      toast.success('Absensi diperbarui');
+      onSaved();
+    } catch(e) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const FLD = "w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand-500)]";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"/>
+      <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl p-5 space-y-4 animate-slide-up"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold">Koreksi Absensi</h3>
+            <p className="text-xs text-[var(--text-muted)]">{att.user?.name} · {att.date}</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)]">
+            <X className="w-4 h-4"/>
+          </button>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Tanggal</label>
+          <input type="date" value={form.date} onChange={e => sf('date', e.target.value)} className={FLD}/>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Status</label>
+          <select value={form.status} onChange={e => sf('status', e.target.value)} className={FLD}>
+            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Jam Masuk</label>
+            <input type="time" value={form.check_in} onChange={e => sf('check_in', e.target.value)} className={FLD}/>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Jam Pulang</label>
+            <input type="time" value={form.check_out} onChange={e => sf('check_out', e.target.value)} className={FLD}/>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Catatan</label>
+          <input value={form.notes} onChange={e => sf('notes', e.target.value)}
+            placeholder="Alasan koreksi..." className={FLD}/>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-10 text-sm gap-2 disabled:opacity-60">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle2 className="w-4 h-4"/>}
+            {saving ? 'Menyimpan...' : 'Simpan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MonitoringTab() {
   const [data, setData]     = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1117,7 +1327,8 @@ export default function AttendancePage() {
   const TABS = [
     { id: 'clock',     label: 'Absen',     icon: Clock },
     { id: 'history',   label: 'Riwayat',   icon: Eye },
-    ...(canMonitor ? [{ id: 'monitor', label: 'Monitor', icon: Users }] : []),
+    ...(isHR ? [{ id: 'admin',   label: 'Koreksi',   icon: Edit2  }] : []),
+    ...(canMonitor ? [{ id: 'monitor', label: 'Monitor',  icon: Users  }] : []),
   ];
 
   const [activeTab,   setActiveTab]   = useState('clock');
@@ -1179,7 +1390,8 @@ export default function AttendancePage() {
         <>
           {activeTab === 'clock'   && <div className="grid lg:grid-cols-[420px_1fr] gap-6 items-start"><div><ClockTab todayData={todayData} onRefresh={fetchToday} /></div><div className="hidden lg:block"/></div>}
           {activeTab === 'history' && <HistoryTab />}
-          {activeTab === 'monitor' && <MonitoringTab />}
+          {activeTab === 'admin'   && <AdminAttendanceTab />}
+      {activeTab === 'monitor' && <MonitoringTab />}
         </>
       )}
 

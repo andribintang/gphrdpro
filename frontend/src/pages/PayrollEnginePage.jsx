@@ -630,18 +630,12 @@ const ComponentsTab = () => {
             className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--brand-600)] transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          {/* Toggle - non-system only */}
-          {!c.is_system ? (
-            <button onClick={() => handleToggle(c.id)} className="flex-shrink-0">
-              {c.is_active
-                ? <ToggleRight className="w-6 h-6 text-emerald-500" />
-                : <ToggleLeft  className="w-6 h-6 text-[var(--text-muted)]" />}
-            </button>
-          ) : (
-            <div className="w-6 h-6 flex items-center justify-center opacity-30">
-              <Lock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-            </div>
-          )}
+          {/* Toggle - all components including system */}
+          <button onClick={() => handleToggle(c.id)} className="flex-shrink-0">
+            {c.is_active
+              ? <ToggleRight className="w-6 h-6 text-emerald-500" />
+              : <ToggleLeft  className="w-6 h-6 text-[var(--text-muted)]" />}
+          </button>
         </div>
       </div>
     );
