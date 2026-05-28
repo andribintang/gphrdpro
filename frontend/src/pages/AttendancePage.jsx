@@ -766,6 +766,7 @@ const STATUS_OPTIONS = ['present','late','absent','half_day','leave','holiday'];
 const STATUS_LABELS  = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
 
 function ImportAttendanceModal({ onClose, onDone }) {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
   const [step,       setStep]       = useState('upload');
   const [rows,       setRows]       = useState([]);
   const [errors,     setErrors]     = useState([]);
@@ -780,7 +781,7 @@ function ImportAttendanceModal({ onClose, onDone }) {
 
   useEffect(() => {
     setLoadingEmp(true);
-    fetch('/api/employees', {
+    fetch(API + '/employees', {
       headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
     }).then(r=>r.json()).then(d=>{
       setEmployees(d.data?.employees || d.data || []);
@@ -859,7 +860,7 @@ function ImportAttendanceModal({ onClose, onDone }) {
     if (errors.length) { toast.error('Perbaiki error dulu'); return; }
     setImporting(true);
     try {
-      const res  = await fetch('/api/attendance/admin/bulk-import', {
+      const res  = await fetch(API + '/attendance/admin/bulk-import', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', Authorization:'Bearer '+localStorage.getItem('accessToken') },
         body: JSON.stringify({ records: rows }),
