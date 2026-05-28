@@ -57,17 +57,24 @@ const generateRun = async (req, res, next) => {
 
     const settings = await engine.getSettings();
 
-    // Check duplicate run (except draft)
+    // Check duplicate run
+    // - Blokir jika sudah approved atau paid (tidak bisa diregenerasi)
+    // - Izinkan regenerate jika masih calculated (belum diapprove)
     const existing = await PayrollRun.findOne({
-      where: { type, period_month: parseInt(period_month), period_year: parseInt(period_year), status: { [Op.ne]: 'draft' } },
+      where: { type, period_month: parseInt(period_month), period_year: parseInt(period_year) },
     });
     if (existing) {
-      await t.rollback();
-      return res.status(409).json({
-        success: false,
-        message: `Payroll ${type} ${period_month}/${period_year} sudah ada (status: ${existing.status})`,
-        code: 'DUPLICATE_RUN',
-      });
+      if (['approved','paid'].includes(existing.status)) {
+        await t.rollback();
+        return res.status(409).json({
+          success: false,
+          message: `Payroll ${type} ${period_month}/${period_year} sudah di-${existing.status} dan tidak dapat diregenerasi.`,
+          code: 'DUPLICATE_RUN',
+        });
+      }
+      // Status calculated atau draft — hapus run lama dan regenerasi ulang
+      await PayrollItem.destroy({ where: { run_id: existing.id }, transaction: t });
+      await existing.destroy({ transaction: t });
     }
 
     // Build period label
