@@ -362,24 +362,24 @@ const bulkImport = async (req, res, next) => {
 
     for (const row of records) {
       try {
-        // Find user by name or email or employee_id
-        const userWhere = [];
-        if (row.email)       userWhere.push({ email: row.email.trim() });
-        if (row.employee_id) userWhere.push({ '$employee.employee_id$': row.employee_id.trim() });
-
+        // Find user by email, employee_id, or name
         let user = null;
-        if (row.email) {
+        if (row.email && row.email.trim()) {
           user = await User.findOne({ where: { email: row.email.trim() } });
         }
-        if (!user && row.employee_id) {
+        if (!user && row.employee_id && row.employee_id.trim()) {
           const emp = await Employee.findOne({ where: { employee_id: row.employee_id.trim() } });
           if (emp) user = await User.findByPk(emp.user_id);
         }
-        if (!user && row.name) {
-          user = await User.findOne({ where: { name: { [Op.like]: `%${row.name.trim()}%` } } });
+        if (!user && row.name && row.name.trim()) {
+          // Search by exact name first, then partial
+          user = await User.findOne({ where: { name: row.name.trim() } });
+          if (!user) {
+            user = await User.findOne({ where: { name: { [Op.like]: `%${row.name.trim()}%` } } });
+          }
         }
         if (!user) {
-          results.errors.push({ row, reason: 'Karyawan tidak ditemukan: ' + (row.email || row.name || row.employee_id) });
+          results.errors.push({ row, reason: 'Karyawan tidak ditemukan: ' + (row.name || row.email || row.employee_id) });
           results.skipped++;
           continue;
         }
