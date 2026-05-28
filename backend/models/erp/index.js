@@ -244,5 +244,4 @@ module.exports = {
   Return, ReturnItem,
   ImportLog,
   Purchase, PurchaseItem, Expense,
-  Return, ReturnItem,
 };
