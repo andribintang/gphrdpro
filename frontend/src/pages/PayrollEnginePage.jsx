@@ -914,8 +914,9 @@ const LoanTab = () => {
   useEffect(() => {
     loadLoans();
     if (canManage) {
-      window.fetch('/api/employees?status=active', { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } })
-        .then(r => r.json()).then(r => { if(r.success) setEmployees(r.data.employees || []); }).catch(() => {});
+      const apiBase = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+      window.fetch(apiBase + '/employees?status=active&limit=200', { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } })
+        .then(r => r.json()).then(r => { if(r.success) setEmployees(r.data.employees || r.data || []); }).catch(() => {});
     }
   }, [loadLoans]);
 

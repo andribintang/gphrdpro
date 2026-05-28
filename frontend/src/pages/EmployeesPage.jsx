@@ -678,10 +678,124 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
               </div>
             ))}
           </div>
+
+          {/* ── Tunjangan Khusus ─────────────────────────── */}
+          {canManage && <AllowanceSection userId={userId} />}
         </div>
       </div>
       {showFaceReg && <FaceRegisterModal userId={userId} userName={user.name} onClose={() => setShowFaceReg(false)} onSuccess={() => setFaceStatus({ registered: true })} />}
     </>
+  );
+};
+
+// ── Allowance Section ─────────────────────────────────────────
+const AllowanceSection = ({ userId }) => {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [allowances,  setAllowances]  = useState([]);
+  const [components,  setComponents]  = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [showAdd,     setShowAdd]     = useState(false);
+  const [addForm,     setAddForm]     = useState({ component_id: '', amount: '', notes: '' });
+  const [saving,      setSaving]      = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const [aRes, cRes] = await Promise.all([
+        fetch(`${API}/payroll/employees/${userId}/allowances`, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()),
+        fetch(`${API}/payroll/components?type=income`, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()),
+      ]);
+      setAllowances(aRes.data?.allowances || []);
+      setComponents(cRes.data?.components || []);
+    } catch { } finally { setLoading(false); }
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    if (!addForm.component_id || !addForm.amount) { toast.error('Komponen dan nominal wajib diisi'); return; }
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const r = await fetch(`${API}/payroll/employees/${userId}/allowances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ component_id: addForm.component_id, amount: parseFloat(addForm.amount), notes: addForm.notes }),
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message);
+      toast.success('Tunjangan ditambahkan');
+      setShowAdd(false);
+      setAddForm({ component_id: '', amount: '', notes: '' });
+      load();
+    } catch(e) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const formatRp = (n) => new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(n||0);
+
+  return (
+    <div className="border-t border-[var(--border)] px-5 py-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">💰 Tunjangan Khusus</p>
+        <button onClick={() => setShowAdd(v => !v)}
+          className="text-xs font-semibold text-[var(--brand-600)] hover:underline flex items-center gap-1">
+          {showAdd ? '✕ Tutup' : '+ Tambah'}
+        </button>
+      </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <div className="bg-[var(--bg)] rounded-xl p-3 mb-3 space-y-2 border border-[var(--border)]">
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Komponen</label>
+            <select value={addForm.component_id}
+              onChange={e => setAddForm(f => ({...f, component_id: e.target.value}))}
+              className="input-base text-sm">
+              <option value="">-- Pilih Komponen --</option>
+              {components.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Nominal (Rp)</label>
+            <input type="number" value={addForm.amount}
+              onChange={e => setAddForm(f => ({...f, amount: e.target.value}))}
+              placeholder="150000" className="input-base text-sm" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Keterangan</label>
+            <input value={addForm.notes}
+              onChange={e => setAddForm(f => ({...f, notes: e.target.value}))}
+              placeholder="Tunjangan pulsa bulanan" className="input-base text-sm" />
+          </div>
+          <button onClick={handleAdd} disabled={saving}
+            className="btn-primary w-full h-9 text-sm gap-2 disabled:opacity-60">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Plus className="w-3.5 h-3.5"/>}
+            {saving ? 'Menyimpan...' : 'Simpan Tunjangan'}
+          </button>
+        </div>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <div className="space-y-1">{[...Array(2)].map((_,i) => <div key={i} className="skeleton h-10 rounded-lg"/>)}</div>
+      ) : allowances.length === 0 ? (
+        <p className="text-xs text-[var(--text-muted)] text-center py-2">Belum ada tunjangan khusus</p>
+      ) : (
+        <div className="space-y-1.5">
+          {allowances.map(a => (
+            <div key={a.id} className="flex items-center justify-between bg-[var(--bg)] rounded-lg px-3 py-2">
+              <div>
+                <p className="text-xs font-semibold">{a.component?.name || 'Komponen'}</p>
+                {a.notes && <p className="text-[10px] text-[var(--text-muted)]">{a.notes}</p>}
+              </div>
+              <p className="text-sm font-bold text-emerald-600">{formatRp(a.amount)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
