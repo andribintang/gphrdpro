@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
   Clock, Camera, MapPin, CheckCircle2, LogIn, LogOut,
   Coffee, Play, ChevronLeft, ChevronRight, RefreshCw,
@@ -766,255 +766,237 @@ const STATUS_OPTIONS = ['present','late','absent','half_day','leave','holiday'];
 const STATUS_LABELS  = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
 
 function ImportAttendanceModal({ onClose, onDone }) {
-  const [step,     setStep]     = useState('upload'); // upload | preview | result
-  const [rows,     setRows]     = useState([]);
-  const [errors,   setErrors]   = useState([]);
-  const [importing,setImporting]= useState(false);
-  const [result,   setResult]   = useState(null);
+  const [step,       setStep]       = useState('upload');
+  const [rows,       setRows]       = useState([]);
+  const [errors,     setErrors]     = useState([]);
+  const [importing,  setImporting]  = useState(false);
+  const [result,     setResult]     = useState(null);
+  const [employees,  setEmployees]  = useState([]);
+  const [loadingEmp, setLoadingEmp] = useState(false);
   const fileRef = useRef();
 
-  // Download template CSV
+  const STATUS_OPTIONS = ['present','late','absent','half_day','leave','holiday'];
+  const STATUS_LABELS  = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
+
+  useEffect(() => {
+    setLoadingEmp(true);
+    fetch('/api/employees', {
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+    }).then(r=>r.json()).then(d=>{
+      setEmployees(d.data?.employees || d.data || []);
+    }).catch(()=>{}).finally(()=>setLoadingEmp(false));
+  }, []);
+
   const downloadTemplate = () => {
-    const headers = ['date','email','employee_id','name','check_in','check_out','status','notes'];
-    const example = [
-      ['2026-01-15','john@example.com','EMP001','John Doe','08:00','17:00','present',''],
-      ['2026-01-15','','EMP002','Jane Smith','08:30','17:00','late','Terlambat 30 menit'],
-      ['2026-01-15','','EMP003','Bob Wilson','','','absent','Sakit'],
-    ];
-    const csv = [headers, ...example].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = 'template_import_absen.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    const today = new Date().toISOString().split('T')[0];
+    const templateRows = employees.length > 0
+      ? employees.map(emp => ({
+          date:        today,
+          employee_id: emp.employee?.employee_id || '',
+          name:        emp.name || '',
+          email:       emp.email || '',
+          check_in:    '08:00',
+          check_out:   '17:00',
+          status:      'present',
+          notes:       '',
+        }))
+      : [{ date: today, employee_id:'EMP001', name:'Contoh Karyawan', email:'', check_in:'08:00', check_out:'17:00', status:'present', notes:'' }];
+
+    const ws = XLSX.utils.json_to_sheet(templateRows, {
+      header: ['date','employee_id','name','email','check_in','check_out','status','notes']
+    });
+    ws['!cols'] = [{wch:12},{wch:12},{wch:25},{wch:28},{wch:10},{wch:10},{wch:12},{wch:30}];
+
+    const wsGuide = XLSX.utils.aoa_to_sheet([
+      ['Status','Keterangan'],
+      ['present','Hadir'],['late','Terlambat'],['absent','Tidak Hadir'],
+      ['half_day','Setengah Hari'],['leave','Cuti'],['holiday','Libur'],
+      ['',''],
+      ['Catatan:',''],
+      ['- date format: YYYY-MM-DD (contoh: 2026-01-15)',''],
+      ['- check_in / check_out format: HH:MM (contoh: 08:00)',''],
+      ['- Minimal isi salah satu: employee_id / email / name',''],
+    ]);
+    wsGuide['!cols'] = [{wch:45},{wch:25}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Import Absensi');
+    XLSX.utils.book_append_sheet(wb, wsGuide, 'Panduan');
+    XLSX.writeFile(wb, `template_import_absen_${today}.xlsx`);
+    toast.success(`Template didownload dengan ${templateRows.length} karyawan`);
   };
 
-  // Parse CSV
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: ({ data, errors: parseErrors }) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb   = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
         const errs = [];
+        const timeRe = /^\d{1,2}:\d{2}(:\d{2})?$/;
         const cleaned = data.map((row, i) => {
           const r = {};
-          // Normalize keys (trim, lowercase)
-          Object.keys(row).forEach(k => { r[k.trim().toLowerCase()] = (row[k]||'').trim(); });
-          // Validate date
+          Object.keys(row).forEach(k => { r[k.trim().toLowerCase()] = String(row[k]||'').trim(); });
           if (!r.date) errs.push(`Baris ${i+2}: kolom "date" kosong`);
-          else if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errs.push(`Baris ${i+2}: format date salah "${r.date}" (harus YYYY-MM-DD)`);
-          // Validate identifier
-          if (!r.email && !r.employee_id && !r.name) errs.push(`Baris ${i+2}: isi salah satu dari email / employee_id / name`);
-          // Validate time format
-          if (r.check_in  && !/^\d{2}:\d{2}(:\d{2})?$/.test(r.check_in))  errs.push(`Baris ${i+2}: format check_in salah "${r.check_in}"`);
-          if (r.check_out && !/^\d{2}:\d{2}(:\d{2})?$/.test(r.check_out)) errs.push(`Baris ${i+2}: format check_out salah "${r.check_out}"`);
-          if (r.status && !STATUS_OPTIONS.includes(r.status)) r.status = 'present';
+          else if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errs.push(`Baris ${i+2}: format date salah "${r.date}"`);
+          if (!r.email && !r.employee_id && !r.name) errs.push(`Baris ${i+2}: isi employee_id / email / name`);
+          if (r.check_in  && !timeRe.test(r.check_in))  errs.push(`Baris ${i+2}: format check_in salah`);
+          if (r.check_out && !timeRe.test(r.check_out)) errs.push(`Baris ${i+2}: format check_out salah`);
+          if (!r.status || !STATUS_OPTIONS.includes(r.status)) r.status = 'present';
           return r;
         });
-        if (parseErrors.length) errs.push(...parseErrors.map(e => e.message));
-        setErrors(errs);
-        setRows(cleaned);
-        setStep('preview');
-      },
-      error: (err) => toast.error('Gagal baca file: ' + err.message),
-    });
+        setErrors(errs); setRows(cleaned); setStep('preview');
+      } catch(err) { toast.error('Gagal baca file: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
   const handleImport = async () => {
-    if (errors.length) { toast.error('Perbaiki error dulu sebelum import'); return; }
+    if (errors.length) { toast.error('Perbaiki error dulu'); return; }
     setImporting(true);
     try {
-      const res = await fetch('/api/attendance/admin/bulk-import', {
+      const res  = await fetch('/api/attendance/admin/bulk-import', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + localStorage.getItem('accessToken'),
-        },
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+localStorage.getItem('accessToken') },
         body: JSON.stringify({ records: rows }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
-      setResult(data.data);
-      setStep('result');
-    } catch(e) {
-      toast.error('Gagal import: ' + e.message);
-    } finally { setImporting(false); }
+      setResult(data.data); setStep('result');
+    } catch(e) { toast.error('Gagal import: ' + e.message); }
+    finally { setImporting(false); }
   };
-
-  const F = "w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--brand-500)]";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="bg-[var(--bg-card)] w-full max-w-3xl my-6 rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <FileSpreadsheet size={20} className="text-blue-600"/>
+            <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+              <FileSpreadsheet size={20} className="text-green-600"/>
             </div>
             <div>
               <h2 className="font-bold text-base">Import Absensi Manual</h2>
-              <p className="text-xs text-[var(--text-muted)]">Upload file CSV untuk import data absensi karyawan</p>
+              <p className="text-xs text-[var(--text-muted)]">Upload file Excel (.xlsx) untuk import data absensi karyawan</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg)] text-[var(--text-muted)]">
-            <X size={18}/>
-          </button>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg)] text-[var(--text-muted)]"><X size={18}/></button>
         </div>
 
         <div className="p-6">
-          {/* Step: Upload */}
+          {/* Upload */}
           {step === 'upload' && (
             <div className="space-y-5">
-              {/* Template download */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5"/>
+                  <Info size={16} className="text-green-700 flex-shrink-0 mt-0.5"/>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-blue-800 mb-1">Format File CSV</p>
-                    <p className="text-xs text-blue-700 mb-3">
-                      Download template CSV, isi data absensi, lalu upload kembali.
-                      Kolom <strong>date</strong> wajib format YYYY-MM-DD.
-                      Minimal isi satu dari: <strong>email</strong>, <strong>employee_id</strong>, atau <strong>name</strong>.
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs text-blue-700 mb-3">
-                      {['date','email','employee_id','name','check_in','check_out','status','notes'].map(col => (
-                        <span key={col} className="bg-blue-100 px-2 py-0.5 rounded font-mono">{col}</span>
+                    <p className="text-sm font-semibold text-green-800 mb-1">Template Excel dengan Daftar Karyawan</p>
+                    <p className="text-xs text-green-700 mb-3">Download template — sudah berisi <strong>semua nama karyawan</strong> aktif. Cukup isi <strong>check_in</strong>, <strong>check_out</strong>, dan <strong>status</strong>, lalu upload.</p>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {['date','employee_id','name','email','check_in','check_out','status','notes'].map(col=>(
+                        <span key={col} className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] font-mono">{col}</span>
                       ))}
                     </div>
-                    <div className="text-xs text-blue-700 mb-3">
-                      Status yang valid: {STATUS_OPTIONS.map(s => (
-                        <span key={s} className="inline-block bg-blue-100 px-1.5 py-0.5 rounded mr-1 font-mono">{s}</span>
-                      ))}
-                    </div>
-                    <button onClick={downloadTemplate}
-                      className="flex items-center gap-2 text-xs font-semibold text-blue-700 hover:text-blue-900 transition-colors">
-                      <Download size={13}/> Download Template CSV
+                    <button onClick={downloadTemplate} disabled={loadingEmp}
+                      className="flex items-center gap-2 text-xs font-semibold text-green-800 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                      {loadingEmp ? <Loader2 size={13} className="animate-spin"/> : <Download size={13}/>}
+                      {loadingEmp ? 'Memuat karyawan...' : `Download Template Excel (${employees.length} karyawan)`}
                     </button>
                   </div>
                 </div>
               </div>
-
-              {/* Drop zone */}
-              <label className="block border-2 border-dashed border-[var(--border)] rounded-xl p-10 text-center cursor-pointer hover:border-[var(--brand-500)] hover:bg-[var(--brand-500)]/5 transition-colors">
-                <Upload size={32} className="mx-auto text-[var(--text-muted)] mb-3"/>
-                <p className="font-semibold text-sm mb-1">Klik atau drag & drop file CSV</p>
-                <p className="text-xs text-[var(--text-muted)]">Format: .csv — Maks 500 baris</p>
-                <input ref={fileRef} type="file" accept=".csv" className="sr-only" onChange={handleFile}/>
+              <label className="block border-2 border-dashed border-[var(--border)] rounded-xl p-10 text-center cursor-pointer hover:border-green-500 hover:bg-green-500/5 transition-colors">
+                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Upload size={24} className="text-green-600"/>
+                </div>
+                <p className="font-semibold text-sm mb-1">Klik atau drag & drop file Excel (.xlsx)</p>
+                <p className="text-xs text-[var(--text-muted)]">Maks 500 baris</p>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls" className="sr-only" onChange={handleFile}/>
               </label>
             </div>
           )}
 
-          {/* Step: Preview */}
+          {/* Preview */}
           {step === 'preview' && (
             <div className="space-y-4">
-              {/* Summary */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
                   <p className="text-2xl font-bold text-green-700">{rows.length}</p>
                   <p className="text-xs text-green-600">Total Baris</p>
                 </div>
-                <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-red-600">{errors.length}</p>
-                  <p className="text-xs text-red-500">Error Ditemukan</p>
+                <div className={`border rounded-xl p-3 text-center ${errors.length ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                  <p className={`text-2xl font-bold ${errors.length ? 'text-red-600':'text-blue-600'}`}>{errors.length || 'OK'}</p>
+                  <p className={`text-xs ${errors.length ? 'text-red-500':'text-blue-500'}`}>{errors.length ? 'Error':'Siap Import'}</p>
                 </div>
               </div>
-
-              {/* Errors */}
               {errors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto">
-                  <p className="text-xs font-bold text-red-700 mb-2 flex items-center gap-1">
-                    <AlertTriangle size={13}/> Error — Perbaiki file dan upload ulang
-                  </p>
-                  {errors.map((e, i) => <p key={i} className="text-xs text-red-600 mb-0.5">• {e}</p>)}
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-36 overflow-y-auto">
+                  <p className="text-xs font-bold text-red-700 mb-2 flex items-center gap-1"><AlertTriangle size={13}/> Perbaiki file dan upload ulang</p>
+                  {errors.map((e,i)=><p key={i} className="text-xs text-red-600 mb-0.5">• {e}</p>)}
                 </div>
               )}
-
-              {/* Data preview table */}
               <div className="border border-[var(--border)] rounded-xl overflow-hidden">
                 <div className="bg-[var(--bg)] px-4 py-2.5 border-b border-[var(--border)] flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">Preview Data</span>
-                  <button onClick={() => setStep('upload')}
-                    className="text-xs text-[var(--text-muted)] hover:text-[var(--brand-600)]">
-                    ← Ganti File
-                  </button>
+                  <button onClick={()=>setStep('upload')} className="text-xs text-[var(--text-muted)] hover:text-[var(--brand-600)]">← Ganti File</button>
                 </div>
                 <div className="overflow-x-auto max-h-64">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
-                        {['Tanggal','Email/ID/Nama','Check In','Check Out','Status','Catatan'].map(h => (
-                          <th key={h} className="px-3 py-2 text-left font-semibold text-[var(--text-muted)] uppercase tracking-wide">{h}</th>
+                        {['Tanggal','Nama / ID','Check In','Check Out','Status','Catatan'].map(h=>(
+                          <th key={h} className="px-3 py-2 text-left font-semibold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
-                      {rows.slice(0, 50).map((row, i) => (
+                      {rows.slice(0,50).map((row,i)=>(
                         <tr key={i} className="hover:bg-[var(--bg)]">
-                          <td className="px-3 py-2 font-mono">{row.date}</td>
-                          <td className="px-3 py-2">{row.email || row.employee_id || row.name || '—'}</td>
-                          <td className="px-3 py-2 font-mono">{row.check_in || '—'}</td>
-                          <td className="px-3 py-2 font-mono">{row.check_out || '—'}</td>
+                          <td className="px-3 py-2 font-mono whitespace-nowrap">{row.date}</td>
+                          <td className="px-3 py-2"><p className="font-medium">{row.name||'—'}</p><p className="text-[var(--text-muted)]">{row.employee_id||''}</p></td>
+                          <td className="px-3 py-2 font-mono">{row.check_in||'—'}</td>
+                          <td className="px-3 py-2 font-mono">{row.check_out||'—'}</td>
                           <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              row.status === 'present' ? 'bg-green-100 text-green-700' :
-                              row.status === 'late'    ? 'bg-yellow-100 text-yellow-700' :
-                              row.status === 'absent'  ? 'bg-red-100 text-red-600' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              {STATUS_LABELS[row.status] || row.status || 'present'}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${row.status==='present'?'bg-green-100 text-green-700':row.status==='late'?'bg-yellow-100 text-yellow-700':row.status==='absent'?'bg-red-100 text-red-600':'bg-gray-100 text-gray-600'}`}>
+                              {STATUS_LABELS[row.status]||row.status}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-[var(--text-muted)] max-w-32 truncate">{row.notes || '—'}</td>
+                          <td className="px-3 py-2 text-[var(--text-muted)] max-w-[120px] truncate">{row.notes||'—'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {rows.length > 50 && (
-                    <p className="text-xs text-center text-[var(--text-muted)] py-2">
-                      Menampilkan 50 dari {rows.length} baris
-                    </p>
-                  )}
+                  {rows.length>50&&<p className="text-xs text-center text-[var(--text-muted)] py-2">Menampilkan 50 dari {rows.length} baris</p>}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step: Result */}
+          {/* Result */}
           {step === 'result' && result && (
             <div className="space-y-4">
               <div className="text-center py-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check size={32} className="text-green-600"/>
-                </div>
-                <h3 className="font-bold text-lg mb-1">Import Selesai!</h3>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3"><Check size={32} className="text-green-600"/></div>
+                <h3 className="font-bold text-lg">Import Selesai!</h3>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label:'Ditambahkan', value: result.success, color:'green' },
-                  { label:'Diupdate',    value: result.updated, color:'blue'  },
-                  { label:'Dilewati',    value: result.skipped, color:'red'   },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-4 text-center`}>
-                    <p className={`text-3xl font-bold text-${color}-700`}>{value}</p>
-                    <p className={`text-xs text-${color}-600 mt-1`}>{label}</p>
+                {[{label:'Ditambahkan',value:result.success,c:'green'},{label:'Diupdate',value:result.updated,c:'blue'},{label:'Dilewati',value:result.skipped,c:'red'}].map(({label,value,c})=>(
+                  <div key={label} className={`bg-${c}-50 border border-${c}-200 rounded-xl p-4 text-center`}>
+                    <p className={`text-3xl font-bold text-${c}-700`}>{value}</p>
+                    <p className={`text-xs text-${c}-600 mt-1`}>{label}</p>
                   </div>
                 ))}
               </div>
-              {result.errors?.length > 0 && (
+              {result.errors?.length>0&&(
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto">
-                  <p className="text-xs font-bold text-red-700 mb-2">Baris yang Dilewati:</p>
-                  {result.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-red-600 mb-0.5">
-                      • {e.row?.date} | {e.row?.email || e.row?.name} — {e.reason}
-                    </p>
-                  ))}
+                  <p className="text-xs font-bold text-red-700 mb-2">Baris Dilewati:</p>
+                  {result.errors.map((e,i)=><p key={i} className="text-xs text-red-600 mb-0.5">• {e.row?.date} | {e.row?.name||e.row?.employee_id} — {e.reason}</p>)}
                 </div>
               )}
             </div>
@@ -1023,26 +1005,22 @@ function ImportAttendanceModal({ onClose, onDone }) {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)]">
-          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-            {step === 'result' ? 'Tutup' : 'Batal'}
-          </button>
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{step==='result'?'Tutup':'Batal'}</button>
           <div className="flex gap-3">
-            {step === 'preview' && errors.length === 0 && (
+            {step==='preview'&&errors.length===0&&(
               <button onClick={handleImport} disabled={importing}
-                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-600)] rounded-xl disabled:opacity-60 hover:opacity-90 transition-opacity">
-                {importing ? <Loader2 size={15} className="animate-spin"/> : <Upload size={15}/>}
-                {importing ? `Mengimport ${rows.length} data...` : `Import ${rows.length} Data`}
+                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl disabled:opacity-60 hover:bg-green-700 transition-colors">
+                {importing?<Loader2 size={15} className="animate-spin"/>:<Upload size={15}/>}
+                {importing?`Mengimport ${rows.length} data...`:`Import ${rows.length} Data`}
               </button>
             )}
-            {step === 'result' && (
-              <button onClick={() => { onDone(); onClose(); }}
-                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-600)] rounded-xl">
+            {step==='result'&&(
+              <button onClick={()=>{onDone();onClose();}} className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl">
                 <Check size={15}/> Selesai & Refresh
               </button>
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
