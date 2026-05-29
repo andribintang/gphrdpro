@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
-  Clock, Camera, MapPin, CheckCircle2, LogIn, LogOut, Edit2, Trash2,
+  Clock, Camera, MapPin, CheckCircle2, LogIn, LogOut, Edit2, Trash2, Search,
   Coffee, Play, ChevronLeft, ChevronRight, RefreshCw,
   AlertTriangle, Loader2, Navigation, Shield, ShieldCheck,
   ShieldX, Map, Users, Eye, Settings, X, Info,
@@ -1031,26 +1031,91 @@ function ImportAttendanceModal({ onClose, onDone }) {
 // ── Admin Attendance Tab ─────────────────────────────────────
 function AdminAttendanceTab() {
   const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
-  const [attendances, setAttendances] = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [editModal,   setEditModal]   = useState(null);
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0,7)); // YYYY-MM
-  const [search,      setSearch]      = useState('');
 
+  // ── State ─────────────────────────────────────────────────
+  const [attendances,  setAttendances]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [editModal,    setEditModal]    = useState(null);
+  const [search,       setSearch]       = useState('');
+  const [sortKey,      setSortKey]      = useState('date');
+  const [sortDir,      setSortDir]      = useState('desc');
+  const [page,         setPage]         = useState(1);
+  const [periodMode,   setPeriodMode]   = useState('this_month'); // today|yesterday|this_week|this_month|last_month|custom
+  const [customFrom,   setCustomFrom]   = useState('');
+  const [customTo,     setCustomTo]     = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const PAGE_SIZE = 20;
+
+  // ── Period helpers ────────────────────────────────────────
+  const getPeriodDates = () => {
+    const now   = new Date();
+    const y     = now.getFullYear();
+    const m     = now.getMonth();
+    const d     = now.getDate();
+    const pad   = (n) => String(n).padStart(2,'0');
+    const fmt   = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+    const today = fmt(now);
+
+    if (periodMode === 'today')      return { from: today, to: today };
+    if (periodMode === 'yesterday')  { const y2 = new Date(now); y2.setDate(d-1); return { from: fmt(y2), to: fmt(y2) }; }
+    if (periodMode === 'this_week')  { const mon = new Date(now); mon.setDate(d - (now.getDay()||7) + 1); return { from: fmt(mon), to: today }; }
+    if (periodMode === 'this_month') return { from: `${y}-${pad(m+1)}-01`, to: today };
+    if (periodMode === 'last_month') {
+      const lm  = new Date(y, m, 0);
+      const lm1 = new Date(y, m-1, 1);
+      return { from: fmt(lm1), to: fmt(lm) };
+    }
+    if (periodMode === 'custom') return { from: customFrom, to: customTo };
+    return { from: `${y}-${pad(m+1)}-01`, to: today };
+  };
+
+  const PERIOD_OPTIONS = [
+    { v:'today',       l:'Hari Ini' },
+    { v:'yesterday',   l:'Kemarin' },
+    { v:'this_week',   l:'Minggu Ini' },
+    { v:'this_month',  l:'Bulan Ini' },
+    { v:'last_month',  l:'Bulan Lalu' },
+    { v:'custom',      l:'Custom...' },
+  ];
+
+  const STATUS_OPTIONS = [
+    { v:'',          l:'Semua Status' },
+    { v:'present',   l:'Hadir' },
+    { v:'late',      l:'Terlambat' },
+    { v:'absent',    l:'Absen' },
+    { v:'half_day',  l:'Setengah Hari' },
+    { v:'leave',     l:'Cuti' },
+    { v:'holiday',   l:'Libur' },
+  ];
+
+  const STATUS_STYLES = {
+    present:  'bg-green-100 text-green-700',
+    late:     'bg-yellow-100 text-yellow-700',
+    absent:   'bg-red-100 text-red-600',
+    half_day: 'bg-orange-100 text-orange-600',
+    leave:    'bg-blue-100 text-blue-600',
+    holiday:  'bg-purple-100 text-purple-600',
+  };
+
+  // ── Fetch ─────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [year, month] = filterMonth.split('-');
-      const r = await fetch(`${API}/attendance/admin/all?year=${year}&month=${month}&limit=200`, {
+      const { from, to } = getPeriodDates();
+      if (!from || !to) { setLoading(false); return; }
+      const params = new URLSearchParams({ from, to, limit: 500 });
+      const r = await fetch(`${API}/attendance/admin/all?${params}`, {
         headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
       });
       const d = await r.json();
       setAttendances(d.data?.attendances || d.data || []);
+      setPage(1);
     } catch { toast.error('Gagal memuat data'); } finally { setLoading(false); }
-  }, [filterMonth]);
+  }, [periodMode, customFrom, customTo]);
 
   useEffect(() => { load(); }, [load]);
 
+  // ── Delete ────────────────────────────────────────────────
   const handleDelete = async (id, name, date) => {
     if (!confirm(`Hapus absensi ${name} tanggal ${date}?`)) return;
     try {
@@ -1065,78 +1130,211 @@ function AdminAttendanceTab() {
     } catch(e) { toast.error(e.message); }
   };
 
-  const STATUS_COLORS = {
-    present:  'bg-green-100 text-green-700',
-    late:     'bg-yellow-100 text-yellow-700',
-    absent:   'bg-red-100 text-red-600',
-    half_day: 'bg-orange-100 text-orange-600',
-    leave:    'bg-blue-100 text-blue-600',
-    holiday:  'bg-purple-100 text-purple-600',
+  // ── Sort ──────────────────────────────────────────────────
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+    setPage(1);
   };
-  const STATUS_LABELS = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
 
-  const filtered = attendances.filter(a =>
-    !search || a.user?.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const SortIcon = ({ col }) => {
+    if (sortKey !== col) return <span className="text-[var(--text-muted)] opacity-40">↕</span>;
+    return <span className="text-[var(--brand-600)]">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+  };
+
+  // ── Filter + Sort + Paginate ──────────────────────────────
+  const filtered = attendances
+    .filter(a => {
+      const name = (a.user?.name || '').toLowerCase();
+      const matchSearch = !search || name.includes(search.toLowerCase());
+      const matchStatus = !statusFilter || a.status === statusFilter;
+      return matchSearch && matchStatus;
+    })
+    .sort((a, b) => {
+      let va, vb;
+      if (sortKey === 'date')     { va = a.date;               vb = b.date; }
+      else if (sortKey === 'name') { va = a.user?.name || '';    vb = b.user?.name || ''; }
+      else if (sortKey === 'in')   { va = a.check_in  || '';     vb = b.check_in  || ''; }
+      else if (sortKey === 'out')  { va = a.check_out || '';     vb = b.check_out || ''; }
+      else if (sortKey === 'hours'){ va = parseFloat(a.work_hours||0); vb = parseFloat(b.work_hours||0); }
+      else if (sortKey === 'status'){ va = a.status || '';       vb = b.status || ''; }
+      else { va = ''; vb = ''; }
+      const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const thCls = "px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] cursor-pointer select-none hover:text-[var(--text-primary)] whitespace-nowrap";
+  const tdCls = "px-3 py-2.5 text-sm";
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
-          className="input-base text-sm flex-shrink-0 w-40" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Cari nama karyawan..." className="input-base text-sm flex-1 min-w-40" />
-        <button onClick={load} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)]">
+    <div className="space-y-3 animate-fade-in">
+      {/* ── Toolbar ────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        {/* Period selector */}
+        <select value={periodMode} onChange={e => { setPeriodMode(e.target.value); setPage(1); }}
+          className="input-base text-sm h-9 flex-shrink-0">
+          {PERIOD_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+        </select>
+
+        {/* Custom date range */}
+        {periodMode === 'custom' && (
+          <>
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="input-base text-sm h-9 w-36" />
+            <span className="self-center text-[var(--text-muted)] text-sm">—</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="input-base text-sm h-9 w-36" />
+            <button onClick={load} className="btn-primary h-9 px-4 text-sm">Tampilkan</button>
+          </>
+        )}
+
+        {/* Status filter */}
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+          className="input-base text-sm h-9 w-40 flex-shrink-0">
+          {STATUS_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+        </select>
+
+        {/* Search */}
+        <div className="relative flex-1 min-w-36">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Cari nama karyawan..." className="input-base text-sm h-9 pl-8 w-full" />
+        </div>
+
+        <button onClick={load} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)] flex-shrink-0">
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Count */}
-      <p className="text-xs text-[var(--text-muted)]">{filtered.length} data absensi</p>
+      {/* ── Summary chips ──────────────────────────────────── */}
+      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+        <span className="font-semibold text-[var(--text-primary)]">{filtered.length}</span> data
+        {statusFilter && <span className={`px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLES[statusFilter]}`}>{STATUS_OPTIONS.find(o=>o.v===statusFilter)?.l}</span>}
+        {search && <span>· "{search}"</span>}
+      </div>
 
-      {/* Table */}
-      {loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_,i)=><div key={i} className="skeleton h-14 rounded-xl"/>)}</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-10 text-[var(--text-muted)]">
-          <p>Tidak ada data absensi</p>
+      {/* ── Table ──────────────────────────────────────────── */}
+      <div className="table-wrapper overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                <th className={thCls} onClick={() => handleSort('date')}>
+                  <span className="flex items-center gap-1">Tanggal <SortIcon col="date"/></span>
+                </th>
+                <th className={thCls} onClick={() => handleSort('name')}>
+                  <span className="flex items-center gap-1">Karyawan <SortIcon col="name"/></span>
+                </th>
+                <th className={thCls} onClick={() => handleSort('status')}>
+                  <span className="flex items-center gap-1">Status <SortIcon col="status"/></span>
+                </th>
+                <th className={thCls} onClick={() => handleSort('in')}>
+                  <span className="flex items-center gap-1">Masuk <SortIcon col="in"/></span>
+                </th>
+                <th className={thCls} onClick={() => handleSort('out')}>
+                  <span className="flex items-center gap-1">Pulang <SortIcon col="out"/></span>
+                </th>
+                <th className={thCls} onClick={() => handleSort('hours')}>
+                  <span className="flex items-center gap-1">Jam Kerja <SortIcon col="hours"/></span>
+                </th>
+                <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {loading ? (
+                [...Array(8)].map((_,i) => (
+                  <tr key={i}>
+                    {[...Array(7)].map((_,j) => (
+                      <td key={j} className="px-3 py-3"><div className="skeleton h-4 rounded w-full"/></td>
+                    ))}
+                  </tr>
+                ))
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-[var(--text-muted)]">
+                    <p className="text-sm">Tidak ada data absensi</p>
+                    <p className="text-xs mt-1">Coba ubah filter periode atau pencarian</p>
+                  </td>
+                </tr>
+              ) : paginated.map((a, i) => (
+                <tr key={a.id || i} className="hover:bg-[var(--bg)] transition-colors">
+                  <td className={tdCls + " font-mono text-xs whitespace-nowrap"}>{a.date}</td>
+                  <td className={tdCls}>
+                    <p className="font-semibold leading-tight">{a.user?.name || '—'}</p>
+                    {a.user?.employee?.department && (
+                      <p className="text-[10px] text-[var(--text-muted)]">{a.user.employee.department}</p>
+                    )}
+                  </td>
+                  <td className={tdCls}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${STATUS_STYLES[a.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_OPTIONS.find(o=>o.v===a.status)?.l || a.status}
+                    </span>
+                  </td>
+                  <td className={tdCls + " font-mono text-xs"}>{a.check_in ? a.check_in.slice(0,5) : '—'}</td>
+                  <td className={tdCls + " font-mono text-xs"}>{a.check_out ? a.check_out.slice(0,5) : '—'}</td>
+                  <td className={tdCls}>
+                    {a.work_hours
+                      ? <span className="font-semibold">{parseFloat(a.work_hours).toFixed(1)}<span className="text-[var(--text-muted)] font-normal text-[10px]"> jam</span></span>
+                      : <span className="text-[var(--text-muted)]">—</span>}
+                  </td>
+                  <td className={tdCls + " text-right"}>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => setEditModal(a)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-blue-50 text-blue-500 transition-colors" title="Koreksi">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => handleDelete(a.id, a.user?.name, a.date)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400 transition-colors" title="Hapus">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ) : (
-        <div className="table-wrapper divide-y-0">
-          {filtered.map((a, i) => (
-            <div key={a.id || i} className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold truncate">{a.user?.name || a.user_id}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[a.status] || 'bg-gray-100 text-gray-600'}`}>
-                    {STATUS_LABELS[a.status] || a.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-0.5 text-xs text-[var(--text-muted)]">
-                  <span>{a.date}</span>
-                  {a.check_in  && <span>Masuk: {a.check_in.slice(0,5)}</span>}
-                  {a.check_out && <span>Pulang: {a.check_out.slice(0,5)}</span>}
-                  {a.work_hours && <span>{parseFloat(a.work_hours).toFixed(1)} jam</span>}
-                </div>
-                {a.notes && <p className="text-[10px] text-[var(--text-muted)] italic mt-0.5">{a.notes}</p>}
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button onClick={() => setEditModal(a)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-blue-50 text-blue-500 transition-colors">
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => handleDelete(a.id, a.user?.name, a.date)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-50 text-red-400 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+
+        {/* ── Pagination ─────────────────────────────────── */}
+        {!loading && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--bg)]">
+            <p className="text-xs text-[var(--text-muted)]">
+              {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, filtered.length)} dari <span className="font-semibold text-[var(--text-primary)]">{filtered.length}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(1)} disabled={page===1}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:bg-[var(--bg-secondary)] disabled:opacity-30">«</button>
+              <button onClick={() => setPage(p=>Math.max(1,p-1))} disabled={page===1}
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-30">
+                <ChevronLeft className="w-3.5 h-3.5"/>
+              </button>
+              {/* Page numbers */}
+              {[...Array(totalPages)].map((_,i) => {
+                const p = i+1;
+                if (p === 1 || p === totalPages || Math.abs(p-page) <= 1) return (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-medium transition-colors
+                      ${p===page ? 'bg-[var(--brand-600)] text-white' : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]'}`}>
+                    {p}
+                  </button>
+                );
+                if (Math.abs(p-page) === 2) return <span key={p} className="text-[var(--text-muted)] text-xs">…</span>;
+                return null;
+              })}
+              <button onClick={() => setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-30">
+                <ChevronRight className="w-3.5 h-3.5"/>
+              </button>
+              <button onClick={() => setPage(totalPages)} disabled={page===totalPages}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:bg-[var(--bg-secondary)] disabled:opacity-30">»</button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
-      {/* Edit Modal */}
       {editModal && (
         <EditAttendanceModal
           attendance={editModal}
@@ -1147,6 +1345,7 @@ function AdminAttendanceTab() {
     </div>
   );
 }
+
 
 // ── Edit Attendance Modal ─────────────────────────────────────
 function EditAttendanceModal({ attendance: att, onClose, onSaved }) {

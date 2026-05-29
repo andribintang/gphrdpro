@@ -705,9 +705,9 @@ const AllowanceSection = ({ userId }) => {
     setLoading(true);
     try {
       const [aRes, incRes, dedRes] = await Promise.all([
-        fetch(`${API}/payroll/allowances/${userId}`,      { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
-        fetch(`${API}/payroll/components?type=income`,    { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
-        fetch(`${API}/payroll/components?type=deduction`, { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
+        fetch(`${API}/payroll-engine/allowances/${userId}`,      { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
+        fetch(`${API}/payroll-engine/components?type=income`,    { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
+        fetch(`${API}/payroll-engine/components?type=deduction`, { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
       ]);
       setAllowances(aRes.data?.allowances || []);
       setIncomeComps((incRes.data?.components || []).filter(c => c.is_active));
@@ -727,7 +727,7 @@ const AllowanceSection = ({ userId }) => {
     if (!addForm.component_id || !addForm.amount) { toast.error('Komponen dan nominal wajib diisi'); return; }
     setSaving(true);
     try {
-      const r = await fetch(`${API}/payroll/allowances/${userId}`, {
+      const r = await fetch(`${API}/payroll-engine/allowances/${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
         body: JSON.stringify({ component_id: parseInt(addForm.component_id), amount: parseFloat(addForm.amount), notes: addForm.notes }),
