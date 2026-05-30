@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Package, Plus, Edit3, X, Loader2, CheckCircle2, AlertTriangle, Trash2,
-  Store, ChevronDown, Upload, Trash2, Image as ImageIcon,
+  Store, ChevronDown, Upload, Image as ImageIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../../components/DataTable';
