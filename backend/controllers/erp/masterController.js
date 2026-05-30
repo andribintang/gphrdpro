@@ -164,7 +164,7 @@ const createProduct = async (req, res, next) => {
     const int = (v, d=0) => { const n = parseInt(v); return isNaN(n) ? d : n; };
     const jsn = (v, d='[]') => esc(JSON.stringify(v && typeof v === 'object' ? v : JSON.parse(d)));
 
-    const [result] = await sequelize.query(
+    const [, insertMeta] = await sequelize.query(
       `INSERT INTO erp_products 
         (branch_id, category_id, name, sku, barcode, unit, buy_price, sell_price, 
          sell_price_mp, sell_price_wa, stock_min, weight, notes, is_active,
@@ -204,7 +204,12 @@ const createProduct = async (req, res, next) => {
        )`,
       { transaction: t }
     );
-    const productId = result.insertId;
+    // Get insertId — works across Sequelize versions
+    const productId = insertMeta?.insertId
+      || (Array.isArray(insertMeta) ? insertMeta[0]?.insertId : null)
+      || await sequelize.query('SELECT LAST_INSERT_ID() as id', { transaction: t })
+           .then(([[row]]) => row?.id);
+    if (!productId) throw new Error('Gagal mendapatkan ID produk baru');
     await sequelize.query(
       `INSERT INTO erp_stock (product_id, branch_id, qty) VALUES (${productId}, ${parseInt(b.branch_id)||1}, 0)`,
       { transaction: t }
