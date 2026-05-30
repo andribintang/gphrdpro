@@ -217,9 +217,48 @@ const createProduct = async (req, res, next) => {
 
 const updateProduct = async (req, res, next) => {
   try {
+    const b = req.body;
+    const num = (v, d=0) => { const n = parseFloat(v); return isNaN(n) ? d : n; };
+    const int = (v, d=0) => { const n = parseInt(v);   return isNaN(n) ? d : n; };
+    const safe = (v) => (v == null ? null : v);
+
+    // Build explicit update — only known columns, no undefined fields
+    const data = {
+      name:                safe(b.name),
+      sku:                 safe(b.sku),
+      barcode:             safe(b.barcode),
+      unit:                safe(b.unit),
+      buy_price:           num(b.buy_price),
+      sell_price:          num(b.sell_price),
+      sell_price_mp:       b.sell_price_mp != null && b.sell_price_mp !== '' ? num(b.sell_price_mp) : null,
+      sell_price_wa:       b.sell_price_wa != null && b.sell_price_wa !== '' ? num(b.sell_price_wa) : null,
+      stock_min:           int(b.stock_min),
+      weight:              num(b.weight),
+      notes:               safe(b.notes),
+      category_id:         b.category_id ? int(b.category_id) : null,
+      // Store fields
+      store_price:         num(b.store_price),
+      store_price_compare: num(b.store_price_compare),
+      store_active_gpd:    b.store_active_gpd ? 1 : 0,
+      store_active_gpr:    b.store_active_gpr ? 1 : 0,
+      store_short_desc:    safe(b.store_short_desc),
+      store_description:   safe(b.store_description),
+      store_meta_title:    safe(b.store_meta_title || b.name),
+      store_meta_desc:     safe(b.store_meta_desc),
+      store_slug:          safe(b.store_slug),
+      store_featured:      b.store_featured ? 1 : 0,
+    };
+    // JSON fields — only update if provided
+    if (b.store_images  !== undefined) data.store_images  = Array.isArray(b.store_images)  ? b.store_images  : [];
+    if (b.store_variants !== undefined) data.store_variants = typeof b.store_variants === 'object' ? b.store_variants : {};
+    if (b.store_tags    !== undefined) data.store_tags    = Array.isArray(b.store_tags)    ? b.store_tags    : [];
+
+    // Remove undefined keys
+    Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ success:false, message:'Tidak ditemukan' });
-    await product.update(req.body);
+    await product.update(data);
     return res.json({ success:true, data:{ product } });
   } catch (err) { next(err); }
 };

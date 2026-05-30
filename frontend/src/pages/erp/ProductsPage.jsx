@@ -243,6 +243,10 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
         weight: parseFloat(form.weight) || 0,
         notes: form.notes,
         // Store fields — saved directly to erp_products
+        // category_id: use store category if set, else ERP category
+        ...(form.store_category_gpdistro || form.store_category_gpracing
+          ? { category_id: parseInt(form.store_category_gpdistro || form.store_category_gpracing) || null }
+          : {}),
         store_price:         parseFloat(form.store_price_gpracing || form.store_price_gpdistro || form.sell_price_mp || form.sell_price) || 0,
         store_price_compare: parseFloat(form.store_price_compare_gpracing || form.store_price_compare_gpdistro) || 0,
         store_active_gpd:    form.publish_gpdistro ? 1 : 0,
@@ -656,6 +660,8 @@ function BulkPublishModal({ products, onClose, onDone }) {
           weight:         Math.round((parseFloat(r.weight) || 0.5) * 1000),
           stock:          r.stock || 0,
           category_id:    r.category_id || null,
+        store_category_gpdistro: r.category_id ? String(r.category_id) : '',
+        store_category_gpracing: r.category_id ? String(r.category_id) : '',
           images:         [],
           variants:       {},
           is_active:      true,
