@@ -21,6 +21,7 @@ const companyRoutes        = require('./routes/company');
 const erpRoutes            = require('./routes/erp');
 
 const app  = express();
+app.set('trust proxy', 1); // Railway/Railway proxy
 // ── Railway requires PORT from env, bound to 0.0.0.0 ──
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Package, Plus, Edit3, X, Loader2, CheckCircle2, AlertTriangle,
+  Package, Plus, Edit3, X, Loader2, CheckCircle2, AlertTriangle, Trash2,
   Store, ChevronDown, Upload, Trash2, Image as ImageIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -120,16 +120,44 @@ function VariantEditor({ variants, onChange, brand }) {
 // ── Image Uploader ────────────────────────────────────────────
 function ImageUploader({ images, onChange }) {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress]   = useState(0);
   const inputRef = useRef();
+
+  const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+  const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
+
+  const uploadToCloudinary = async (file) => {
+    if (!CLOUD_NAME) {
+      // Fallback: base64 if Cloudinary not configured
+      return toBase64(file);
+    }
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', UPLOAD_PRESET);
+    fd.append('folder', 'erp_products');
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: 'POST', body: fd,
+    });
+    const d = await r.json();
+    if (!d.secure_url) throw new Error(d.error?.message || 'Upload gagal');
+    return d.secure_url;
+  };
 
   const handleFiles = async (files) => {
     if (!files.length) return;
     setUploading(true);
+    setProgress(0);
     try {
-      const b64s = await Promise.all(Array.from(files).map(toBase64));
-      onChange([...images, ...b64s].slice(0, 6)); // max 6
-    } catch { toast.error('Gagal upload gambar'); }
-    finally { setUploading(false); }
+      const urls = [];
+      for (let i = 0; i < Math.min(files.length, 6 - images.length); i++) {
+        const url = await uploadToCloudinary(files[i]);
+        urls.push(url);
+        setProgress(Math.round((i + 1) / files.length * 100));
+      }
+      onChange([...images, ...urls].slice(0, 6));
+      toast.success(`${urls.length} foto berhasil diupload`);
+    } catch(e) { toast.error('Gagal upload: ' + e.message); }
+    finally { setUploading(false); setProgress(0); }
   };
 
   const handleDrop = (e) => {
@@ -243,10 +271,14 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
         weight: parseFloat(form.weight) || 0,
         notes: form.notes,
         // Store fields — saved directly to erp_products
-        // category_id: use store category if set, else ERP category
-        ...(form.store_category_gpdistro || form.store_category_gpracing
-          ? { category_id: parseInt(form.store_category_gpdistro || form.store_category_gpracing) || null }
-          : {}),
+        // category_id: use branch-specific store category
+        category_id: (() => {
+          const branchId = parseInt(form.branch_id) || 1;
+          const cat = branchId === 2
+            ? form.store_category_gpdistro
+            : form.store_category_gpracing;
+          return cat ? parseInt(cat) : (form.category_id ? parseInt(form.category_id) : null);
+        })(),
         store_price:         parseFloat(form.store_price_gpracing || form.store_price_gpdistro || form.sell_price_mp || form.sell_price) || 0,
         store_price_compare: parseFloat(form.store_price_compare_gpracing || form.store_price_compare_gpdistro) || 0,
         store_active_gpd:    form.publish_gpdistro ? 1 : 0,
@@ -648,31 +680,19 @@ function BulkPublishModal({ products, onClose, onDone }) {
 
     for (const r of targets) {
       try {
-        await createStoreProduct({
-          brand,
-          erp_product_id: r.id,
-          name:           r.name,
-          slug:           toSlug(r.name) + '-' + r.id + '-' + Date.now().toString().slice(-4),
-          sku:            r.sku || '',
-          short_desc:     r.name,
-          price:          parseFloat(r.store_price),
-          price_compare:  parseFloat(r.price_compare) || 0,
-          weight:         Math.round((parseFloat(r.weight) || 0.5) * 1000),
-          stock:          r.stock || 0,
-          category_id:    r.category_id || null,
-        store_category_gpdistro: r.category_id ? String(r.category_id) : '',
-        store_category_gpracing: r.category_id ? String(r.category_id) : '',
-          images:         [],
-          variants:       {},
-          is_active:      true,
-          is_featured:    false,
+        // Update store fields on existing ERP product — no duplicate insert
+        await erpService.updateProduct(r.id, {
+          store_price:         parseFloat(r.store_price) || 0,
+          store_price_compare: parseFloat(r.price_compare) || 0,
+          store_active_gpd:    brand === 'gpdistro' ? 1 : (r.store_active_gpd ? 1 : 0),
+          store_active_gpr:    brand === 'gpracing' ? 1 : (r.store_active_gpr ? 1 : 0),
+          store_slug:          r.store_slug || (toSlug(r.name) + '-' + r.id),
+          store_meta_title:    r.name,
+          category_id:         r.category_id || null,
         });
         ok.push(r.id);
       } catch (e) {
-        const msg = e.response?.data?.message || '';
-        // Skip duplicate slug — product already published
-        if (msg.includes('slug') || msg.includes('Duplicate')) ok.push(r.id);
-        else fail.push({ id: r.id, name: r.name, msg });
+        fail.push({ id: r.id, name: r.name, msg: e.response?.data?.message || e.message });
       }
     }
 
@@ -880,6 +900,18 @@ export default function ProductsPage() {
   const [modal,         setModal]         = useState(null);
   const [selected,      setSelected]      = useState(new Set());
   const [bulkPublish,   setBulkPublish]   = useState(false);
+  const [deleting,      setDeleting]      = useState(null); // product to delete
+
+  const handleDelete = async (product) => {
+    if (!confirm(`Hapus produk "${product.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try {
+      await erpService.deleteProduct(product.id);
+      toast.success('Produk dihapus');
+      load();
+    } catch(e) {
+      toast.error(e.response?.data?.message || 'Gagal menghapus produk');
+    } finally { setDeleting(null); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1009,9 +1041,15 @@ export default function ProductsPage() {
           </button>
         }
         actions={(row) => (
-          <button onClick={() => setModal(row)} className="btn-icon-sm" title="Edit">
-            <Edit3 size={13}/>
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setModal(row)} className="btn-icon-sm" title="Edit">
+              <Edit3 size={13}/>
+            </button>
+            <button onClick={() => handleDelete(row)}
+              className="btn-icon-sm text-red-400 hover:text-red-600 hover:bg-red-50" title="Hapus">
+              <Trash2 size={13}/>
+            </button>
+          </div>
         )}
         pageSize={25}
         zebra
