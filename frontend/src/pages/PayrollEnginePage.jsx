@@ -1122,22 +1122,34 @@ const PayrollSettingsTab = () => {
   const [saving,   setSaving]   = useState(false);
   const [form,     setForm]     = useState({});
 
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const token = () => localStorage.getItem('accessToken');
+
   useEffect(() => {
-    payrollEngineService.getSettings()
-      .then(r => {
-        const s = r.data.data.settings;
-        setSettings(s);
-        setForm({
-          late_deduction_amount:  s.late_deduction_amount  || 0,
-          late_tolerance_minutes: s.late_tolerance_minutes || 0,
-          alpha_deduction_type:   s.alpha_deduction_type   || 'per_day_salary',
-          alpha_flat_amount:      s.alpha_flat_amount      || 0,
-          bpjs_enabled:           s.bpjs_enabled           !== false,
-          pph21_enabled:          s.pph21_enabled          || false,
-          pph21_rate:             s.pph21_rate             || 5,
-        });
-        setLoading(false);
-      }).catch(() => setLoading(false));
+    Promise.all([
+      payrollEngineService.getSettings(),
+      fetch(`${API}/attendance/office/settings`, { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
+    ]).then(([pr, or]) => {
+      const s = pr.data.data.settings;
+      setSettings(s);
+      setForm({
+        late_deduction_amount:  s.late_deduction_amount  || 0,
+        late_tolerance_minutes: s.late_tolerance_minutes || 0,
+        alpha_deduction_type:   s.alpha_deduction_type   || 'per_day_salary',
+        alpha_flat_amount:      s.alpha_flat_amount      || 0,
+        bpjs_enabled:           s.bpjs_enabled           !== false,
+        pph21_enabled:          s.pph21_enabled          || false,
+        pph21_rate:             s.pph21_rate             || 5,
+        // Office settings
+        office_name:            or.data?.name            || 'Kantor',
+        check_in_start:         or.data?.check_in_start  || '06:00',
+        check_in_deadline:      or.data?.check_in_deadline || '08:05',
+        check_out_start:        or.data?.check_out_start || '15:00',
+        work_hours_required:    or.data?.work_hours_required || 8,
+        radius:                 or.data?.radius          || 100,
+      });
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -1145,10 +1157,32 @@ const PayrollSettingsTab = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await payrollEngineService.updateSettings(form);
+      // Save payroll settings
+      await payrollEngineService.updateSettings({
+        late_deduction_amount:  form.late_deduction_amount,
+        late_tolerance_minutes: form.late_tolerance_minutes,
+        alpha_deduction_type:   form.alpha_deduction_type,
+        alpha_flat_amount:      form.alpha_flat_amount,
+        bpjs_enabled:           form.bpjs_enabled,
+        pph21_enabled:          form.pph21_enabled,
+        pph21_rate:             form.pph21_rate,
+      });
+      // Save office settings
+      await fetch(`${API}/attendance/office/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+        body: JSON.stringify({
+          name:                form.office_name,
+          check_in_start:      form.check_in_start,
+          check_in_deadline:   form.check_in_deadline,
+          check_out_start:     form.check_out_start,
+          work_hours_required: parseFloat(form.work_hours_required),
+          radius:              parseInt(form.radius),
+        }),
+      });
       toast.success('Pengaturan disimpan');
     } catch(e) {
-      toast.error(e.response?.data?.message || 'Gagal menyimpan');
+      toast.error(e.response?.data?.message || e.message || 'Gagal menyimpan');
     } finally { setSaving(false); }
   };
 
@@ -1243,11 +1277,52 @@ const PayrollSettingsTab = () => {
         )}
       </Section>
 
+      {/* ── Jam Kerja & Kehadiran ── */}
+      <Section title="🏢 Jam Kerja & Aturan Kehadiran">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Jam Mulai Check-In" hint="Jam paling awal karyawan bisa check-in">
+            <input type="time" value={form.check_in_start}
+              onChange={e => sf('check_in_start', e.target.value)}
+              className="input-base text-sm" />
+          </Field>
+          <Field label="Batas Tepat Waktu (Deadline)" hint="Lewat jam ini dianggap terlambat">
+            <input type="time" value={form.check_in_deadline}
+              onChange={e => sf('check_in_deadline', e.target.value)}
+              className="input-base text-sm" />
+          </Field>
+          <Field label="Jam Minimal Check-Out" hint="Jam paling awal karyawan bisa check-out">
+            <input type="time" value={form.check_out_start}
+              onChange={e => sf('check_out_start', e.target.value)}
+              className="input-base text-sm" />
+          </Field>
+          <Field label="Jam Kerja Wajib per Hari" hint="Minimal jam kerja agar dianggap hadir penuh">
+            <div className="flex items-center gap-2">
+              <input type="number" min="1" max="12" step="0.5" value={form.work_hours_required}
+                onChange={e => sf('work_hours_required', parseFloat(e.target.value)||8)}
+                className="input-base text-sm w-24" />
+              <span className="text-sm text-[var(--text-muted)]">jam</span>
+            </div>
+          </Field>
+          <Field label="Radius Lokasi (meter)" hint="Jarak maksimal dari kantor agar check-in valid">
+            <div className="flex items-center gap-2">
+              <input type="number" min="10" max="5000" value={form.radius}
+                onChange={e => sf('radius', parseInt(e.target.value)||100)}
+                className="input-base text-sm w-24" />
+              <span className="text-sm text-[var(--text-muted)]">meter</span>
+            </div>
+          </Field>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+          <strong>Contoh:</strong> Deadline <strong>08:05</strong> + Toleransi <strong>0 menit</strong> → karyawan yang check-in jam 08:06 dianggap terlambat.
+          Deadline <strong>08:00</strong> + Toleransi <strong>15 menit</strong> → karyawan masih dianggap tepat waktu sampai jam 08:15.
+        </div>
+      </Section>
+
       {/* Save */}
       <button onClick={handleSave} disabled={saving}
         className="btn-primary h-11 px-8 text-sm gap-2 disabled:opacity-60">
         {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle2 className="w-4 h-4"/>}
-        {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+        {saving ? 'Menyimpan...' : 'Simpan Semua Pengaturan'}
       </button>
     </div>
   );

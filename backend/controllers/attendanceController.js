@@ -360,23 +360,41 @@ const updateAttendance = async (req, res, next) => {
 
     const { date, check_in, check_out, status, notes } = req.body;
     const validStatuses = ['present','absent','late','half_day','leave','holiday'];
+    const manualStatuses = ['absent','half_day','leave','holiday']; // status yang tidak di-auto-hitung
 
     // Calculate work hours
     let work_hours = null;
-    if (check_in && check_out) {
-      const [ih, im] = check_in.split(':').map(Number);
-      const [oh, om] = check_out.split(':').map(Number);
+    const ci = check_in || att.check_in;
+    const co = check_out || att.check_out;
+    if (ci && co) {
+      const [ih, im] = ci.split(':').map(Number);
+      const [oh, om] = co.split(':').map(Number);
       work_hours = ((oh * 60 + om) - (ih * 60 + im)) / 60;
       if (work_hours < 0) work_hours = null;
     }
 
+    // Auto-determine status dari check_in vs deadline
+    // Kecuali jika admin set manual ke absent/leave/holiday/half_day
+    let finalStatus = att.status;
+    if (status && manualStatuses.includes(status)) {
+      // Admin set manual — pakai apa adanya
+      finalStatus = status;
+    } else if (ci) {
+      // Ada check_in — hitung otomatis dari deadline
+      const office = await OfficeSetting.findOne({ where: { is_active: true } });
+      const deadline = office?.check_in_deadline || '08:05';
+      finalStatus = determineStatus(ci.slice(0,5), deadline);
+    } else if (status && validStatuses.includes(status)) {
+      finalStatus = status;
+    }
+
     await att.update({
-      date:       date       || att.date,
-      check_in:   check_in  || null,
-      check_out:  check_out || null,
-      status:     validStatuses.includes(status) ? status : att.status,
+      date:      date      || att.date,
+      check_in:  check_in !== undefined ? (check_in || null) : att.check_in,
+      check_out: check_out !== undefined ? (check_out || null) : att.check_out,
+      status:    finalStatus,
       work_hours,
-      notes:      notes !== undefined ? notes : att.notes,
+      notes:     notes !== undefined ? notes : att.notes,
     });
 
     return res.json({ success: true, message: 'Absensi diperbarui', data: { attendance: att } });
@@ -438,8 +456,16 @@ const bulkImport = async (req, res, next) => {
 
         const checkIn  = row.check_in  || null;
         const checkOut = row.check_out || null;
-        const status   = row.status || (checkIn ? 'present' : 'absent');
         const notes    = row.notes || 'Import manual oleh admin';
+
+        // Auto-determine status: jika ada check_in dan status present/kosong → hitung dari deadline
+        const manualStatuses = ['absent','half_day','leave','holiday'];
+        let status = row.status || (checkIn ? 'present' : 'absent');
+        if (checkIn && !manualStatuses.includes(status)) {
+          const office  = await OfficeSetting.findOne({ where: { is_active: true } });
+          const deadline = office?.check_in_deadline || '08:05';
+          status = determineStatus(checkIn.slice(0,5), deadline);
+        }
 
         // Calculate work hours
         let workHours = null;
