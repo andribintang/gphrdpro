@@ -191,13 +191,23 @@ function ImageUploader({ images, onChange }) {
             onDragOver={e => e.preventDefault()}
             className="aspect-square border-2 border-dashed border-[var(--border)] rounded flex flex-col items-center justify-center gap-1 hover:border-[var(--brand-600)] hover:bg-[var(--brand-600)]/5 transition-colors text-[var(--text-muted)] cursor-pointer">
             {uploading
-              ? <Loader2 size={18} className="animate-spin text-[var(--brand-600)]"/>
-              : <><Upload size={18}/><span className="text-[10px]">Upload</span></>}
+              ? <>
+                  <Loader2 size={18} className="animate-spin text-[var(--brand-600)]"/>
+                  <span className="text-[9px] text-[var(--brand-600)]">{progress}%</span>
+                </>
+              : <>
+                  <Upload size={18}/>
+                  <span className="text-[10px]">Upload</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">max 100KB</span>
+                </>}
           </button>
         )}
       </div>
       <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only"
         onChange={e => handleFiles(e.target.files)}/>
+      <p className="text-[10px] text-[var(--text-muted)] mt-1">
+        📐 Gambar otomatis dikompres maks 100KB · Maks 6 foto · JPG, PNG, WebP
+      </p>
       <p className="text-[10px] text-[var(--text-muted)]">
         Maks 6 foto · JPG, PNG, WebP · Foto pertama = foto utama
       </p>
