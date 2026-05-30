@@ -211,7 +211,7 @@ const createProduct = async (req, res, next) => {
            .then(([[row]]) => row?.id);
     if (!productId) throw new Error('Gagal mendapatkan ID produk baru');
     await sequelize.query(
-      `INSERT INTO erp_stock (product_id, branch_id, qty) VALUES (${productId}, ${parseInt(b.branch_id)||1}, 0)`,
+      `INSERT INTO erp_stock (product_id, branch_id, qty, created_at, updated_at) VALUES (${productId}, ${parseInt(b.branch_id)||1}, 0, NOW(), NOW())`,
       { transaction: t }
     );
     await t.commit();
