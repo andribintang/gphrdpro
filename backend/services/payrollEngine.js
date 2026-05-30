@@ -139,11 +139,10 @@ const calculateMonthly = async (user, employee, year, month) => {
         break;
 
       case 'attendance_bonus': {
-        // Uang kerajinan — proporsional kehadiran
-        const base = empAllowances[comp.id] !== undefined ? empAllowances[comp.id] : parseFloat(comp.default_value);
-        const ratio = att.workDays > 0 ? att.presentDays / att.workDays : 0;
-        amount = base * ratio;
-        note   = `${att.presentDays}/${att.workDays} hari × Rp ${base.toLocaleString('id-ID')}`;
+        // Uang kerajinan — per hari hadir (default_value = nilai per hari)
+        const perDay = empAllowances[comp.id] !== undefined ? empAllowances[comp.id] : parseFloat(comp.default_value);
+        amount = perDay * att.presentDays;
+        note   = `${att.presentDays} hari × Rp ${perDay.toLocaleString('id-ID')}`;
         break;
       }
 
@@ -203,7 +202,12 @@ const calculateMonthly = async (user, employee, year, month) => {
 
       case 'late_deduction':
         if (att.lateCount > 0) {
-          const perLate = parseFloat(settings.late_deduction_amount) || 25000;
+          // Prioritas: override per karyawan > default_value komponen > settings.late_deduction_amount
+          const perLate = empAllowances[comp.id] !== undefined
+            ? parseFloat(empAllowances[comp.id])
+            : (parseFloat(comp.default_value) > 0
+                ? parseFloat(comp.default_value)
+                : parseFloat(settings.late_deduction_amount) || 25000);
           amount = perLate * att.lateCount;
           note   = `${att.lateCount}x terlambat × Rp ${perLate.toLocaleString('id-ID')}`;
         }

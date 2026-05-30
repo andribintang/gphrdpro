@@ -1107,11 +1107,226 @@ const TABS_HR = [
   { id:'myslip',     label:'Slip Saya', icon:FileText },
   { id:'loan',       label:'Kasbon',    icon:Wallet },
   { id:'components', label:'Komponen',  icon:Settings },
+  { id:'settings',   label:'Pengaturan',icon:Settings },
 ];
 const TABS_EMP = [
   { id:'myslip', label:'Slip Saya', icon:FileText },
   { id:'loan',   label:'Kasbon',    icon:Wallet },
 ];
+
+
+// ── Payroll Settings Tab ──────────────────────────────────────
+const PayrollSettingsTab = () => {
+  const [settings, setSettings] = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [form,     setForm]     = useState({});
+
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const token = () => localStorage.getItem('accessToken');
+
+  useEffect(() => {
+    Promise.all([
+      payrollEngineService.getSettings(),
+      fetch(`${API}/attendance/office/settings`, { headers: { Authorization: 'Bearer ' + token() } }).then(r => r.json()),
+    ]).then(([pr, or]) => {
+      const s = pr.data.data.settings;
+      setSettings(s);
+      setForm({
+        late_deduction_amount:  s.late_deduction_amount  || 0,
+        late_tolerance_minutes: s.late_tolerance_minutes || 0,
+        alpha_deduction_type:   s.alpha_deduction_type   || 'per_day_salary',
+        alpha_flat_amount:      s.alpha_flat_amount      || 0,
+        bpjs_enabled:           s.bpjs_enabled           !== false,
+        pph21_enabled:          s.pph21_enabled          || false,
+        pph21_rate:             s.pph21_rate             || 5,
+        // Office settings
+        office_name:            or.data?.name            || 'Kantor',
+        check_in_start:         or.data?.check_in_start  || '06:00',
+        check_in_deadline:      or.data?.check_in_deadline || '08:05',
+        check_out_start:        or.data?.check_out_start || '15:00',
+        work_hours_required:    or.data?.work_hours_required || 8,
+        radius:                 or.data?.radius          || 100,
+      });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Save payroll settings
+      await payrollEngineService.updateSettings({
+        late_deduction_amount:  form.late_deduction_amount,
+        late_tolerance_minutes: form.late_tolerance_minutes,
+        alpha_deduction_type:   form.alpha_deduction_type,
+        alpha_flat_amount:      form.alpha_flat_amount,
+        bpjs_enabled:           form.bpjs_enabled,
+        pph21_enabled:          form.pph21_enabled,
+        pph21_rate:             form.pph21_rate,
+      });
+      // Save office settings
+      await fetch(`${API}/attendance/office/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+        body: JSON.stringify({
+          name:                form.office_name,
+          check_in_start:      form.check_in_start,
+          check_in_deadline:   form.check_in_deadline,
+          check_out_start:     form.check_out_start,
+          work_hours_required: parseFloat(form.work_hours_required),
+          radius:              parseInt(form.radius),
+        }),
+      });
+      toast.success('Pengaturan disimpan');
+    } catch(e) {
+      toast.error(e.response?.data?.message || e.message || 'Gagal menyimpan');
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>;
+
+  const Section = ({ title, children }) => (
+    <div className="table-wrapper p-5 space-y-4">
+      <h3 className="text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border)] pb-2">{title}</h3>
+      {children}
+    </div>
+  );
+
+  const Field = ({ label, hint, children }) => (
+    <div>
+      <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">{label}</label>
+      {children}
+      {hint && <p className="text-[10px] text-[var(--text-muted)] mt-1">{hint}</p>}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* ── Keterlambatan ── */}
+      <Section title="⏰ Aturan Keterlambatan">
+        <Field label="Toleransi Terlambat (menit)"
+          hint="Karyawan yang check-in dalam batas toleransi tidak dihitung terlambat. Contoh: 15 = sampai 15 menit setelah jam masuk masih dianggap tepat waktu.">
+          <div className="flex items-center gap-2">
+            <input type="number" min="0" max="120" value={form.late_tolerance_minutes}
+              onChange={e => sf('late_tolerance_minutes', parseInt(e.target.value)||0)}
+              className="input-base text-sm w-24" />
+            <span className="text-sm text-[var(--text-muted)]">menit</span>
+          </div>
+        </Field>
+        <Field label="Potongan per Keterlambatan (Rp)"
+          hint="Nominal potongan untuk setiap kali karyawan terlambat. Nilai ini akan dipakai jika komponen TELAT tidak memiliki default_value.">
+          <input type="number" min="0" value={form.late_deduction_amount}
+            onChange={e => sf('late_deduction_amount', parseFloat(e.target.value)||0)}
+            className="input-base text-sm w-48" />
+        </Field>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+          <strong>Info:</strong> Nilai potongan terlambat bisa juga diset langsung di <strong>Tab Komponen → TELAT → Edit → Nilai Default</strong>. Nilai komponen akan diprioritaskan.
+        </div>
+      </Section>
+
+      {/* ── Alpha / Tidak Hadir ── */}
+      <Section title="📋 Aturan Absen (Alpha)">
+        <Field label="Tipe Potongan Alpha">
+          <select value={form.alpha_deduction_type} onChange={e => sf('alpha_deduction_type', e.target.value)}
+            className="input-base text-sm">
+            <option value="per_day_salary">Proporsional gaji harian</option>
+            <option value="flat">Nominal flat per hari</option>
+          </select>
+        </Field>
+        {form.alpha_deduction_type === 'flat' && (
+          <Field label="Nominal Flat per Hari Alpha (Rp)">
+            <input type="number" min="0" value={form.alpha_flat_amount}
+              onChange={e => sf('alpha_flat_amount', parseFloat(e.target.value)||0)}
+              className="input-base text-sm w-48" />
+          </Field>
+        )}
+      </Section>
+
+      {/* ── BPJS & PPH ── */}
+      <Section title="🏛️ BPJS & Pajak">
+        <Field label="BPJS Aktif">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button type="button" onClick={() => sf('bpjs_enabled', !form.bpjs_enabled)}
+              className={`w-10 h-5 rounded-full transition-colors relative ${form.bpjs_enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.bpjs_enabled ? 'translate-x-5' : 'translate-x-0.5'}`}/>
+            </button>
+            <span className="text-sm text-[var(--text-secondary)]">{form.bpjs_enabled ? 'Aktif' : 'Nonaktif'}</span>
+          </label>
+        </Field>
+        <Field label="PPH21 Aktif">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <button type="button" onClick={() => sf('pph21_enabled', !form.pph21_enabled)}
+              className={`w-10 h-5 rounded-full transition-colors relative ${form.pph21_enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.pph21_enabled ? 'translate-x-5' : 'translate-x-0.5'}`}/>
+            </button>
+            <span className="text-sm text-[var(--text-secondary)]">{form.pph21_enabled ? 'Aktif' : 'Nonaktif'}</span>
+          </label>
+        </Field>
+        {form.pph21_enabled && (
+          <Field label="Tarif PPH21 (%)" hint="Persentase PPH21 yang dipotong dari penghasilan kena pajak">
+            <div className="flex items-center gap-2">
+              <input type="number" min="0" max="100" step="0.5" value={form.pph21_rate}
+                onChange={e => sf('pph21_rate', parseFloat(e.target.value)||5)}
+                className="input-base text-sm w-24" />
+              <span className="text-sm text-[var(--text-muted)]">%</span>
+            </div>
+          </Field>
+        )}
+      </Section>
+
+      {/* ── Jam Kerja & Kehadiran ── */}
+      <Section title="🏢 Jam Kerja & Aturan Kehadiran">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Jam Mulai Check-In" hint="Jam paling awal karyawan bisa check-in">
+            <input type="time" value={form.check_in_start}
+              onChange={e => sf('check_in_start', e.target.value)}
+              className="input-base text-sm" />
+          </Field>
+          <Field label="Batas Tepat Waktu (Deadline)" hint="Lewat jam ini dianggap terlambat">
+            <input type="time" value={form.check_in_deadline}
+              onChange={e => sf('check_in_deadline', e.target.value)}
+              className="input-base text-sm" />
+          </Field>
+          <Field label="Jam Minimal Check-Out" hint="Jam paling awal karyawan bisa check-out">
+            <input type="time" value={form.check_out_start}
+              onChange={e => sf('check_out_start', e.target.value)}
+              className="input-base text-sm" />
+          </Field>
+          <Field label="Jam Kerja Wajib per Hari" hint="Minimal jam kerja agar dianggap hadir penuh">
+            <div className="flex items-center gap-2">
+              <input type="number" min="1" max="12" step="0.5" value={form.work_hours_required}
+                onChange={e => sf('work_hours_required', parseFloat(e.target.value)||8)}
+                className="input-base text-sm w-24" />
+              <span className="text-sm text-[var(--text-muted)]">jam</span>
+            </div>
+          </Field>
+          <Field label="Radius Lokasi (meter)" hint="Jarak maksimal dari kantor agar check-in valid">
+            <div className="flex items-center gap-2">
+              <input type="number" min="10" max="5000" value={form.radius}
+                onChange={e => sf('radius', parseInt(e.target.value)||100)}
+                className="input-base text-sm w-24" />
+              <span className="text-sm text-[var(--text-muted)]">meter</span>
+            </div>
+          </Field>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+          <strong>Contoh:</strong> Deadline <strong>08:05</strong> + Toleransi <strong>0 menit</strong> → karyawan yang check-in jam 08:06 dianggap terlambat.
+          Deadline <strong>08:00</strong> + Toleransi <strong>15 menit</strong> → karyawan masih dianggap tepat waktu sampai jam 08:15.
+        </div>
+      </Section>
+
+      {/* Save */}
+      <button onClick={handleSave} disabled={saving}
+        className="btn-primary h-11 px-8 text-sm gap-2 disabled:opacity-60">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin"/> : <CheckCircle2 className="w-4 h-4"/>}
+        {saving ? 'Menyimpan...' : 'Simpan Semua Pengaturan'}
+      </button>
+    </div>
+  );
+};
 
 export default function PayrollEnginePage() {
   const { user, isHR } = useAuth();
@@ -1150,6 +1365,7 @@ export default function PayrollEnginePage() {
       {activeTab === 'myslip'     && <MySlipTab />}
       {activeTab === 'loan'        && <LoanTab />}
       {activeTab === 'components' && <ComponentsTab />}
+      {activeTab === 'settings'   && <PayrollSettingsTab />}
     </div>
   );
 }

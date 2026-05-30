@@ -1103,14 +1103,34 @@ function AdminAttendanceTab() {
     try {
       const { from, to } = getPeriodDates();
       if (!from || !to) { setLoading(false); return; }
-      const params = new URLSearchParams({ from, to, limit: 500 });
-      const r = await fetch(`${API}/attendance/admin/all?${params}`, {
-        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
-      });
-      const d = await r.json();
-      setAttendances(d.data?.attendances || d.data || []);
+      // Backend supports month/year OR from/to — use from/to via admin/all with date range
+      // getAllAttendances uses month/year, so compute from dates
+      const fromDate = new Date(from);
+      const toDate   = new Date(to);
+      // Fetch all months in range
+      const allRecords = [];
+      const seen = new Set();
+      for (let d = new Date(fromDate); d <= toDate; d.setMonth(d.getMonth() + 1)) {
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${m}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const params = new URLSearchParams({ year: y, month: m, limit: 500 });
+        const r = await fetch(`${API}/attendance/admin/all?${params}`, {
+          headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+        });
+        const data = await r.json();
+        const records = data.data?.records || data.data?.attendances || [];
+        // Filter to date range
+        records.forEach(rec => {
+          if (rec.date >= from && rec.date <= to) allRecords.push(rec);
+        });
+      }
+      setAttendances(Array.isArray(allRecords) ? allRecords : []);
       setPage(1);
-    } catch { toast.error('Gagal memuat data'); } finally { setLoading(false); }
+    } catch(e) { console.error(e); toast.error('Gagal memuat data'); }
+    finally { setLoading(false); }
   }, [periodMode, customFrom, customTo]);
 
   useEffect(() => { load(); }, [load]);
