@@ -20,6 +20,7 @@ const PayrollSetting = sequelize.define('PayrollSetting', {
 
   // Attendance deduction
   late_deduction_amount:    { type: DataTypes.DECIMAL(15,2), defaultValue: 25000, comment: 'Potongan per keterlambatan' },
+  late_tolerance_minutes:   { type: DataTypes.INTEGER, defaultValue: 0, comment: 'Toleransi terlambat dalam menit (0 = tidak ada toleransi)' },
   alpha_deduction_type:     { type: DataTypes.ENUM('per_day_salary','flat'), defaultValue: 'per_day_salary' },
   alpha_flat_amount:        { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
 

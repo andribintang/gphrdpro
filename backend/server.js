@@ -372,6 +372,7 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN sidebar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
+      `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
       `ALTER TABLE erp_products MODIFY COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
       `ALTER TABLE erp_products MODIFY COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
       // ── Merge store_products into erp_products ──────────────

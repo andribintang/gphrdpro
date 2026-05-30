@@ -202,7 +202,12 @@ const calculateMonthly = async (user, employee, year, month) => {
 
       case 'late_deduction':
         if (att.lateCount > 0) {
-          const perLate = parseFloat(settings.late_deduction_amount) || 25000;
+          // Prioritas: override per karyawan > default_value komponen > settings.late_deduction_amount
+          const perLate = empAllowances[comp.id] !== undefined
+            ? parseFloat(empAllowances[comp.id])
+            : (parseFloat(comp.default_value) > 0
+                ? parseFloat(comp.default_value)
+                : parseFloat(settings.late_deduction_amount) || 25000);
           amount = perLate * att.lateCount;
           note   = `${att.lateCount}x terlambat × Rp ${perLate.toLocaleString('id-ID')}`;
         }
