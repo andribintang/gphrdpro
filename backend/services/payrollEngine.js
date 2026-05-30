@@ -139,11 +139,10 @@ const calculateMonthly = async (user, employee, year, month) => {
         break;
 
       case 'attendance_bonus': {
-        // Uang kerajinan — proporsional kehadiran
-        const base = empAllowances[comp.id] !== undefined ? empAllowances[comp.id] : parseFloat(comp.default_value);
-        const ratio = att.workDays > 0 ? att.presentDays / att.workDays : 0;
-        amount = base * ratio;
-        note   = `${att.presentDays}/${att.workDays} hari × Rp ${base.toLocaleString('id-ID')}`;
+        // Uang kerajinan — per hari hadir (default_value = nilai per hari)
+        const perDay = empAllowances[comp.id] !== undefined ? empAllowances[comp.id] : parseFloat(comp.default_value);
+        amount = perDay * att.presentDays;
+        note   = `${att.presentDays} hari × Rp ${perDay.toLocaleString('id-ID')}`;
         break;
       }
 
