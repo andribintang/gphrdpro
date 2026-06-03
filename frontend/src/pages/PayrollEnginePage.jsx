@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   payrollEngineService, toRupiah, toRupiahShort,
   RUN_STATUS, RUN_TYPES, MONTHS_ID, currentMonth, currentYear,
+  flipService,
 } from '../utils/payrollEngineService';
 
 // ── Shared components ──────────────────────────────────────────
@@ -296,11 +297,18 @@ const RunsTab = () => {
                     </button>
                   )}
                   {run.status === 'approved' && (
-                    <button onClick={() => handlePay(run.id)} disabled={actionLoading === run.id+'-pay'}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white">
-                      {actionLoading === run.id+'-pay' ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
-                      Bayar
-                    </button>
+                    <>
+                      <button onClick={() => setDisburseRun(run)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">
+                        <Banknote className="w-3.5 h-3.5" />
+                        Transfer Flip
+                      </button>
+                      <button onClick={() => handlePay(run.id)} disabled={actionLoading === run.id+'-pay'}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white">
+                        {actionLoading === run.id+'-pay' ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                        Bayar Manual
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1328,11 +1336,174 @@ const PayrollSettingsTab = () => {
   );
 };
 
+
+// ── Disburse Modal (Transfer Gaji via Flip) ───────────────────
+const DisburseModal = ({ run, onClose, onSuccess }) => {
+  const [status,      setStatus]      = useState(null); // disbursement status per item
+  const [loading,     setLoading]     = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [transferring, setTransferring] = useState(false);
+
+  // Load current disbursement status
+  const loadStatus = useCallback(async () => {
+    setLoadingStatus(true);
+    try {
+      const r = await flipService.getStatus(run.id);
+      setStatus(r.data.data);
+    } catch { }
+    finally { setLoadingStatus(false); }
+  }, [run.id]);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const handleDisburse = async () => {
+    if (!confirm(`Transfer gaji ${run.period_label} untuk semua karyawan via Flip?\n\nPastikan saldo Flip mencukupi sebelum melanjutkan.`)) return;
+    setTransferring(true);
+    try {
+      const r = await flipService.disburseRun(run.id);
+      const d = r.data;
+      if (d.data.failed > 0) {
+        toast.error(`${d.data.failed} transfer gagal — cek detail`);
+      } else {
+        toast.success(d.message);
+      }
+      await loadStatus();
+      if (d.data.failed === 0) onSuccess();
+    } catch(e) {
+      toast.error(e.response?.data?.message || 'Gagal melakukan transfer');
+    } finally { setTransferring(false); }
+  };
+
+  const handleRetry = async (itemId) => {
+    try {
+      await flipService.disburseItem(itemId);
+      toast.success('Retry transfer berhasil');
+      loadStatus();
+    } catch(e) { toast.error(e.response?.data?.message || 'Gagal retry'); }
+  };
+
+  const FLIP_STATUS_STYLE = {
+    NONE:      'bg-gray-100 text-gray-500',
+    PENDING:   'bg-yellow-100 text-yellow-700',
+    DONE:      'bg-green-100 text-green-700',
+    FAILED:    'bg-red-100 text-red-600',
+    CANCELLED: 'bg-gray-100 text-gray-500',
+  };
+
+  const summary = status?.summary;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-card)] w-full max-w-2xl my-6 rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <Banknote size={20} className="text-blue-600"/>
+            </div>
+            <div>
+              <h2 className="font-bold text-base">Transfer Gaji via Flip</h2>
+              <p className="text-xs text-[var(--text-muted)]">{run.period_label} · {run.total_employees} karyawan</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg)]">
+            <X size={18}/>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Summary */}
+          {summary && (
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label:'Total', value: summary.total,   color:'gray'   },
+                { label:'Sukses', value: summary.done,   color:'green'  },
+                { label:'Pending', value: summary.pending, color:'yellow' },
+                { label:'Gagal',  value: summary.failed, color:'red'    },
+              ].map(({ label, value, color }) => (
+                <div key={label} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-3 text-center`}>
+                  <p className={`text-2xl font-bold text-${color}-700`}>{value}</p>
+                  <p className={`text-xs text-${color}-600`}>{label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700 space-y-1">
+            <p><strong>Total Transfer:</strong> {toRupiah(run.total_net)}</p>
+            <p><strong>Catatan:</strong> Karyawan yang belum isi rekening bank akan dilewati otomatis.</p>
+            <p>Isi rekening bank karyawan di menu <strong>HRD → Karyawan → Profil → Rekening Bank</strong>.</p>
+          </div>
+
+          {/* Item list */}
+          {loadingStatus ? (
+            <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>
+          ) : (
+            <div className="border border-[var(--border)] rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-[var(--bg)] border-b border-[var(--border)]">
+                    <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">Karyawan</th>
+                    <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">Rekening</th>
+                    <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase tracking-wide">Nominal</th>
+                    <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase tracking-wide">Status</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {(status?.items || []).map(item => (
+                    <tr key={item.id} className="hover:bg-[var(--bg)]">
+                      <td className="px-3 py-2 font-medium">{item.employee_name}</td>
+                      <td className="px-3 py-2 text-[var(--text-muted)]">
+                        {item.bank_code ? (
+                          <span className="font-mono">{item.bank_code.toUpperCase()} ···{item.bank_account_number?.slice(-4)}</span>
+                        ) : <span className="text-red-400">Belum diisi</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold">{toRupiah(item.net_salary)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${FLIP_STATUS_STYLE[item.flip_status] || 'bg-gray-100 text-gray-500'}`}>
+                          {item.flip_status || 'NONE'}
+                        </span>
+                        {item.flip_error && <p className="text-[9px] text-red-500 mt-0.5 max-w-[120px] truncate">{item.flip_error}</p>}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {item.flip_status === 'FAILED' && (
+                          <button onClick={() => handleRetry(item.id)}
+                            className="text-[10px] text-blue-600 hover:underline font-semibold">Retry</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)]">
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            Tutup
+          </button>
+          <button onClick={handleDisburse} disabled={transferring || summary?.done === summary?.total}
+            className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-60 transition-colors">
+            {transferring ? <Loader2 size={15} className="animate-spin"/> : <Banknote size={15}/>}
+            {transferring ? 'Mentransfer...' : summary?.none > 0 ? `Transfer ${summary.none + (summary.failed||0)} Karyawan` : 'Retry Gagal'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function PayrollEnginePage() {
   const { user, isHR } = useAuth();
   const canManage = isHR || user?.role === 'admin';
   const TABS = canManage ? TABS_HR : TABS_EMP;
   const [activeTab, setActiveTab] = useState(canManage ? 'runs' : 'myslip');
+  const [disburseRun, setDisburseRun] = useState(null); // run to disburse
 
   return (
     <div className="w-full animate-fade-in">
@@ -1366,6 +1537,14 @@ export default function PayrollEnginePage() {
       {activeTab === 'loan'        && <LoanTab />}
       {activeTab === 'components' && <ComponentsTab />}
       {activeTab === 'settings'   && <PayrollSettingsTab />}
+
+      {disburseRun && (
+        <DisburseModal
+          run={disburseRun}
+          onClose={() => setDisburseRun(null)}
+          onSuccess={() => { setDisburseRun(null); fetch(); }}
+        />
+      )}
     </div>
   );
 }

@@ -67,3 +67,12 @@ export const RUN_TYPES = {
 export const MONTHS_ID = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 export const currentMonth = () => new Date().getMonth() + 1;
 export const currentYear  = () => new Date().getFullYear();
+
+// ── Flip Disbursement ─────────────────────────────────────────
+export const flipService = {
+  getBanks:        ()       => api.get('/flip/banks'),
+  validateAccount: (data)   => api.post('/flip/validate-account', data),
+  disburseRun:     (runId)  => api.post(`/flip/disburse/${runId}`),
+  disburseItem:    (itemId) => api.post(`/flip/disburse-item/${itemId}`),
+  getStatus:       (runId)  => api.get(`/flip/status/${runId}`),
+};

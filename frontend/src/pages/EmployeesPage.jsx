@@ -681,6 +681,7 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
 
           {/* ── Tunjangan Khusus ─────────────────────────── */}
           {canManage && <AllowanceSection userId={userId} />}
+          {canManage && <BankAccountSection employee={emp} onSaved={fetchData} />}
         </div>
       </div>
       {showFaceReg && <FaceRegisterModal userId={userId} userName={user.name} onClose={() => setShowFaceReg(false)} onSuccess={() => setFaceStatus({ registered: true })} />}
@@ -850,6 +851,163 @@ const AllowanceSection = ({ userId }) => {
 // ════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════
+
+// ── Bank Account Section ──────────────────────────────────────
+const BANK_LIST = [
+  { code:'bca',      name:'BCA' },
+  { code:'bni',      name:'BNI' },
+  { code:'bri',      name:'BRI' },
+  { code:'mandiri',  name:'Mandiri' },
+  { code:'bsi',      name:'BSI' },
+  { code:'cimb',     name:'CIMB Niaga' },
+  { code:'danamon',  name:'Danamon' },
+  { code:'permata',  name:'Permata' },
+  { code:'btn',      name:'BTN' },
+  { code:'mega',     name:'Bank Mega' },
+  { code:'bukopin',  name:'Bukopin' },
+  { code:'sinarmas', name:'Sinar Mas' },
+  { code:'ocbc',     name:'OCBC NISP' },
+  { code:'jago',     name:'Bank Jago' },
+  { code:'seabank',  name:'SeaBank' },
+  { code:'gopay',    name:'GoPay' },
+  { code:'ovo',      name:'OVO' },
+  { code:'dana',     name:'DANA' },
+  { code:'shopeepay',name:'ShopeePay' },
+];
+
+const BankAccountSection = ({ employee: emp, onSaved }) => {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [editing,    setEditing]    = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validated,  setValidated]  = useState(null); // { account_number, bank_code, account_holder }
+  const [form, setForm] = useState({
+    bank_code:           emp?.bank_code           || '',
+    bank_account_number: emp?.bank_account_number || '',
+    bank_account_name:   emp?.bank_account_name   || '',
+  });
+  const sf = (k,v) => { setForm(f=>({...f,[k]:v})); setValidated(null); };
+
+  const handleValidate = async () => {
+    if (!form.bank_code || !form.bank_account_number) { toast.error('Pilih bank dan isi nomor rekening'); return; }
+    setValidating(true);
+    try {
+      const r = await fetch(`${API}/flip/validate-account`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+localStorage.getItem('accessToken') },
+        body: JSON.stringify({ bank_code: form.bank_code, account_number: form.bank_account_number }),
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message);
+      setValidated(d.data);
+      setForm(f => ({ ...f, bank_account_name: d.data.account_holder || f.bank_account_name }));
+      toast.success('Rekening valid: ' + d.data.account_holder);
+    } catch(e) { toast.error('Validasi gagal: ' + e.message); }
+    finally { setValidating(false); }
+  };
+
+  const handleSave = async () => {
+    if (!form.bank_code || !form.bank_account_number || !form.bank_account_name) {
+      toast.error('Semua field rekening wajib diisi'); return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/employees/${emp.user_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+localStorage.getItem('accessToken') },
+        body: JSON.stringify({ bank_code: form.bank_code, bank_account_number: form.bank_account_number, bank_account_name: form.bank_account_name }),
+      });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.message);
+      toast.success('Data rekening disimpan');
+      setEditing(false);
+      if (onSaved) onSaved();
+    } catch(e) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const hasBank = emp?.bank_code && emp?.bank_account_number;
+
+  return (
+    <div className="border-t border-[var(--border)] px-5 py-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+          🏦 Rekening Bank
+        </p>
+        <button onClick={() => setEditing(v=>!v)}
+          className="text-xs font-semibold text-[var(--brand-600)] hover:underline">
+          {editing ? '✕ Tutup' : (hasBank ? '✏️ Edit' : '+ Tambah')}
+        </button>
+      </div>
+
+      {/* Current data */}
+      {!editing && (
+        hasBank ? (
+          <div className="bg-[var(--bg)] rounded-xl px-3 py-2.5 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold uppercase">
+                {BANK_LIST.find(b=>b.code===emp.bank_code)?.name || emp.bank_code}
+              </span>
+              <span className="text-sm font-mono font-semibold">{emp.bank_account_number}</span>
+            </div>
+            <p className="text-xs text-[var(--text-muted)]">{emp.bank_account_name}</p>
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--text-muted)] text-center py-1">
+            Belum ada data rekening bank
+          </p>
+        )
+      )}
+
+      {/* Edit form */}
+      {editing && (
+        <div className="space-y-2">
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Bank</label>
+            <select value={form.bank_code} onChange={e => sf('bank_code', e.target.value)} className="input-base text-sm">
+              <option value="">-- Pilih Bank --</option>
+              {BANK_LIST.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Nomor Rekening</label>
+            <div className="flex gap-2">
+              <input value={form.bank_account_number}
+                onChange={e => sf('bank_account_number', e.target.value)}
+                placeholder="Nomor rekening" className="input-base text-sm flex-1" />
+              <button onClick={handleValidate} disabled={validating}
+                className="btn-secondary text-xs h-9 px-3 flex-shrink-0 disabled:opacity-60">
+                {validating ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : 'Validasi'}
+              </button>
+            </div>
+            {validated && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                ✅ Valid: {validated.account_holder}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Nama Pemilik Rekening</label>
+            <input value={form.bank_account_name}
+              onChange={e => sf('bank_account_name', e.target.value)}
+              placeholder="Nama sesuai buku tabungan" className="input-base text-sm" />
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              Klik "Validasi" untuk mengisi otomatis dari data bank
+            </p>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setEditing(false)} className="btn-secondary flex-1 h-9 text-sm">Batal</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 h-9 text-sm gap-1 disabled:opacity-60">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : '💾'}
+              {saving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function EmployeesPage() {
   const { user: currentUser, isHR } = useAuth();
   const canManage = isHR || currentUser?.role === 'admin';

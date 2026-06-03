@@ -53,6 +53,15 @@ const PayrollItem = sequelize.define('PayrollItem', {
   thr_months_worked:  { type: DataTypes.INTEGER, allowNull: true },
   thr_eligibility:    { type: DataTypes.ENUM('full','proportional','not_eligible'), allowNull: true },
 
+  // ── Flip Disbursement fields ─────────────────────────────
+  flip_disbursement_id: { type: DataTypes.STRING(100), allowNull: true },
+  flip_status:          { type: DataTypes.ENUM('NONE','PENDING','DONE','FAILED','CANCELLED'), defaultValue: 'NONE' },
+  flip_error:           { type: DataTypes.TEXT, allowNull: true },
+  transfer_amount:      { type: DataTypes.DECIMAL(15,2), allowNull: true },
+  transfer_at:          { type: DataTypes.DATE, allowNull: true },
+  bank_code:            { type: DataTypes.STRING(20), allowNull: true },
+  bank_account_number:  { type: DataTypes.STRING(50), allowNull: true },
+  bank_account_name:    { type: DataTypes.STRING(100), allowNull: true },
   status: {
     type: DataTypes.ENUM('draft','approved','paid'),
     defaultValue: 'draft',

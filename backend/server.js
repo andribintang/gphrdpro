@@ -19,6 +19,7 @@ const payrollEngineRoutes = require('./routes/payrollEngine');
 const incentiveRoutes      = require('./routes/incentive');
 const companyRoutes        = require('./routes/company');
 const erpRoutes            = require('./routes/erp');
+const flipRoutes           = require('./routes/flip');
 
 const app  = express();
 app.set('trust proxy', 1); // Railway/Railway proxy
@@ -374,6 +375,19 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      // Bank account fields on employees
+      `ALTER TABLE employees ADD COLUMN bank_code VARCHAR(20) NULL COMMENT 'Kode bank'`,
+      `ALTER TABLE employees ADD COLUMN bank_account_number VARCHAR(50) NULL COMMENT 'Nomor rekening'`,
+      `ALTER TABLE employees ADD COLUMN bank_account_name VARCHAR(100) NULL COMMENT 'Nama pemilik rekening'`,
+      // Flip disbursement fields on payroll_items
+      `ALTER TABLE payroll_items ADD COLUMN flip_disbursement_id VARCHAR(100) NULL`,
+      `ALTER TABLE payroll_items ADD COLUMN flip_status ENUM('NONE','PENDING','DONE','FAILED','CANCELLED') DEFAULT 'NONE'`,
+      `ALTER TABLE payroll_items ADD COLUMN flip_error TEXT NULL`,
+      `ALTER TABLE payroll_items ADD COLUMN transfer_amount DECIMAL(15,2) NULL`,
+      `ALTER TABLE payroll_items ADD COLUMN transfer_at DATETIME NULL`,
+      `ALTER TABLE payroll_items ADD COLUMN bank_code VARCHAR(20) NULL`,
+      `ALTER TABLE payroll_items ADD COLUMN bank_account_number VARCHAR(50) NULL`,
+      `ALTER TABLE payroll_items ADD COLUMN bank_account_name VARCHAR(100) NULL`,
       `ALTER TABLE erp_products MODIFY COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
       `ALTER TABLE erp_products MODIFY COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
       // ── Merge store_products into erp_products ──────────────
@@ -889,6 +903,7 @@ app.use('/api/payroll-engine', payrollEngineRoutes);
 app.use('/api/incentive',      incentiveRoutes);
 app.use('/api/company',        companyRoutes);
 app.use('/api/erp',            erpRoutes);
+app.use('/api/flip',           flipRoutes);
 
 // ── 404 + Error ───────────────────────────────────────────────
 app.use(notFound);

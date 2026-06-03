@@ -58,6 +58,22 @@ const Employee = sequelize.define('Employee', {
     type: DataTypes.STRING(20),
     allowNull: true,
   },
+  // ── Bank Account for Salary Disbursement ─────────────────
+  bank_code: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: 'Kode bank: BCA, BNI, BRI, MANDIRI, dll',
+  },
+  bank_account_number: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    comment: 'Nomor rekening bank',
+  },
+  bank_account_name: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Nama pemilik rekening (harus sesuai nama di bank)',
+  },
 }, {
   tableName: 'employees',
   timestamps: true,
