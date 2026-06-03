@@ -269,12 +269,17 @@ const updateProduct = async (req, res, next) => {
 };
 
 const deleteProduct = async (req, res, next) => {
+  const t = await sequelize.transaction();
   try {
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ success:false, message:'Tidak ditemukan' });
-    await product.update({ is_active: false });
-    return res.json({ success:true, message:'Dinonaktifkan' });
-  } catch (err) { next(err); }
+    // Delete stock first (FK constraint)
+    await Stock.destroy({ where: { product_id: req.params.id }, transaction: t });
+    await StockMovement.destroy({ where: { product_id: req.params.id }, transaction: t });
+    await product.destroy({ transaction: t });
+    await t.commit();
+    return res.json({ success:true, message:'Produk berhasil dihapus' });
+  } catch (err) { await t.rollback(); next(err); }
 };
 
 const adjustStock = async (req, res, next) => {

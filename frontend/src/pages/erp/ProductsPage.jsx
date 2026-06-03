@@ -242,7 +242,47 @@ const EMPTY = {
 function ProductModal({ product, allCategories, onClose, onSuccess }) {
   const isEdit = !!product;
   const [tab, setTab] = useState('basic');
-  const [form, setForm] = useState(() => product ? { ...EMPTY, ...product, images: product.images || [], variants: product.variants || {} } : { ...EMPTY });
+  const [form, setForm] = useState(() => {
+    if (!product) return { ...EMPTY };
+    // Map API fields → form fields
+    const p = product;
+    return {
+      ...EMPTY,
+      ...p,
+      // Basic
+      branch_id:    p.branch_id   || 1,
+      category_id:  p.category_id || '',
+      name:         p.name        || '',
+      sku:          p.sku         || '',
+      barcode:      p.barcode     || '',
+      unit:         p.unit        || 'pcs',
+      buy_price:    p.buy_price   || 0,
+      sell_price:   p.sell_price  || 0,
+      sell_price_mp: p.sell_price_mp || '',
+      sell_price_wa: p.sell_price_wa || '',
+      stock_min:    p.stock_min   || 0,
+      weight:       p.weight      || 0,
+      notes:        p.notes       || '',
+      // Store fields — map from erp_products store_* columns
+      images:       Array.isArray(p.store_images)  ? p.store_images  : (p.images || []),
+      variants:     typeof p.store_variants === 'object' && p.store_variants ? p.store_variants : (p.variants || {}),
+      publish_gpdistro:  !!(p.store_active_gpd),
+      publish_gpracing:  !!(p.store_active_gpr),
+      store_price_gpdistro:    p.branch_id === 2 ? (p.store_price || p.sell_price_mp || '') : '',
+      store_price_compare_gpdistro: p.branch_id === 2 ? (p.store_price_compare || '') : '',
+      store_price_gpracing:    p.branch_id === 1 ? (p.store_price || p.sell_price_mp || '') : '',
+      store_price_compare_gpracing: p.branch_id === 1 ? (p.store_price_compare || '') : '',
+      store_category_gpdistro: p.branch_id === 2 ? String(p.category_id || '') : '',
+      store_category_gpracing: p.branch_id === 1 ? String(p.category_id || '') : '',
+      short_desc:   p.store_short_desc   || '',
+      description:  p.store_description || '',
+      meta_title:   p.store_meta_title   || '',
+      meta_desc:    p.store_meta_desc    || '',
+      store_slug:   p.store_slug         || '',
+      store_featured: !!(p.store_featured),
+      tags:         Array.isArray(p.store_tags) ? p.store_tags.join(', ') : (p.store_tags || ''),
+    };
+  });
   const [saving, setSaving] = useState(false);
   const [storeCategories, setStoreCategories] = useState({ gpdistro: [], gpracing: [] });
 
@@ -289,8 +329,16 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
             : form.store_category_gpracing;
           return cat ? parseInt(cat) : (form.category_id ? parseInt(form.category_id) : null);
         })(),
-        store_price:         parseFloat(form.store_price_gpracing || form.store_price_gpdistro || form.sell_price_mp || form.sell_price) || 0,
-        store_price_compare: parseFloat(form.store_price_compare_gpracing || form.store_price_compare_gpdistro) || 0,
+        store_price:         parseFloat(
+                               parseInt(form.branch_id) === 2
+                                 ? (form.store_price_gpdistro || form.sell_price_mp || form.sell_price)
+                                 : (form.store_price_gpracing || form.sell_price_mp || form.sell_price)
+                             ) || 0,
+        store_price_compare: parseFloat(
+                               parseInt(form.branch_id) === 2
+                                 ? form.store_price_compare_gpdistro
+                                 : form.store_price_compare_gpracing
+                             ) || 0,
         store_active_gpd:    form.publish_gpdistro ? 1 : 0,
         store_active_gpr:    form.publish_gpracing ? 1 : 0,
         store_images:        form.images || [],
