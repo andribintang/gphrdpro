@@ -333,21 +333,92 @@ const updateCustomer = async (req, res, next) => {
 // ── Import ────────────────────────────────────────────────────
 const importProducts = async (req, res, next) => {
   try {
-    const { branch_id, rows } = req.body;
-    let success = 0, failed = 0, errors = [];
+    const { branch_id, rows, filename } = req.body;
+    const bid = parseInt(branch_id) || 1;
+    let success = 0, updated = 0, failed = 0, errors = [];
+
+    const num = (v, d=0) => { const n = parseFloat(v); return isNaN(n) ? d : n; };
+    const int = (v, d=0) => { const n = parseInt(v);   return isNaN(n) ? d : n; };
+    const str = (v)       => (v == null || v === '') ? null : String(v).trim();
+
     for (const row of (rows||[])) {
       try {
-        const existing = row.sku ? await Product.findOne({ where: { sku: row.sku, branch_id } }) : null;
-        if (existing) { await existing.update({ ...row, branch_id }); }
-        else {
-          const p = await Product.create({ ...row, branch_id, is_active: true });
-          await Stock.findOrCreate({ where: { product_id: p.id, branch_id }, defaults: { qty: parseInt(row.initial_stock||0) } });
+        if (!row.name) { failed++; errors.push(`Baris dilewati: nama kosong`); continue; }
+
+        // Build safe data object — only valid columns
+        const data = {
+          branch_id:         bid,
+          name:              str(row.name),
+          sku:               str(row.sku),
+          barcode:           str(row.barcode),
+          category_id:       row.category_id ? int(row.category_id) : null,
+          unit:              str(row.unit) || 'pcs',
+          buy_price:         num(row.buy_price),
+          sell_price:        num(row.sell_price),
+          sell_price_mp:     row.sell_price_mp ? num(row.sell_price_mp) : null,
+          sell_price_wa:     row.sell_price_wa ? num(row.sell_price_wa) : null,
+          weight:            num(row.weight, 0),
+          stock_min:         int(row.stock_min, 0),
+          notes:             str(row.notes),
+          is_active:         true,
+          // Store fields
+          store_price:       row.store_price ? num(row.store_price) : num(row.sell_price_mp || row.sell_price),
+          store_active_gpd:  bid === 2 ? (int(row.store_active, 0) ? 1 : 0) : 0,
+          store_active_gpr:  bid === 1 ? (int(row.store_active, 0) ? 1 : 0) : 0,
+          store_short_desc:  str(row.store_short_desc),
+        };
+
+        const existing = row.sku ? await Product.findOne({ where: { sku: data.sku, branch_id: bid } }) : null;
+        if (existing) {
+          const { is_active, ...updateData } = data;
+          await existing.update(updateData);
+          updated++;
+        } else {
+          const [, insertMeta] = await sequelize.query(
+            `INSERT INTO erp_products (branch_id, category_id, name, sku, barcode, unit,
+               buy_price, sell_price, sell_price_mp, sell_price_wa, weight, stock_min,
+               notes, is_active, store_price, store_active_gpd, store_active_gpr,
+               store_short_desc, created_at, updated_at)
+             VALUES (
+               ${bid},
+               ${data.category_id || 'NULL'},
+               ${sequelize.escape(data.name)},
+               ${sequelize.escape(data.sku || '')},
+               ${sequelize.escape(data.barcode || '')},
+               ${sequelize.escape(data.unit)},
+               ${data.buy_price}, ${data.sell_price},
+               ${data.sell_price_mp || 'NULL'},
+               ${data.sell_price_wa || 'NULL'},
+               ${data.weight}, ${data.stock_min},
+               ${sequelize.escape(data.notes || '')},
+               1,
+               ${data.store_price}, ${data.store_active_gpd}, ${data.store_active_gpr},
+               ${sequelize.escape(data.store_short_desc || '')},
+               NOW(), NOW()
+             )`
+          );
+          const productId = insertMeta?.insertId
+            || await sequelize.query('SELECT LAST_INSERT_ID() as id').then(([[r]]) => r?.id);
+          if (productId) {
+            await sequelize.query(
+              `INSERT INTO erp_stock (product_id, branch_id, qty, created_at, updated_at)
+               VALUES (${productId}, ${bid}, ${int(row.initial_stock, 0)}, NOW(), NOW())`
+            );
+          }
+          success++;
         }
-        success++;
-      } catch (e) { failed++; errors.push(`Row ${success+failed}: ${e.message}`); }
+      } catch (e) {
+        failed++;
+        errors.push(`Baris "${row.name||'?'}": ${e.message}`);
+      }
     }
-    const log = await ImportLog.create({ type:'products', filename: req.body.filename||'import', total: rows?.length||0, success, failed, errors: JSON.stringify(errors), created_by: req.user?.id });
-    return res.json({ success:true, data:{ success, failed, errors } });
+
+    await ImportLog.create({
+      type: 'products', filename: filename || 'import',
+      total: rows?.length || 0, success: success + updated, failed,
+      errors: JSON.stringify(errors), created_by: req.user?.id
+    });
+    return res.json({ success: true, data: { success, updated, failed, errors } });
   } catch (err) { next(err); }
 };
 
