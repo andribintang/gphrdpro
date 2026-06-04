@@ -273,6 +273,7 @@ const update = async (req, res, next) => {
       name, role,
       nip, position, department, salary_base, join_date, status,
       phone, address, emergency_contact, emergency_phone,
+      bank_code, bank_account_number, bank_account_name,
     } = req.body;
 
     // NIP uniqueness check (if changing)
@@ -306,6 +307,10 @@ const update = async (req, res, next) => {
       if (join_date)    empUpdates.join_date    = join_date;
       if (status)       empUpdates.status       = status;
     }
+    // Bank account — can be updated by HR/admin or self
+    if (bank_code           !== undefined) empUpdates.bank_code           = bank_code;
+    if (bank_account_number !== undefined) empUpdates.bank_account_number = bank_account_number;
+    if (bank_account_name   !== undefined) empUpdates.bank_account_name   = bank_account_name;
 
     if (Object.keys(empUpdates).length) await employee.update(empUpdates, { transaction: t });
     await t.commit();
