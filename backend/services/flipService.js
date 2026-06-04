@@ -1,15 +1,31 @@
 // ── Flip for Business Disbursement Service ────────────────────
 // Docs: https://docs.flip.id/
+// Sandbox base URL: https://bigflip.id/big_sandbox_api/v2
+// Production base URL: https://bigflip.id/api/v2
 const axios = require('axios');
 
-const FLIP_API_URL  = process.env.FLIP_API_URL  || 'https://bigflip.id/api/v2';
-const FLIP_SECRET   = process.env.FLIP_SECRET_KEY || '';
+const FLIP_API_URL          = process.env.FLIP_API_URL       || 'https://bigflip.id/api/v2';
+const FLIP_SECRET           = process.env.FLIP_SECRET_KEY    || '';
 const FLIP_VALIDATION_TOKEN = process.env.FLIP_VALIDATION_TOKEN || '';
 
-// Axios instance dengan Basic Auth (Flip pakai secret key sebagai username)
+// Bank Account Inquiry always uses v2 (Flip pinned, no v3)
+// Derive inquiry base URL from main URL
+const FLIP_INQUIRY_URL = FLIP_API_URL.includes('big_sandbox_api')
+  ? 'https://bigflip.id/big_sandbox_api/v2'
+  : 'https://bigflip.id/api/v2';
+
+// Axios instance — Basic Auth, secret key as username, empty password
 const flipApi = axios.create({
   baseURL: FLIP_API_URL,
-  auth: { username: FLIP_SECRET, password: '' },
+  auth:    { username: FLIP_SECRET, password: '' },
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  timeout: 30000,
+});
+
+// Separate instance for inquiry (always v2)
+const flipInquiryApi = axios.create({
+  baseURL: FLIP_INQUIRY_URL,
+  auth:    { username: FLIP_SECRET, password: '' },
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   timeout: 30000,
 });
@@ -20,17 +36,22 @@ const getBanks = async () => {
   return r.data;
 };
 
-// ── Validate bank account ─────────────────────────────────────
+// ── Validate bank account (inquiry) ──────────────────────────
+// Endpoint: POST /disbursement/bank-account-inquiry
+// Docs: https://docs.flip.id/docs/api/account-inquiry/
 const validateBankAccount = async (bankCode, accountNumber) => {
   const params = new URLSearchParams({
     account_number: accountNumber,
     bank_code:      bankCode,
   });
-  const r = await flipApi.post('/disbursement/bank-account-inquiry', params);
-  return r.data; // { account_number, bank_code, account_holder }
+  const r = await flipInquiryApi.post('/disbursement/bank-account-inquiry', params);
+  // Response: { bank_code, account_number, account_holder, status }
+  return r.data;
 };
 
 // ── Create single disbursement ────────────────────────────────
+// Endpoint: POST /disbursement
+// Docs: https://docs.flip.id/docs/api/money-transfer/create-disbursement
 const createDisbursement = async ({ idempotencyKey, amount, bankCode, accountNumber, accountName, remark }) => {
   const params = new URLSearchParams({
     account_number: accountNumber,
@@ -42,7 +63,7 @@ const createDisbursement = async ({ idempotencyKey, amount, bankCode, accountNum
     headers: { 'idempotency-key': idempotencyKey },
   });
   return r.data;
-  // Returns: { id, amount, status, timestamp, bank_code, account_number, recipient_name, ... }
+  // { id, amount, status, timestamp, bank_code, account_number, recipient_name, ... }
 };
 
 // ── Get disbursement status ───────────────────────────────────
@@ -62,7 +83,7 @@ const validateWebhook = (token) => {
   return token === FLIP_VALIDATION_TOKEN;
 };
 
-// ── Map Flip status to our status ────────────────────────────
+// ── Map Flip status → internal status ────────────────────────
 const mapStatus = (flipStatus) => {
   const map = {
     'PENDING':   'PENDING',
@@ -74,33 +95,33 @@ const mapStatus = (flipStatus) => {
   return map[flipStatus] || 'PENDING';
 };
 
-// ── List of Indonesian banks supported by Flip ────────────────
+// ── Indonesian bank list supported by Flip ────────────────────
 const BANK_LIST = [
-  { code: 'bca',     name: 'BCA' },
-  { code: 'bni',     name: 'BNI' },
-  { code: 'bri',     name: 'BRI' },
-  { code: 'mandiri', name: 'Mandiri' },
-  { code: 'bsi',     name: 'BSI' },
-  { code: 'cimb',    name: 'CIMB Niaga' },
-  { code: 'danamon', name: 'Danamon' },
-  { code: 'permata', name: 'Permata' },
-  { code: 'btn',     name: 'BTN' },
-  { code: 'panin',   name: 'Panin' },
-  { code: 'mega',    name: 'Bank Mega' },
-  { code: 'bukopin', name: 'Bukopin' },
-  { code: 'sinarmas',name: 'Sinar Mas' },
-  { code: 'ocbc',    name: 'OCBC NISP' },
-  { code: 'uob',     name: 'UOB' },
-  { code: 'muamalat',name: 'Muamalat' },
-  { code: 'maybank', name: 'Maybank' },
-  { code: 'jago',    name: 'Bank Jago' },
-  { code: 'allo',    name: 'Allo Bank' },
-  { code: 'seabank', name: 'SeaBank' },
-  { code: 'neo',     name: 'Bank Neo Commerce' },
-  { code: 'blu',     name: 'blu by BCA' },
-  { code: 'gopay',   name: 'GoPay' },
-  { code: 'ovo',     name: 'OVO' },
-  { code: 'dana',    name: 'DANA' },
+  { code: 'bca',       name: 'BCA' },
+  { code: 'bni',       name: 'BNI' },
+  { code: 'bri',       name: 'BRI' },
+  { code: 'mandiri',   name: 'Mandiri' },
+  { code: 'bsi',       name: 'BSI' },
+  { code: 'cimb',      name: 'CIMB Niaga' },
+  { code: 'danamon',   name: 'Danamon' },
+  { code: 'permata',   name: 'Permata' },
+  { code: 'btn',       name: 'BTN' },
+  { code: 'panin',     name: 'Panin' },
+  { code: 'mega',      name: 'Bank Mega' },
+  { code: 'bukopin',   name: 'Bukopin' },
+  { code: 'sinarmas',  name: 'Sinar Mas' },
+  { code: 'ocbc',      name: 'OCBC NISP' },
+  { code: 'uob',       name: 'UOB' },
+  { code: 'muamalat',  name: 'Muamalat' },
+  { code: 'maybank',   name: 'Maybank' },
+  { code: 'jago',      name: 'Bank Jago' },
+  { code: 'allo',      name: 'Allo Bank' },
+  { code: 'seabank',   name: 'SeaBank' },
+  { code: 'neo',       name: 'Bank Neo Commerce' },
+  { code: 'blu',       name: 'blu by BCA' },
+  { code: 'gopay',     name: 'GoPay' },
+  { code: 'ovo',       name: 'OVO' },
+  { code: 'dana',      name: 'DANA' },
   { code: 'shopeepay', name: 'ShopeePay' },
 ];
 
