@@ -570,13 +570,12 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
   const [showFaceReg, setShowFaceReg] = useState(false);
   const { user: currentUser } = useAuth();
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     setLoading(true);
     Promise.all([
       employeeService.getOne(userId),
       attendanceService.getFaceStatus(userId),
       incentiveService.getEmployees({ limit: 1 }).then(r => {
-        // Get all inc employees and find by user_id
         return api.get('/incentive/employees').then(er => er.data.data.employees.find(e => e.user_id === userId));
       }).catch(() => null),
     ]).then(([r, fr, incEmp]) => {
@@ -585,6 +584,8 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
     }).catch(() => toast.error('Gagal memuat profil'))
       .finally(() => setLoading(false));
   }, [userId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
