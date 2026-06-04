@@ -201,29 +201,56 @@ const getRunDisbursementStatus = async (req, res, next) => {
 };
 
 // ── POST /api/flip/webhook ────────────────────────────────────
-// Flip akan POST ke sini saat status disbursement berubah
+// Flip POST ke sini saat status disbursement berubah
+// Flip kirim: application/x-www-form-urlencoded
+// Header: x-callback-token
 const handleWebhook = async (req, res, next) => {
   try {
-    const token = req.headers['x-callback-token'] || req.body.token;
-    if (!flip.validateWebhook(token)) {
-      return res.status(401).json({ success: false, message: 'Invalid webhook token' });
+    // Flip kirim token di header x-callback-token
+    const token = req.headers['x-callback-token'];
+
+    // Jika FLIP_VALIDATION_TOKEN belum di-set, skip validasi (development)
+    if (FLIP_VALIDATION_TOKEN && token !== FLIP_VALIDATION_TOKEN) {
+      console.warn('Flip webhook: invalid token', token);
+      return res.status(200).json({ success: false, message: 'Invalid token' }); // 200 agar Flip tidak retry terus
     }
 
-    const { id, status, reason } = req.body;
-    if (!id) return res.status(400).json({ success: false });
+    // Flip kirim data sebagai form-urlencoded
+    // data berisi JSON string: { id, amount, status, bank_code, ... }
+    const body = req.body;
+    console.log('Flip webhook received:', JSON.stringify(body));
 
-    // Find item by flip_disbursement_id
+    // Flip bisa kirim sebagai field 'data' (JSON string) atau langsung
+    let data = body;
+    if (body.data && typeof body.data === 'string') {
+      try { data = JSON.parse(body.data); } catch { data = body; }
+    }
+
+    const id     = data.id     || body.id;
+    const status = data.status || body.status;
+    const reason = data.reason || body.reason || null;
+
+    if (!id) {
+      console.warn('Flip webhook: no id in body', body);
+      return res.status(200).json({ success: true }); // ACK
+    }
+
+    // Find PayrollItem by flip_disbursement_id
     const item = await PayrollItem.findOne({ where: { flip_disbursement_id: String(id) } });
-    if (!item) return res.status(200).json({ success: true }); // ACK even if not found
+    if (!item) {
+      console.warn('Flip webhook: item not found for id', id);
+      return res.status(200).json({ success: true }); // ACK
+    }
 
     const newStatus = flip.mapStatus(status);
     await item.update({
-      flip_status:  newStatus,
-      flip_error:   reason || null,
-      transfer_at:  newStatus === 'DONE' ? new Date() : item.transfer_at,
+      flip_status: newStatus,
+      flip_error:  reason,
+      transfer_at: newStatus === 'DONE' ? new Date() : item.transfer_at,
+      status:      newStatus === 'DONE' ? 'paid' : item.status,
     });
 
-    // If all items in run are DONE, mark run as paid
+    // If all items DONE → mark run as paid
     if (newStatus === 'DONE') {
       const allItems = await PayrollItem.findAll({ where: { payroll_run_id: item.payroll_run_id } });
       const allDone  = allItems.every(i => ['DONE','CANCELLED'].includes(i.flip_status));
@@ -235,8 +262,15 @@ const handleWebhook = async (req, res, next) => {
       }
     }
 
+    console.log(`Flip webhook: item ${item.id} → ${newStatus}`);
     return res.status(200).json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('Flip webhook error:', err.message);
+    return res.status(200).json({ success: true }); // Always 200 to prevent Flip retry loop
+  }
 };
+
+// Get FLIP_VALIDATION_TOKEN for webhook
+const FLIP_VALIDATION_TOKEN = process.env.FLIP_VALIDATION_TOKEN || '';
 
 module.exports = { getBanks, validateAccount, disburseRun, disburseItem, getRunDisbursementStatus, handleWebhook };
