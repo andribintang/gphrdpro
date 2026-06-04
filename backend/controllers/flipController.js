@@ -165,15 +165,38 @@ const getRunDisbursementStatus = async (req, res, next) => {
     const items = await PayrollItem.findAll({
       where: { payroll_run_id: req.params.runId },
       attributes: ['id','employee_name','net_salary','flip_status','flip_error','transfer_at','bank_code','bank_account_number'],
+      include: [{
+        model: User, as: 'user',
+        attributes: ['id'],
+        include: [{ model: Employee, as: 'employee', attributes: ['bank_code','bank_account_number','bank_account_name'] }],
+      }],
     });
+
+    // Merge: use item bank if already transferred, else use employee bank
+    const mapped = items.map(item => {
+      const empBank = item.user?.employee;
+      return {
+        id:                  item.id,
+        employee_name:       item.employee_name,
+        net_salary:          item.net_salary,
+        flip_status:         item.flip_status,
+        flip_error:          item.flip_error,
+        transfer_at:         item.transfer_at,
+        // Prioritize item bank (already used for transfer), fallback to employee bank
+        bank_code:           item.bank_code           || empBank?.bank_code           || null,
+        bank_account_number: item.bank_account_number || empBank?.bank_account_number || null,
+        bank_account_name:   item.bank_account_name   || empBank?.bank_account_name   || null,
+      };
+    });
+
     const summary = {
-      total:   items.length,
-      done:    items.filter(i => i.flip_status === 'DONE').length,
-      pending: items.filter(i => i.flip_status === 'PENDING').length,
-      failed:  items.filter(i => i.flip_status === 'FAILED').length,
-      none:    items.filter(i => i.flip_status === 'NONE').length,
+      total:   mapped.length,
+      done:    mapped.filter(i => i.flip_status === 'DONE').length,
+      pending: mapped.filter(i => i.flip_status === 'PENDING').length,
+      failed:  mapped.filter(i => i.flip_status === 'FAILED').length,
+      none:    mapped.filter(i => i.flip_status === 'NONE').length,
     };
-    return res.json({ success: true, data: { items, summary } });
+    return res.json({ success: true, data: { items: mapped, summary } });
   } catch (err) { next(err); }
 };
 
