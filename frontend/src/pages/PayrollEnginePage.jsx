@@ -180,6 +180,7 @@ const SlipModal = ({ itemId, onClose }) => {
 const RunsTab = () => {
   const [runs, setRuns]       = useState([]);
   const [loading, setLoading] = useState(true);
+  const [disburseRun, setDisburseRun] = useState(null);
   const [filterType, setType] = useState('');
   const [showGenerate, setShowGenerate] = useState(false);
   const [selectedRun, setSelectedRun]   = useState(null);
@@ -1503,7 +1504,6 @@ export default function PayrollEnginePage() {
   const canManage = isHR || user?.role === 'admin';
   const TABS = canManage ? TABS_HR : TABS_EMP;
   const [activeTab, setActiveTab] = useState(canManage ? 'runs' : 'myslip');
-  const [disburseRun, setDisburseRun] = useState(null); // run to disburse
 
   return (
     <div className="w-full animate-fade-in">
@@ -1538,13 +1538,6 @@ export default function PayrollEnginePage() {
       {activeTab === 'components' && <ComponentsTab />}
       {activeTab === 'settings'   && <PayrollSettingsTab />}
 
-      {disburseRun && (
-        <DisburseModal
-          run={disburseRun}
-          onClose={() => setDisburseRun(null)}
-          onSuccess={() => { setDisburseRun(null); fetch(); }}
-        />
-      )}
     </div>
   );
 }
