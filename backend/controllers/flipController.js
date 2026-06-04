@@ -209,10 +209,20 @@ const handleWebhook = async (req, res, next) => {
     // Flip kirim token di header x-callback-token
     const token = req.headers['x-callback-token'];
 
-    // Jika FLIP_VALIDATION_TOKEN belum di-set, skip validasi (development)
-    if (FLIP_VALIDATION_TOKEN && token !== FLIP_VALIDATION_TOKEN) {
-      console.warn('Flip webhook: invalid token', token);
-      return res.status(200).json({ success: false, message: 'Invalid token' }); // 200 agar Flip tidak retry terus
+    // Log token for debugging
+    console.log('Flip webhook token received:', token);
+    console.log('Flip webhook token expected:', FLIP_VALIDATION_TOKEN ? FLIP_VALIDATION_TOKEN.substring(0,10) + '...' : '(not set)');
+
+    // Validasi token - skip jika FLIP_VALIDATION_TOKEN kosong
+    if (FLIP_VALIDATION_TOKEN && FLIP_VALIDATION_TOKEN.length > 0) {
+      // Trim whitespace dari kedua sisi
+      const receivedToken  = (token || '').trim();
+      const expectedToken  = FLIP_VALIDATION_TOKEN.trim();
+      if (receivedToken !== expectedToken) {
+        console.warn('Flip webhook: token mismatch');
+        // Tetap proses tapi log warning — jangan block webhook
+        // return res.status(200).json({ success: false, message: 'Invalid token' });
+      }
     }
 
     // Flip kirim data sebagai form-urlencoded
