@@ -350,6 +350,13 @@ const RunsTab = () => {
 
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onSuccess={fetch} existingRuns={runs} />}
       {selectedSlip && <SlipModal itemId={selectedSlip} onClose={() => setSelectedSlip(null)} />}
+      {disburseRun && (
+        <DisburseModal
+          run={disburseRun}
+          onClose={() => setDisburseRun(null)}
+          onSuccess={() => { setDisburseRun(null); fetch(); }}
+        />
+      )}
     </div>
   );
 };
