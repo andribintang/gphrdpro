@@ -681,7 +681,7 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
 
           {/* ── Tunjangan Khusus ─────────────────────────── */}
           {canManage && <AllowanceSection userId={userId} />}
-          {canManage && <BankAccountSection employee={emp} onSaved={fetchData} />}
+          {canManage && <BankAccountSection employee={emp} onSaved={load} />}
         </div>
       </div>
       {showFaceReg && <FaceRegisterModal userId={userId} userName={user.name} onClose={() => setShowFaceReg(false)} onSuccess={() => setFaceStatus({ registered: true })} />}
