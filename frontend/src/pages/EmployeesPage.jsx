@@ -75,7 +75,7 @@ const uploadPhoto = async (file) => {
   const fd = new FormData();
   fd.append('file', compressed);
   fd.append('upload_preset', UPLOAD_PRESET);
-  fd.append('folder', 'employee_photos');
+  // folder handled by Cloudinary preset
   const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
     method: 'POST', body: fd,
   });
@@ -700,7 +700,15 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
                           const d = await r.json();
                           if (!d.success) throw new Error(d.message || 'Gagal simpan foto');
                           toast.success('Foto berhasil diupload!', { id: 'photo-upload' });
-                          fetchData(); // refresh data including photo_url
+                          // Update state immediately so photo shows without waiting for refetch
+                          setData(prev => prev ? {
+                            ...prev,
+                            user: {
+                              ...prev.user,
+                              employee: { ...prev.user.employee, photo_url: url }
+                            }
+                          } : prev);
+                          fetchData(); // also refresh in background
                         } catch(err) {
                           toast.error('Gagal: ' + err.message, { id: 'photo-upload' });
                         }
