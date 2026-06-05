@@ -5,7 +5,7 @@ import {
   Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
   Mail, Shield, Camera, ShieldCheck, Link2
-, CreditCard, History, ChevronLeft} from 'lucide-react';
+, CreditCard, History, ChevronLeft, Upload, ChevronRight} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
