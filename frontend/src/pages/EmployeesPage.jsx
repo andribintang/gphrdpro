@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Users, Search, Plus, X, ChevronRight, Filter, Eye,
+  Users, Search, Plus, X, ChevronRight, ChevronLeft, Filter, Eye,
   Loader2, RefreshCw, Phone, MapPin, AlertTriangle,
   Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
-  Mail, Shield, Camera, ShieldCheck, Link2
-, CreditCard, History, ChevronLeft, Upload, ChevronRight} from 'lucide-react';
+  Mail, Shield, Camera, ShieldCheck, Link2,
+  CreditCard, History, Upload, Banknote,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
