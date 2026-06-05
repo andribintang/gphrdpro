@@ -568,6 +568,7 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
   const [loading, setLoading]   = useState(true);
   const [faceStatus, setFaceStatus] = useState(null);
   const [showFaceReg, setShowFaceReg] = useState(false);
+  const [activeTab, setActiveTab] = useState('personal');
   const { user: currentUser } = useAuth();
 
   const fetchData = useCallback(() => {
@@ -600,8 +601,6 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
   const { user, stats } = data;
   const emp    = user.employee;
   const isSelf = currentUser.id === user.id;
-
-  const [activeTab, setActiveTab] = useState('personal');
 
   const TABS = [
     { id: 'personal',    label: 'Personal',          icon: Shield },
