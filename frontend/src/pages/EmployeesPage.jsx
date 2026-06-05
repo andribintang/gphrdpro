@@ -5,7 +5,7 @@ import {
   Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
   Mail, Shield, Camera, ShieldCheck, Link2
-} from 'lucide-react';
+, CreditCard, History} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -601,88 +601,175 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
   const emp    = user.employee;
   const isSelf = currentUser.id === user.id;
 
+  const [activeTab, setActiveTab] = useState('personal');
+
+  const TABS = [
+    { id: 'personal',    label: 'Personal',          icon: Shield },
+    { id: 'employment',  label: 'Data Kerja',         icon: Briefcase },
+    { id: 'allowance',   label: 'Komponen Khusus',    icon: DollarSign },
+    { id: 'bank',        label: 'Rekening Bank',      icon: CreditCard },
+    { id: 'attendance',  label: 'Absensi',            icon: Calendar },
+  ];
+
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
-        <div className="relative w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto scrollbar-thin"
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
+        <div className="relative w-full max-w-3xl bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[90vh] flex flex-col"
           onClick={e => e.stopPropagation()}>
-          <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
-          <div className="px-5 pt-4 pb-5 border-b border-[var(--border)]">
+
+          {/* ── Header ── */}
+          <div className="px-6 pt-5 pb-4 border-b border-[var(--border)] flex-shrink-0">
             <div className="flex items-start justify-between mb-4">
-              <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]"><X className="w-4 h-4" /></button>
-              {canManage && !isSelf && (
-                <div className="flex gap-2 flex-wrap justify-end">
-                  <button onClick={() => setShowFaceReg(true)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all
-                      ${faceStatus?.registered ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400'}`}>
-                    <Camera className="w-3 h-3" />{faceStatus?.registered ? '✓ Update Wajah' : 'Daftarkan Wajah'}
-                  </button>
-                  <button onClick={() => { onClose(); onEdit(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
-                    <Edit3 className="w-3 h-3" /> Edit
-                  </button>
-                  {user.is_active
-                    ? <button onClick={() => { onClose(); onDeactivate(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"><UserX className="w-3 h-3" /> Nonaktifkan</button>
-                    : <button onClick={() => { onClose(); onReactivate(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white"><UserCheck className="w-3 h-3" /> Aktifkan</button>}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Avatar name={user.name} size="xl" />
+                  {faceStatus?.registered && (
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[var(--bg-card)] flex items-center justify-center">
+                      <ShieldCheck className="w-3 h-3 text-white" />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Avatar name={user.name} size="xl" />
-                {faceStatus?.registered && <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-[var(--bg-card)] flex items-center justify-center"><ShieldCheck className="w-3 h-3 text-white" /></div>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-black text-[var(--text-primary)] truncate">{user.name}</h2>
-                <p className="text-sm text-[var(--text-secondary)] truncate">{emp?.position}</p>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <StatusBadge status={emp?.status || 'inactive'} />
-                  <RoleBadge role={user.role} />
+                <div>
+                  <h2 className="text-xl font-black text-[var(--text-primary)]">{user.name}</h2>
+                  <p className="text-sm text-[var(--text-secondary)]">{emp?.position} · {emp?.department}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <StatusBadge status={emp?.status || 'inactive'} />
+                    <RoleBadge role={user.role} />
+                  </div>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                {canManage && !isSelf && (
+                  <>
+                    <button onClick={() => setShowFaceReg(true)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all
+                        ${faceStatus?.registered ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-50 text-amber-700'}`}>
+                      <Camera className="w-3 h-3" />{faceStatus?.registered ? 'Update Wajah' : 'Daftarkan Wajah'}
+                    </button>
+                    <button onClick={() => { onClose(); onEdit(user); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+                      <Edit3 className="w-3 h-3" /> Edit
+                    </button>
+                    {user.is_active
+                      ? <button onClick={() => { onClose(); onDeactivate(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50">
+                          <UserX className="w-3 h-3" /> Nonaktifkan
+                        </button>
+                      : <button onClick={() => { onClose(); onReactivate(user); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white">
+                          <UserCheck className="w-3 h-3" /> Aktifkan
+                        </button>}
+                  </>
+                )}
+                <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+
+            {/* Stats */}
+            {stats && (
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { v: stats.attendance_this_month?.present || 0, l:'Hadir Bulan Ini', c:'text-emerald-600' },
+                  { v: stats.leave_quota?.remaining ?? '—',       l:'Sisa Cuti',       c:'text-amber-600' },
+                  { v: stats.last_salary ? `Rp ${Math.round(stats.last_salary.amount/1000000)}jt` : '—', l:'Gaji Terakhir', c:'text-blue-600' },
+                ].map((s,i) => (
+                  <div key={i} className="bg-[var(--bg-secondary)] rounded-xl p-3 text-center">
+                    <p className={`text-lg font-black ${s.c}`}>{s.v}</p>
+                    <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">{s.l}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {stats && (
-            <div className="grid grid-cols-3 divide-x divide-[var(--border)] border-b border-[var(--border)]">
-              {[
-                { v: stats.attendance_this_month?.present || 0, l:'Hadir', c:'text-emerald-600 dark:text-emerald-400' },
-                { v: stats.leave_quota?.remaining ?? '—',       l:'Sisa Cuti', c:'text-amber-600 dark:text-amber-400' },
-                { v: stats.last_salary ? `${Math.round(stats.last_salary.amount/1000000)}jt` : '—', l:'Gaji', c:'text-brand-600 dark:text-brand-400' },
-              ].map((s,i) => (
-                <div key={i} className="p-3.5 text-center">
-                  <p className={`text-lg font-black ${s.c}`}>{s.v}</p>
-                  <p className="text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide mt-0.5">{s.l}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="p-5 space-y-3">
-            {[
-              { icon: Shield,    l:'NIP',        v: emp?.nip },
-              { icon: Building2, l:'Departemen', v: emp?.department },
-              { icon: Briefcase, l:'Jabatan',    v: emp?.position },
-              { icon: Calendar,  l:'Bergabung',  v: formatJoinDate(emp?.join_date) },
-              { icon: Mail,      l:'Email',      v: user.email },
-              { icon: Camera,    l:'Wajah',      v: faceStatus?.registered ? '✅ Terdaftar' : '❌ Belum' },
-            { icon: Link2,     l:'Sistem Insentif', v: data?.inc_employee ? `✅ Terhubung (${data.inc_employee.branch?.name || 'Cabang'})` : '❌ Belum terhubung' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide">{item.l}</p>
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{item.v || '—'}</p>
-                </div>
-              </div>
+          {/* ── Tabs ── */}
+          <div className="flex border-b border-[var(--border)] flex-shrink-0 overflow-x-auto">
+            {TABS.map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all
+                  ${activeTab === tab.id
+                    ? 'border-[var(--brand-600)] text-[var(--brand-600)]'
+                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
             ))}
           </div>
 
-          {/* ── Tunjangan Khusus ─────────────────────────── */}
-          {canManage && <AllowanceSection userId={userId} />}
-          {canManage && <BankAccountSection employee={emp} onSaved={fetchData} />}
+          {/* ── Tab Content ── */}
+          <div className="flex-1 overflow-y-auto">
+
+            {/* Tab: Personal */}
+            {activeTab === 'personal' && (
+              <div className="p-6 grid grid-cols-2 gap-x-8 gap-y-4">
+                {[
+                  { l:'Email',       v: user.email },
+                  { l:'NIP',         v: emp?.nip },
+                  { l:'No. HP',      v: emp?.phone },
+                  { l:'Alamat',      v: emp?.address },
+                  { l:'Kontak Darurat', v: emp?.emergency_contact },
+                  { l:'No. Darurat',    v: emp?.emergency_phone },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">{item.l}</p>
+                    <p className="text-sm text-[var(--text-primary)]">{item.v || '—'}</p>
+                  </div>
+                ))}
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Sistem Insentif</p>
+                  <p className="text-sm">{data?.inc_employee ? `✅ Terhubung (${data.inc_employee.branch?.name || 'Cabang'})` : '❌ Belum terhubung'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Wajah</p>
+                  <p className="text-sm">{faceStatus?.registered ? '✅ Terdaftar' : '❌ Belum'}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Employment */}
+            {activeTab === 'employment' && (
+              <div className="p-6 grid grid-cols-2 gap-x-8 gap-y-4">
+                {[
+                  { l:'Departemen',   v: emp?.department },
+                  { l:'Jabatan',      v: emp?.position },
+                  { l:'Tanggal Bergabung', v: formatJoinDate(emp?.join_date) },
+                  { l:'Status',       v: emp?.status },
+                  { l:'Role',         v: user.role },
+                  { l:'Gaji Pokok',   v: emp?.salary_base ? `Rp ${parseInt(emp.salary_base).toLocaleString('id-ID')}` : '—' },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">{item.l}</p>
+                    <p className="text-sm text-[var(--text-primary)]">{item.v || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab: Komponen Khusus */}
+            {activeTab === 'allowance' && (
+              <div className="p-4">
+                {canManage ? <AllowanceSection userId={userId} /> : (
+                  <p className="text-sm text-[var(--text-muted)] text-center py-8">Tidak ada akses</p>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Rekening Bank */}
+            {activeTab === 'bank' && (
+              <div className="p-4">
+                {canManage ? <BankAccountSection employee={emp} onSaved={fetchData} /> : (
+                  <p className="text-sm text-[var(--text-muted)] text-center py-8">Tidak ada akses</p>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Absensi */}
+            {activeTab === 'attendance' && (
+              <AttendanceTab userId={userId} />
+            )}
+
+          </div>
         </div>
       </div>
       {showFaceReg && <FaceRegisterModal userId={userId} userName={user.name} onClose={() => setShowFaceReg(false)} onSuccess={() => setFaceStatus({ registered: true })} />}
@@ -852,6 +939,101 @@ const AllowanceSection = ({ userId }) => {
 // ════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════
+
+
+// ── Attendance Tab in ProfileDrawer ──────────────────────────
+const AttendanceTab = ({ userId }) => {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [records,  setRecords]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [month,    setMonth]    = useState(new Date().toISOString().slice(0,7));
+
+  useEffect(() => {
+    setLoading(true);
+    const [y, m] = month.split('-');
+    fetch(`${API}/attendance/admin/all?year=${y}&month=${m}&limit=200`, {
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+    }).then(r => r.json()).then(d => {
+      const all = d.data?.records || d.data?.attendances || [];
+      setRecords(all.filter(a => a.user_id === userId));
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [userId, month]);
+
+  const STATUS_STYLE = {
+    present:  'bg-green-100 text-green-700',
+    late:     'bg-yellow-100 text-yellow-700',
+    absent:   'bg-red-100 text-red-600',
+    half_day: 'bg-orange-100 text-orange-600',
+    leave:    'bg-blue-100 text-blue-600',
+    holiday:  'bg-purple-100 text-purple-600',
+  };
+  const STATUS_LABEL = { present:'Hadir', late:'Terlambat', absent:'Absen', half_day:'Setengah Hari', leave:'Cuti', holiday:'Libur' };
+
+  const summary = {
+    hadir:     records.filter(r => ['present','late'].includes(r.status)).length,
+    terlambat: records.filter(r => r.status === 'late').length,
+    absen:     records.filter(r => r.status === 'absent').length,
+    cuti:      records.filter(r => r.status === 'leave').length,
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Filter bulan */}
+      <div className="flex items-center gap-3">
+        <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+          className="input-base text-sm h-9 w-40" />
+        <div className="flex gap-2 text-xs">
+          {[
+            { l:'Hadir', v: summary.hadir, c:'text-green-600' },
+            { l:'Terlambat', v: summary.terlambat, c:'text-yellow-600' },
+            { l:'Absen', v: summary.absen, c:'text-red-500' },
+            { l:'Cuti', v: summary.cuti, c:'text-blue-600' },
+          ].map(s => (
+            <div key={s.l} className="bg-[var(--bg-secondary)] rounded-lg px-2.5 py-1.5 text-center">
+              <p className={`font-bold ${s.c}`}>{s.v}</p>
+              <p className="text-[9px] text-[var(--text-muted)]">{s.l}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-[var(--brand-500)]"/></div>
+      ) : records.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)] text-center py-8">Tidak ada data absensi bulan ini</p>
+      ) : (
+        <div className="table-wrapper overflow-hidden">
+          <div className="overflow-x-auto max-h-64">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                  {['Tanggal','Status','Masuk','Pulang','Jam Kerja'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {records.map((r, i) => (
+                  <tr key={i} className="hover:bg-[var(--bg)]">
+                    <td className="px-3 py-2 font-mono">{r.date}</td>
+                    <td className="px-3 py-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_STYLE[r.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {STATUS_LABEL[r.status] || r.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono">{r.check_in ? r.check_in.slice(0,5) : '—'}</td>
+                    <td className="px-3 py-2 font-mono">{r.check_out ? r.check_out.slice(0,5) : '—'}</td>
+                    <td className="px-3 py-2">{r.work_hours ? `${parseFloat(r.work_hours).toFixed(1)} jam` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── Bank Account Section ──────────────────────────────────────
 const BANK_LIST = [
