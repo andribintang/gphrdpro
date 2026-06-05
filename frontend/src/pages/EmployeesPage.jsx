@@ -5,7 +5,7 @@ import {
   Briefcase, Building2, Calendar, DollarSign,
   CheckCircle2, UserX, UserCheck, Edit3, ArrowLeft,
   Mail, Shield, Camera, ShieldCheck, Link2
-, CreditCard, History} from 'lucide-react';
+, CreditCard, History, ChevronLeft} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -30,7 +30,60 @@ const RoleBadge = ({ role }) => {
   const r = ROLE_CONFIG[role] || ROLE_CONFIG.employee;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${r.bg} ${r.color}`}>{r.label}</span>;
 };
-const Avatar = ({ name, size = 'md' }) => {
+// ── Photo compression + upload ───────────────────────────────
+const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
+
+const compressPhoto = (file, maxKB = 100) => new Promise((resolve) => {
+  if (file.size <= maxKB * 1024) { resolve(file); return; }
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const canvas = document.createElement('canvas');
+    let { width, height } = img;
+    const MAX = 800;
+    if (width > MAX || height > MAX) {
+      if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+      else { width = Math.round(width * MAX / height); height = MAX; }
+    }
+    canvas.width = width; canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    const tryQ = (q) => new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+    const search = async () => {
+      let lo = 0.1, hi = 0.9, best = null;
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        const blob = await tryQ(mid);
+        if (blob.size <= maxKB * 1024) { best = blob; lo = mid; }
+        else hi = mid;
+        if (hi - lo < 0.02) break;
+      }
+      if (!best) best = await tryQ(0.1);
+      resolve(new File([best], 'photo.jpg', { type: 'image/jpeg' }));
+    };
+    search();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+  img.src = url;
+});
+
+const uploadPhoto = async (file) => {
+  const compressed = await compressPhoto(file, 100);
+  if (!CLOUD_NAME) throw new Error('Cloudinary belum dikonfigurasi');
+  const fd = new FormData();
+  fd.append('file', compressed);
+  fd.append('upload_preset', UPLOAD_PRESET);
+  fd.append('folder', 'employee_photos');
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: 'POST', body: fd,
+  });
+  const d = await r.json();
+  if (!d.secure_url) throw new Error(d.error?.message || 'Upload gagal');
+  return d.secure_url;
+};
+
+const Avatar = ({ name, size = 'md', photoUrl }) => {
   const sizes = { sm:'w-8 h-8 text-sm', md:'w-10 h-10 text-base', lg:'w-14 h-14 text-xl', xl:'w-20 h-20 text-3xl' };
   return (
     <div className={`${sizes[size]} rounded-2xl bg-gradient-to-br ${avatarColor(name)} flex items-center justify-center flex-shrink-0 shadow-sm`}>
@@ -621,13 +674,37 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
           <div className="px-6 pt-5 pb-4 border-b border-[var(--border)] flex-shrink-0">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Avatar name={user.name} size="xl" />
+                <div className="relative group">
+                  <Avatar name={user.name} size="xl" photoUrl={emp?.photo_url}/>
                   {faceStatus?.registered && (
                     <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[var(--bg-card)] flex items-center justify-center">
                       <ShieldCheck className="w-3 h-3 text-white" />
                     </div>
                   )}
+                  <label className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" title="Upload foto">
+                    <Upload className="w-4 h-4 text-white" />
+                    <input type="file" accept="image/*" className="sr-only"
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        try {
+                          toast.loading('Upload foto...', { id: 'photo-upload' });
+                          const url = await uploadPhoto(file);
+                          const API2 = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+                          await fetch(`${API2}/employees/${emp.user_id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('accessToken') },
+                            body: JSON.stringify({ photo_url: url }),
+                          });
+                          toast.success('Foto berhasil diupload!', { id: 'photo-upload' });
+                          fetchData();
+                        } catch(err) {
+                          toast.error('Gagal: ' + err.message, { id: 'photo-upload' });
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-[var(--text-primary)]">{user.name}</h2>
@@ -701,7 +778,17 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
 
             {/* Tab: Personal */}
             {activeTab === 'personal' && (
-              <div className="p-6 grid grid-cols-2 gap-x-8 gap-y-4">
+              <div className="p-6 space-y-4">
+                {isSelf && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                    <p className="text-xs text-blue-700">Kamu dapat mengedit biodata pribadi kamu</p>
+                    <button onClick={() => { onClose(); onEdit(user); }}
+                      className="text-xs font-semibold text-blue-700 hover:underline flex items-center gap-1">
+                      <Edit3 className="w-3 h-3"/> Edit Biodata
+                    </button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                 {[
                   { l:'Email',       v: user.email },
                   { l:'NIP',         v: emp?.nip },
@@ -722,6 +809,7 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
                 <div>
                   <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-0.5">Wajah</p>
                   <p className="text-sm">{faceStatus?.registered ? '✅ Terdaftar' : '❌ Belum'}</p>
+                </div>
                 </div>
               </div>
             )}
@@ -1190,6 +1278,198 @@ const BankAccountSection = ({ employee: emp, onSaved }) => {
   );
 };
 
+
+// ── Premium Employee Table ────────────────────────────────────
+const PremiumEmployeeTable = ({ employees, loading, canManage, onView, onEdit, onDeactivate, onAdd }) => {
+  const [sortKey, setSortKey]   = useState('name');
+  const [sortDir, setSortDir]   = useState('asc');
+  const [page,    setPage]      = useState(1);
+  const PAGE_SIZE = 10;
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+    setPage(1);
+  };
+
+  const sorted = [...employees].sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'name')       { va = a.name;                      vb = b.name; }
+    else if (sortKey === 'dept')  { va = a.employee?.department || ''; vb = b.employee?.department || ''; }
+    else if (sortKey === 'pos')   { va = a.employee?.position || '';   vb = b.employee?.position || ''; }
+    else if (sortKey === 'join')  { va = a.employee?.join_date || '';  vb = b.employee?.join_date || ''; }
+    else if (sortKey === 'status'){ va = a.employee?.status || '';     vb = b.employee?.status || ''; }
+    else { va = ''; vb = ''; }
+    const cmp = String(va).localeCompare(String(vb));
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const paged      = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const SortBtn = ({ col, label }) => (
+    <button onClick={() => handleSort(col)}
+      className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors select-none">
+      {label}
+      <span className={`text-[10px] ${sortKey === col ? 'text-[var(--brand-600)]' : 'opacity-30'}`}>
+        {sortKey === col ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+      </span>
+    </button>
+  );
+
+  if (loading) return (
+    <div className="table-wrapper overflow-hidden">
+      <div className="p-4 space-y-3">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="flex items-center gap-4">
+            <div className="skeleton w-10 h-10 rounded-2xl flex-shrink-0"/>
+            <div className="flex-1 space-y-2">
+              <div className="skeleton h-3.5 w-44 rounded"/>
+              <div className="skeleton h-3 w-32 rounded opacity-60"/>
+            </div>
+            <div className="skeleton h-6 w-20 rounded-full hidden md:block"/>
+            <div className="skeleton h-6 w-24 rounded-full hidden md:block"/>
+            <div className="skeleton h-5 w-16 rounded hidden lg:block"/>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (employees.length === 0) return (
+    <div className="table-wrapper text-center py-16">
+      <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
+      <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">Tidak ada karyawan ditemukan</p>
+      <p className="text-xs text-[var(--text-muted)] mb-4">Coba ubah filter atau tambah karyawan baru</p>
+      {canManage && <button onClick={onAdd} className="btn-primary text-sm"><Plus className="w-4 h-4"/> Tambah Karyawan</button>}
+    </div>
+  );
+
+  return (
+    <div className="table-wrapper overflow-hidden">
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+              <th className="px-4 py-3 text-left w-12">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">#</span>
+              </th>
+              <th className="px-4 py-3 text-left"><SortBtn col="name" label="Karyawan" /></th>
+              <th className="px-4 py-3 text-left hidden md:table-cell"><SortBtn col="pos" label="Jabatan" /></th>
+              <th className="px-4 py-3 text-left hidden md:table-cell"><SortBtn col="dept" label="Departemen" /></th>
+              <th className="px-4 py-3 text-left hidden md:table-cell"><SortBtn col="status" label="Status" /></th>
+              <th className="px-4 py-3 text-left hidden lg:table-cell"><SortBtn col="join" label="Bergabung" /></th>
+              <th className="px-4 py-3 text-right">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Aksi</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {paged.map((emp, idx) => {
+              const no    = (page - 1) * PAGE_SIZE + idx + 1;
+              const photo = emp.employee?.photo_url;
+              return (
+                <tr key={emp.id}
+                  className="hover:bg-[var(--bg-secondary)]/40 transition-colors cursor-pointer group"
+                  onClick={() => onView(emp)}>
+                  <td className="px-4 py-3 text-xs text-[var(--text-muted)] font-mono">{no}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={emp.name} size="md" photoUrl={photo} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{emp.name}</p>
+                          <RoleBadge role={emp.role} />
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)] truncate">{emp.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <p className="text-sm text-[var(--text-secondary)] truncate max-w-[130px]">{emp.employee?.position || '—'}</p>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[11px] font-medium text-[var(--text-secondary)]">
+                      {emp.employee?.department || '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <StatusBadge status={emp.employee?.status} />
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {emp.employee?.join_date
+                        ? new Date(emp.employee.join_date).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })
+                        : '—'}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => onView(emp)} title="Lihat Profil"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand-600)] hover:bg-[var(--brand-600)]/10 transition-all">
+                        <Eye className="w-3.5 h-3.5"/>
+                      </button>
+                      {canManage && (
+                        <button onClick={() => onEdit(emp)} title="Edit"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 transition-all">
+                          <Edit3 className="w-3.5 h-3.5"/>
+                        </button>
+                      )}
+                      {canManage && emp.employee?.status === 'active' && (
+                        <button onClick={() => onDeactivate(emp)} title="Nonaktifkan"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-all">
+                          <UserX className="w-3.5 h-3.5"/>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--bg)]">
+          <p className="text-xs text-[var(--text-muted)]">
+            {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, sorted.length)} dari <span className="font-semibold text-[var(--text-primary)]">{sorted.length}</span> karyawan
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(1)} disabled={page===1}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:bg-[var(--bg-secondary)] disabled:opacity-30">«</button>
+            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}
+              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-30">
+              <ChevronLeft className="w-3.5 h-3.5"/>
+            </button>
+            {[...Array(totalPages)].map((_, i) => {
+              const p = i + 1;
+              if (p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                return (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors
+                      ${p === page ? 'bg-[var(--brand-600)] text-white' : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]'}`}>
+                    {p}
+                  </button>
+                );
+              if (Math.abs(p - page) === 2) return <span key={p} className="text-[var(--text-muted)] text-xs">…</span>;
+              return null;
+            })}
+            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages}
+              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-30">
+              <ChevronRight className="w-3.5 h-3.5"/>
+            </button>
+            <button onClick={() => setPage(totalPages)} disabled={page===totalPages}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:bg-[var(--bg-secondary)] disabled:opacity-30">»</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function EmployeesPage() {
   const { user: currentUser, isHR } = useAuth();
   const canManage = isHR || currentUser?.role === 'admin';
@@ -1339,97 +1619,16 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Employee Table */}
-      {loading ? (
-        <div className="table-wrapper divide-y divide-[var(--border-subtle)]">
-          {[...Array(6)].map((_,i) => (
-            <div key={i} className="flex items-center gap-4 px-5 py-4">
-              <div className="skeleton w-9 h-9 rounded-xl flex-shrink-0"/>
-              <div className="flex-1 space-y-2"><div className="skeleton h-3.5 w-40 rounded"/><div className="skeleton h-3 w-28 rounded opacity-60"/></div>
-              <div className="skeleton h-6 w-16 rounded-full"/>
-              <div className="skeleton h-3 w-24 rounded hidden md:block"/>
-              <div className="skeleton h-3 w-20 rounded hidden lg:block"/>
-            </div>
-          ))}
-        </div>
-      ) : employees.length === 0 ? (
-        <div className="table-wrapper text-center py-16">
-          <Users className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">Tidak ada karyawan ditemukan</p>
-          <p className="text-xs text-[var(--text-muted)]">Coba ubah filter atau tambah karyawan baru</p>
-          {canManage && <button onClick={() => setShowAddForm(true)} className="btn-primary mt-4 text-sm"><Plus className="w-4 h-4"/> Tambah Karyawan</button>}
-        </div>
-      ) : (
-        <div className="table-wrapper">
-          {/* Desktop header */}
-          <div className="hidden md:grid grid-cols-[minmax(200px,1fr)_120px_140px_120px_100px_auto] gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]/70">
-            {['KARYAWAN','JABATAN','DEPARTEMEN','STATUS','BERGABUNG','AKSI'].map(h=>(
-              <p key={h} className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{h}</p>
-            ))}
-          </div>
-          {employees.map((emp,idx) => (
-            <div key={emp.id}
-              className={`flex flex-col md:grid md:grid-cols-[minmax(200px,1fr)_120px_140px_120px_100px_auto] md:gap-4 px-5 py-3.5 transition-colors hover:bg-[var(--bg-secondary)]/50 cursor-pointer border-b border-[var(--border-subtle)] last:border-0 group ${idx%2===0?'':'bg-[var(--bg-secondary)]/20'}`}
-              onClick={() => setProfileId(emp.id)}>
-              {/* Karyawan */}
-              <div className="flex items-center gap-3 min-w-0">
-                <Avatar name={emp.name} size="md"/>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-[13.5px] font-semibold text-[var(--text-primary)] truncate">{emp.name}</p>
-                    <RoleBadge role={emp.role}/>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-muted)] truncate">{emp.email}</p>
-                </div>
-              </div>
-              {/* Jabatan */}
-              <div className="hidden md:flex items-center">
-                <p className="text-[13px] text-[var(--text-secondary)] truncate">{emp.employee?.position || '—'}</p>
-              </div>
-              {/* Departemen */}
-              <div className="hidden md:flex items-center">
-                <span className="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-full">
-                  {emp.employee?.department || '—'}
-                </span>
-              </div>
-              {/* Status */}
-              <div className="hidden md:flex items-center">
-                <StatusBadge status={emp.employee?.status}/>
-              </div>
-              {/* Bergabung */}
-              <div className="hidden lg:flex items-center">
-                <p className="text-[12px] text-[var(--text-muted)]">
-                  {emp.employee?.join_date ? new Date(emp.employee.join_date).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}
-                </p>
-              </div>
-              {/* Aksi */}
-              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" onClick={e=>e.stopPropagation()}>
-                <button onClick={()=>setProfileId(emp.id)} title="Lihat Detail"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand-600)] hover:bg-[var(--brand-600)]/8 transition-all">
-                  <Eye className="w-3.5 h-3.5"/>
-                </button>
-                {canManage && (
-                  <button onClick={()=>setEditEmployee(emp)} title="Edit"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all">
-                    <Edit3 className="w-3.5 h-3.5"/>
-                  </button>
-                )}
-                {canManage && emp.employee?.status === 'active' && (
-                  <button onClick={()=>setDeactivateTarget(emp)} title="Nonaktifkan"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all">
-                    <UserX className="w-3.5 h-3.5"/>
-                  </button>
-                )}
-              </div>
-              {/* Mobile: info tambahan */}
-              <div className="flex md:hidden items-center gap-2 mt-2">
-                <StatusBadge status={emp.employee?.status}/>
-                <span className="text-[11px] text-[var(--text-muted)]">{emp.employee?.position} · {emp.employee?.department}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* ── Premium Employee Table ── */}
+      <PremiumEmployeeTable
+        employees={employees}
+        loading={loading}
+        canManage={canManage}
+        onView={(emp) => setProfileId(emp.id)}
+        onEdit={(emp) => setEditEmployee(emp)}
+        onDeactivate={(emp) => setDeactivateTarget(emp)}
+        onAdd={() => setShowAddForm(true)}
+      />
 
       {/* Modals */}
       {showAddForm && <EmployeeForm key="add-form" onClose={() => setShowAddForm(false)} onSuccess={handleFormSuccess} />}

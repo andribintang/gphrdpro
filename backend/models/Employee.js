@@ -59,6 +59,11 @@ const Employee = sequelize.define('Employee', {
     allowNull: true,
   },
   // ── Bank Account for Salary Disbursement ─────────────────
+  photo_url: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'URL foto profil karyawan (Cloudinary)',
+  },
   bank_code: {
     type: DataTypes.STRING(20),
     allowNull: true,

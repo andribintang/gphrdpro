@@ -375,6 +375,8 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      // Photo URL for employees
+      `ALTER TABLE employees ADD COLUMN photo_url TEXT NULL COMMENT 'URL foto profil'`,
       // Bank account fields on employees
       `ALTER TABLE employees ADD COLUMN bank_code VARCHAR(20) NULL COMMENT 'Kode bank'`,
       `ALTER TABLE employees ADD COLUMN bank_account_number VARCHAR(50) NULL COMMENT 'Nomor rekening'`,
