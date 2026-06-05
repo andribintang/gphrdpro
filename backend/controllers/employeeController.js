@@ -273,6 +273,7 @@ const update = async (req, res, next) => {
       name, role,
       nip, position, department, salary_base, join_date, status,
       phone, address, emergency_contact, emergency_phone,
+      photo_url,
       bank_code, bank_account_number, bank_account_name,
     } = req.body;
 
@@ -298,6 +299,7 @@ const update = async (req, res, next) => {
     if (address           !== undefined) empUpdates.address           = address;
     if (emergency_contact !== undefined) empUpdates.emergency_contact = emergency_contact;
     if (emergency_phone   !== undefined) empUpdates.emergency_phone   = emergency_phone;
+    if (photo_url         !== undefined) empUpdates.photo_url         = photo_url;
 
     if (isHRAdmin) {
       if (nip)          empUpdates.nip          = nip.trim();

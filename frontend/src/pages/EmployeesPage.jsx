@@ -689,16 +689,18 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
                         const file = e.target.files[0];
                         if (!file) return;
                         try {
-                          toast.loading('Upload foto...', { id: 'photo-upload' });
+                          toast.loading('Mengupload foto...', { id: 'photo-upload' });
                           const url = await uploadPhoto(file);
                           const API2 = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
-                          await fetch(`${API2}/employees/${emp.user_id}`, {
+                          const r = await fetch(`${API2}/employees/${emp.user_id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('accessToken') },
                             body: JSON.stringify({ photo_url: url }),
                           });
+                          const d = await r.json();
+                          if (!d.success) throw new Error(d.message || 'Gagal simpan foto');
                           toast.success('Foto berhasil diupload!', { id: 'photo-upload' });
-                          fetchData();
+                          fetchData(); // refresh data including photo_url
                         } catch(err) {
                           toast.error('Gagal: ' + err.message, { id: 'photo-upload' });
                         }
