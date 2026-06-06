@@ -699,16 +699,18 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
                           });
                           const d = await r.json();
                           if (!d.success) throw new Error(d.message || 'Gagal simpan foto');
-                          toast.success('Foto berhasil diupload!', { id: 'photo-upload' });
-                          // Update state immediately so photo shows without waiting for refetch
-                          setData(prev => prev ? {
-                            ...prev,
-                            user: {
-                              ...prev.user,
-                              employee: { ...prev.user.employee, photo_url: url }
-                            }
-                          } : prev);
-                          fetchData(); // also refresh in background
+                          toast.success('Foto berhasil diupload! (' + Math.round(file.size/1024) + 'KB)', { id: 'photo-upload' });
+                          // Directly update employee photo_url in state
+                          setData(prev => {
+                            if (!prev?.user?.employee) return prev;
+                            return {
+                              ...prev,
+                              user: {
+                                ...prev.user,
+                                employee: { ...prev.user.employee, photo_url: url }
+                              }
+                            };
+                          });
                         } catch(err) {
                           toast.error('Gagal: ' + err.message, { id: 'photo-upload' });
                         }
