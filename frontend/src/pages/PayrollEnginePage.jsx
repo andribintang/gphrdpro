@@ -6,7 +6,12 @@ import {
   ToggleRight, Edit3, Eye, ArrowUpRight, ArrowDownRight,
   Calendar, TrendingUp, Banknote, Star, Moon,
   Percent, Clock, Info, CheckCheck, Wallet, UserCheck
-, Pencil, Lock, Check} from 'lucide-react';
+, Pencil, Lock, Check  Printer,
+  Download,
+  BarChart3,
+  TrendingUp,
+  Clock,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -34,6 +39,131 @@ const SectionTitle = ({ title, action }) => (
 );
 
 // ── Slip Modal ─────────────────────────────────────────────────
+// ── PDF Slip Generator (browser print) ───────────────────────
+const handlePrintSlip = (item, run) => {
+  const toRp = (n) => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
+  const rt = RUN_TYPES[run?.type] || RUN_TYPES.monthly;
+
+  const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Slip Gaji - ${item.employee_name} - ${run?.period_label}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; padding: 24px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:12px; border-bottom:2px solid #1a1a1a; margin-bottom:16px; }
+    .company-name { font-size:18px; font-weight:900; color:#1a1a1a; }
+    .company-sub { font-size:10px; color:#666; margin-top:2px; }
+    .slip-title { text-align:right; }
+    .slip-title h2 { font-size:14px; font-weight:700; color:#1a1a1a; }
+    .slip-title p { font-size:10px; color:#666; margin-top:2px; }
+    .employee-box { background:#f8f9fa; border:1px solid #e0e0e0; border-radius:8px; padding:12px 16px; margin-bottom:16px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .emp-field label { font-size:9px; color:#888; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:2px; }
+    .emp-field span { font-size:12px; font-weight:600; color:#1a1a1a; }
+    .attendance { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+    .att-box { border:1px solid #e0e0e0; border-radius:6px; padding:8px; text-align:center; }
+    .att-box .num { font-size:18px; font-weight:900; }
+    .att-box .lbl { font-size:9px; color:#888; font-weight:600; text-transform:uppercase; }
+    .att-box.hadir .num { color:#16a34a; }
+    .att-box.telat .num { color:#d97706; }
+    .att-box.alpha .num { color:#dc2626; }
+    .att-box.cuti  .num { color:#2563eb; }
+    table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+    table thead th { background:#f1f5f9; padding:8px 10px; text-align:left; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; border-bottom:1px solid #e2e8f0; }
+    table thead th:last-child { text-align:right; }
+    table tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; font-size:11px; }
+    table tbody td:last-child { text-align:right; font-weight:600; }
+    table tbody td.note { font-size:9px; color:#888; padding-top:1px; padding-bottom:5px; }
+    .income td:last-child { color:#16a34a; }
+    .deduct td:last-child { color:#dc2626; }
+    .total-row td { font-weight:700; font-size:12px; padding-top:10px; border-top:2px solid #1a1a1a; }
+    .net-box { background:#f0fdf4; border:2px solid #16a34a; border-radius:8px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+    .net-box .label { font-size:13px; font-weight:700; }
+    .net-box .amount { font-size:20px; font-weight:900; color:#16a34a; }
+    .footer { border-top:1px solid #e0e0e0; padding-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+    .sign-box { text-align:center; }
+    .sign-box .title { font-size:10px; font-weight:600; margin-bottom:40px; }
+    .sign-box .name { font-size:10px; border-top:1px solid #1a1a1a; padding-top:4px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:100px; font-size:9px; font-weight:700; background:#dbeafe; color:#1d4ed8; }
+    @media print { body { padding:12px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="company-name">GPDISTRO RACING ID</div>
+      <div class="company-sub">HR &amp; Payroll Management System</div>
+    </div>
+    <div class="slip-title">
+      <h2>SLIP GAJI ${rt.label.toUpperCase()}</h2>
+      <p>Periode: ${run?.period_label || ''}</p>
+      <p>Diterbitkan: ${new Date().toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'})}</p>
+    </div>
+  </div>
+
+  <div class="employee-box">
+    <div class="emp-field"><label>Nama Karyawan</label><span>${item.employee_name}</span></div>
+    <div class="emp-field"><label>NIP</label><span>${item.employee_nip || '—'}</span></div>
+    <div class="emp-field"><label>Jabatan</label><span>${item.employee_position || '—'}</span></div>
+    <div class="emp-field"><label>Departemen</label><span>${item.employee_department || '—'}</span></div>
+  </div>
+
+  ${run?.type === 'monthly' ? `
+  <div class="attendance">
+    <div class="att-box hadir"><div class="num">${item.present_days||0}</div><div class="lbl">Hadir</div></div>
+    <div class="att-box telat"><div class="num">${item.late_count||0}</div><div class="lbl">Terlambat</div></div>
+    <div class="att-box alpha"><div class="num">${item.alpha_days||0}</div><div class="lbl">Alpha</div></div>
+    <div class="att-box cuti"><div class="num">${item.leave_days||0}</div><div class="lbl">Cuti</div></div>
+  </div>` : ''}
+
+  <table>
+    <thead><tr><th>Komponen Pendapatan</th><th>Keterangan</th><th>Jumlah</th></tr></thead>
+    <tbody class="income">
+      ${(item.income_lines||[]).map(l => `
+        <tr><td>${l.name}${l.note ? `<br/><span class="note">${l.note}</span>` : ''}</td><td>${l.note||''}</td><td>+${toRp(l.amount)}</td></tr>
+      `).join('')}
+      <tr class="total-row"><td colspan="2">Total Pendapatan</td><td style="color:#16a34a">+${toRp(item.total_income)}</td></tr>
+    </tbody>
+  </table>
+
+  ${(item.deduction_lines||[]).length > 0 || item.pph21_amount > 0 ? `
+  <table>
+    <thead><tr><th>Komponen Potongan</th><th>Keterangan</th><th>Jumlah</th></tr></thead>
+    <tbody class="deduct">
+      ${(item.deduction_lines||[]).map(l => `
+        <tr><td>${l.name}${l.note ? `<br/><span class="note">${l.note}</span>` : ''}</td><td>${l.note||''}</td><td>-${toRp(l.amount)}</td></tr>
+      `).join('')}
+      ${item.pph21_amount > 0 ? `<tr><td>PPH21</td><td></td><td>-${toRp(item.pph21_amount)}</td></tr>` : ''}
+      <tr class="total-row"><td colspan="2">Total Potongan</td><td style="color:#dc2626">-${toRp(item.total_deductions)}</td></tr>
+    </tbody>
+  </table>` : ''}
+
+  <div class="net-box">
+    <span class="label">💰 Take Home Pay</span>
+    <span class="amount">${toRp(item.net_salary)}</span>
+  </div>
+
+  <div class="footer">
+    <div class="sign-box">
+      <div class="title">Karyawan</div>
+      <div class="name">${item.employee_name}</div>
+    </div>
+    <div class="sign-box">
+      <div class="title">Mengetahui, HRD</div>
+      <div class="name">____________________</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=800,height=900');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 500);
+};
+
 const SlipModal = ({ itemId, onClose }) => {
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +223,18 @@ const SlipModal = ({ itemId, onClose }) => {
               <StatusBadge status={item.status} />
             </div>
           </div>
+        </div>
+
+        {/* Download PDF Button */}
+        <div className="px-5 pb-2 pt-3 border-b border-[var(--border)] flex gap-2">
+          <button onClick={() => handlePrintSlip(item, run)}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-[var(--brand-600)] text-white hover:bg-[var(--brand-700)] transition-colors">
+            <Download className="w-4 h-4"/> Download PDF
+          </button>
+          <button onClick={() => window.print()}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]">
+            <Printer className="w-4 h-4"/> Print
+          </button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -1115,15 +1257,382 @@ const LoanTab = () => {
   );
 };
 
+
+// ════════════════════════════════════════════════════════════════
+// TAB: LAPORAN PAYROLL BULANAN
+// ════════════════════════════════════════════════════════════════
+const PayrollReportTab = () => {
+  const [runs,    setRuns]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selRun,  setSelRun]  = useState(null);
+  const [detail,  setDetail]  = useState(null);
+  const [loadDet, setLoadDet] = useState(false);
+  const year = new Date().getFullYear();
+
+  useEffect(() => {
+    payrollEngineService.getRuns({ limit: 50 })
+      .then(r => {
+        const all = r.data.data?.runs || [];
+        setRuns(all.filter(r => r.status === 'paid' || r.status === 'approved'));
+        if (all.length) setSelRun(all[0].id);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selRun) return;
+    setLoadDet(true);
+    payrollEngineService.getRunDetail(selRun, { limit: 200 })
+      .then(r => setDetail(r.data.data))
+      .catch(() => toast.error('Gagal memuat detail'))
+      .finally(() => setLoadDet(false));
+  }, [selRun]);
+
+  const handleExport = () => {
+    if (!detail) return;
+    const run   = detail.run;
+    const items = detail.items || [];
+    const toRp  = (n) => `Rp ${Number(n||0).toLocaleString('id-ID')}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"/>
+<title>Laporan Payroll - ${run?.period_label}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Arial,sans-serif; font-size:10px; padding:20px; color:#111; }
+  h1 { font-size:16px; font-weight:900; margin-bottom:2px; }
+  .sub { color:#666; font-size:10px; margin-bottom:16px; }
+  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+  .sum-box { border:1px solid #e0e0e0; border-radius:6px; padding:10px; text-align:center; }
+  .sum-box .num { font-size:16px; font-weight:900; }
+  .sum-box .lbl { font-size:9px; color:#888; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f1f5f9; padding:7px 8px; text-align:left; font-size:9px; font-weight:700; text-transform:uppercase; border-bottom:2px solid #e2e8f0; }
+  td { padding:6px 8px; border-bottom:1px solid #f1f5f9; font-size:10px; }
+  tr:last-child td { border-bottom:none; }
+  .num-col { text-align:right; font-weight:600; }
+  .total-row td { font-weight:700; background:#f8fafc; border-top:2px solid #1a1a1a; }
+  @media print { body { padding:12px; } }
+</style></head>
+<body>
+<h1>LAPORAN PAYROLL — ${run?.period_label?.toUpperCase()}</h1>
+<div class="sub">GPDISTRO RACING ID · Dicetak: ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</div>
+<div class="summary">
+  <div class="sum-box"><div class="num" style="color:#2563eb">${items.length}</div><div class="lbl">Karyawan</div></div>
+  <div class="sum-box"><div class="num" style="color:#16a34a">${toRp(items.reduce((s,i)=>s+Number(i.total_income||0),0))}</div><div class="lbl">Total Pendapatan</div></div>
+  <div class="sum-box"><div class="num" style="color:#dc2626">${toRp(items.reduce((s,i)=>s+Number(i.total_deductions||0),0))}</div><div class="lbl">Total Potongan</div></div>
+  <div class="sum-box"><div class="num" style="color:#16a34a">${toRp(items.reduce((s,i)=>s+Number(i.net_salary||0),0))}</div><div class="lbl">Total Gaji Bersih</div></div>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Nama Karyawan</th><th>Jabatan</th><th>Departemen</th>
+      <th class="num-col">Gaji Pokok</th><th class="num-col">Total Pendapatan</th>
+      <th class="num-col">Total Potongan</th><th class="num-col">Take Home Pay</th>
+      <th>Hadir</th><th>Alpha</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${items.map((item,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${item.employee_name}</td>
+      <td>${item.employee_position||'—'}</td>
+      <td>${item.employee_department||'—'}</td>
+      <td class="num-col">${toRp(item.base_salary)}</td>
+      <td class="num-col">${toRp(item.total_income)}</td>
+      <td class="num-col" style="color:#dc2626">-${toRp(item.total_deductions)}</td>
+      <td class="num-col" style="color:#16a34a;font-weight:900">${toRp(item.net_salary)}</td>
+      <td style="text-align:center">${item.present_days||0}</td>
+      <td style="text-align:center;color:#dc2626">${item.alpha_days||0}</td>
+      <td><span style="background:${item.flip_status==='DONE'?'#dcfce7':'#f1f5f9'};color:${item.flip_status==='DONE'?'#16a34a':'#64748b'};padding:2px 6px;border-radius:100px;font-size:9px;font-weight:700">${item.flip_status==='DONE'?'Ditransfer':'Pending'}</span></td>
+    </tr>`).join('')}
+    <tr class="total-row">
+      <td colspan="4"><strong>TOTAL</strong></td>
+      <td class="num-col">${toRp(items.reduce((s,i)=>s+Number(i.base_salary||0),0))}</td>
+      <td class="num-col">${toRp(items.reduce((s,i)=>s+Number(i.total_income||0),0))}</td>
+      <td class="num-col" style="color:#dc2626">-${toRp(items.reduce((s,i)=>s+Number(i.total_deductions||0),0))}</td>
+      <td class="num-col" style="color:#16a34a">${toRp(items.reduce((s,i)=>s+Number(i.net_salary||0),0))}</td>
+      <td></td><td></td><td></td>
+    </tr>
+  </tbody>
+</table>
+</body></html>`;
+    const w = window.open('', '_blank', 'width=1100,height=800');
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
+  };
+
+  const run   = detail?.run;
+  const items = detail?.items || [];
+  const totIncome = items.reduce((s,i) => s + Number(i.total_income||0), 0);
+  const totDeduct = items.reduce((s,i) => s + Number(i.total_deductions||0), 0);
+  const totNet    = items.reduce((s,i) => s + Number(i.net_salary||0), 0);
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Laporan Payroll</h1>
+          <p className="page-subtitle">Breakdown komponen gaji per periode</p>
+        </div>
+        {detail && (
+          <button onClick={handleExport}
+            className="btn-primary gap-2">
+            <Printer className="w-4 h-4"/> Cetak / Export PDF
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+        {/* Run selector */}
+        <div className="table-wrapper p-4">
+          <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Pilih Periode</p>
+          {loading ? <div className="skeleton h-8 rounded-lg"/> : (
+            <select value={selRun||''} onChange={e => setSelRun(e.target.value)}
+              className="input-base text-sm w-full">
+              {runs.map(r => (
+                <option key={r.id} value={r.id}>{r.period_label} — {RUN_TYPES[r.type]?.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Summary cards */}
+        {[
+          { l:'Karyawan', v: items.length, c:'text-blue-600', icon:'👥' },
+          { l:'Total Pendapatan', v: toRupiah(totIncome), c:'text-emerald-600', icon:'💰' },
+          { l:'Total Potongan',   v: toRupiah(totDeduct), c:'text-red-500',     icon:'✂️' },
+          { l:'Take Home Pay',    v: toRupiah(totNet),    c:'text-emerald-700', icon:'🏦' },
+        ].map(({ l, v, c, icon }) => (
+          <div key={l} className="table-wrapper p-4">
+            <p className="text-xs text-[var(--text-muted)] mb-1">{icon} {l}</p>
+            <p className={`text-lg font-black ${c}`}>{v}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Detail table */}
+      <div className="table-wrapper overflow-hidden">
+        <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">
+            {run ? `${run.period_label} · ${items.length} karyawan` : 'Pilih periode'}
+          </p>
+        </div>
+        {loadDet ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                  {['#','Karyawan','Jabatan','Dept','Gaji Pokok','Tunjangan','Potongan','Take Home Pay','Hadir','Alpha','Status'].map(h => (
+                    <th key={h} className="px-3 py-2.5 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {items.map((item, i) => (
+                  <tr key={item.id} className="hover:bg-[var(--bg-secondary)]/40">
+                    <td className="px-3 py-2.5 text-[var(--text-muted)]">{i+1}</td>
+                    <td className="px-3 py-2.5 font-semibold">{item.employee_name}</td>
+                    <td className="px-3 py-2.5 text-[var(--text-muted)]">{item.employee_position||'—'}</td>
+                    <td className="px-3 py-2.5 text-[var(--text-muted)]">{item.employee_department||'—'}</td>
+                    <td className="px-3 py-2.5 text-right">{toRupiah(item.base_salary)}</td>
+                    <td className="px-3 py-2.5 text-right text-emerald-600">+{toRupiah(item.total_income)}</td>
+                    <td className="px-3 py-2.5 text-right text-red-500">-{toRupiah(item.total_deductions)}</td>
+                    <td className="px-3 py-2.5 text-right font-black text-emerald-700">{toRupiah(item.net_salary)}</td>
+                    <td className="px-3 py-2.5 text-center">{item.present_days||0}</td>
+                    <td className="px-3 py-2.5 text-center text-red-500">{item.alpha_days||0}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        item.flip_status === 'DONE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {item.flip_status === 'DONE' ? 'Ditransfer' : 'Pending'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {items.length > 0 && (
+                  <tr className="border-t-2 border-[var(--border)] font-bold bg-[var(--bg)]">
+                    <td colSpan={4} className="px-3 py-3 text-xs font-bold uppercase tracking-wide">TOTAL</td>
+                    <td className="px-3 py-3 text-right">{toRupiah(items.reduce((s,i)=>s+Number(i.base_salary||0),0))}</td>
+                    <td className="px-3 py-3 text-right text-emerald-600">+{toRupiah(totIncome)}</td>
+                    <td className="px-3 py-3 text-right text-red-500">-{toRupiah(totDeduct)}</td>
+                    <td className="px-3 py-3 text-right text-emerald-700 text-sm">{toRupiah(totNet)}</td>
+                    <td colSpan={3}/>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// TAB: PAYROLL HISTORY PER KARYAWAN
+// ════════════════════════════════════════════════════════════════
+const PayrollHistoryTab = () => {
+  const [employees, setEmployees] = useState([]);
+  const [selEmp,    setSelEmp]    = useState('');
+  const [history,   setHistory]   = useState([]);
+  const [loading,   setLoading]   = useState(false);
+  const [selSlip,   setSelSlip]   = useState(null);
+
+  useEffect(() => {
+    // Get all runs then extract unique employees
+    payrollEngineService.getRuns({ limit: 100 }).then(r => {
+      const runs = r.data.data?.runs || [];
+      // Get first run detail to extract employee list
+      if (runs.length) {
+        payrollEngineService.getRunDetail(runs[0].id, { limit: 200 }).then(rd => {
+          const emps = (rd.data.data?.items || []).map(i => ({
+            id: i.user_id, name: i.employee_name, dept: i.employee_department,
+          }));
+          setEmployees(emps);
+          if (emps.length) setSelEmp(String(emps[0].id));
+        });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selEmp) return;
+    setLoading(true);
+    // Get all runs and filter items for this employee
+    payrollEngineService.getRuns({ limit: 100 }).then(async r => {
+      const runs = r.data.data?.runs || [];
+      const items = [];
+      for (const run of runs.slice(0, 24)) { // last 24 periods
+        try {
+          const rd = await payrollEngineService.getRunDetail(run.id, { limit: 200 });
+          const emp = (rd.data.data?.items || []).find(i => String(i.user_id) === selEmp);
+          if (emp) items.push({ ...emp, run });
+        } catch {}
+      }
+      setHistory(items);
+    }).finally(() => setLoading(false));
+  }, [selEmp]);
+
+  const totalNet = history.reduce((s, i) => s + Number(i.net_salary||0), 0);
+  const avgNet   = history.length ? totalNet / history.length : 0;
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">History Payroll</h1>
+          <p className="page-subtitle">Riwayat gaji per karyawan</p>
+        </div>
+      </div>
+
+      {/* Employee selector */}
+      <div className="table-wrapper p-4 mb-4">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 max-w-sm">
+            <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Karyawan</label>
+            <select value={selEmp} onChange={e => setSelEmp(e.target.value)} className="input-base text-sm w-full">
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name} — {e.dept}</option>)}
+            </select>
+          </div>
+          {history.length > 0 && (
+            <div className="flex gap-4 text-sm">
+              <div className="text-center">
+                <p className="font-black text-blue-600">{history.length}x</p>
+                <p className="text-[10px] text-[var(--text-muted)]">Periode</p>
+              </div>
+              <div className="text-center">
+                <p className="font-black text-emerald-600">{toRupiah(totalNet)}</p>
+                <p className="text-[10px] text-[var(--text-muted)]">Total Gaji</p>
+              </div>
+              <div className="text-center">
+                <p className="font-black text-[var(--brand-600)]">{toRupiah(avgNet)}</p>
+                <p className="text-[10px] text-[var(--text-muted)]">Rata-rata/Bulan</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* History table */}
+      <div className="table-wrapper overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>
+        ) : history.length === 0 ? (
+          <div className="text-center py-12">
+            <Clock className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-3 opacity-30"/>
+            <p className="text-sm text-[var(--text-muted)]">Belum ada riwayat gaji</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                  {['Periode','Tipe','Hadir','Telat','Alpha','Gaji Pokok','Tunjangan','Potongan','Take Home Pay','Status',''].map(h => (
+                    <th key={h} className="px-3 py-2.5 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {history.map((item) => {
+                  const rt = RUN_TYPES[item.run?.type] || RUN_TYPES.monthly;
+                  return (
+                    <tr key={item.id} className="hover:bg-[var(--bg-secondary)]/40">
+                      <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{item.run?.period_label}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[10px]">{rt.icon} {rt.label}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-emerald-600 font-bold">{item.present_days||0}</td>
+                      <td className="px-3 py-2.5 text-center text-amber-600">{item.late_count||0}</td>
+                      <td className="px-3 py-2.5 text-center text-red-500">{item.alpha_days||0}</td>
+                      <td className="px-3 py-2.5 text-right">{toRupiah(item.base_salary)}</td>
+                      <td className="px-3 py-2.5 text-right text-emerald-600">+{toRupiah(item.total_income)}</td>
+                      <td className="px-3 py-2.5 text-right text-red-500">-{toRupiah(item.total_deductions)}</td>
+                      <td className="px-3 py-2.5 text-right font-black text-emerald-700">{toRupiah(item.net_salary)}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          item.run?.status === 'paid' ? 'bg-green-100 text-green-700' :
+                          item.run?.status === 'approved' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-500'
+                        }`}>
+                          {RUN_STATUS[item.run?.status]?.label || item.run?.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <button onClick={() => setSelSlip(item.id)}
+                          className="text-[10px] text-[var(--brand-600)] hover:underline font-semibold">
+                          Lihat Slip
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {selSlip && <SlipModal itemId={selSlip} onClose={() => setSelSlip(null)} />}
+    </div>
+  );
+};
+
 // ════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════
 const TABS_HR = [
-  { id:'runs',       label:'Payroll',   icon:DollarSign },
-  { id:'myslip',     label:'Slip Saya', icon:FileText },
-  { id:'loan',       label:'Kasbon',    icon:Wallet },
-  { id:'components', label:'Komponen',  icon:Settings },
-  { id:'settings',   label:'Pengaturan',icon:Settings },
+  { id:'runs',       label:'Payroll',      icon:DollarSign },
+  { id:'report',     label:'Laporan',      icon:BarChart3 },
+  { id:'history',    label:'History',      icon:Clock },
+  { id:'myslip',     label:'Slip Saya',    icon:FileText },
+  { id:'loan',       label:'Kasbon',       icon:Wallet },
+  { id:'components', label:'Komponen',     icon:Settings },
+  { id:'settings',   label:'Pengaturan',   icon:Settings },
 ];
 const TABS_EMP = [
   { id:'myslip', label:'Slip Saya', icon:FileText },
@@ -1540,6 +2049,8 @@ export default function PayrollEnginePage() {
       </div>
 
       {activeTab === 'runs'       && <RunsTab />}
+      {activeTab === 'report'     && <PayrollReportTab />}
+      {activeTab === 'history'    && <PayrollHistoryTab />}
       {activeTab === 'myslip'     && <MySlipTab />}
       {activeTab === 'loan'        && <LoanTab />}
       {activeTab === 'components' && <ComponentsTab />}
