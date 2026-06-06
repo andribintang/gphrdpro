@@ -86,6 +86,12 @@ const uploadPhoto = async (file) => {
 
 const Avatar = ({ name, size = 'md', photoUrl }) => {
   const sizes = { sm:'w-8 h-8 text-sm', md:'w-10 h-10 text-base', lg:'w-14 h-14 text-xl', xl:'w-20 h-20 text-3xl' };
+  if (photoUrl) return (
+    <img src={photoUrl} alt={name}
+      className={`${sizes[size]} rounded-2xl object-cover flex-shrink-0 shadow-sm`}
+      onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }}
+    />
+  );
   return (
     <div className={`${sizes[size]} rounded-2xl bg-gradient-to-br ${avatarColor(name)} flex items-center justify-center flex-shrink-0 shadow-sm`}>
       <span className="text-white font-black leading-none">{name?.[0]?.toUpperCase() || '?'}</span>
