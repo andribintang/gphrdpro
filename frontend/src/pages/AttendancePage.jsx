@@ -6,6 +6,7 @@ import {
   AlertTriangle, Loader2, Navigation, Shield, ShieldCheck,
   ShieldX, Map, Users, Eye, Settings, X, Info,
   Upload, Download, FileSpreadsheet, Check, History, Calendar,
+  BarChart3, Bell, TrendingDown, AlertCircle, Building2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -1539,15 +1540,473 @@ function MonitoringTab() {
 // ════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════
+// TAB: REKAP ABSENSI PER DEPARTEMEN
+// ════════════════════════════════════════════════════════════════
+const RekapDeptTab = () => {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [month,   setMonth]   = useState(new Date().toISOString().slice(0,7));
+  const [data,    setData]    = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [y, m] = month.split('-');
+    try {
+      const r = await fetch(`${API}/attendance/admin/all?year=${y}&month=${m}&limit=1000`, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      const d = await r.json();
+      const records = d.data?.records || d.data?.attendances || [];
+
+      // Group by department
+      const deptMap = {};
+      records.forEach(rec => {
+        const dept = rec.user?.employee?.department || rec.department || 'Tidak Diketahui';
+        if (!deptMap[dept]) deptMap[dept] = { dept, total:0, present:0, late:0, absent:0, leave:0, hours:0 };
+        deptMap[dept].total++;
+        if (['present','late'].includes(rec.status)) deptMap[dept].present++;
+        if (rec.status === 'late')    deptMap[dept].late++;
+        if (rec.status === 'absent')  deptMap[dept].absent++;
+        if (rec.status === 'leave')   deptMap[dept].leave++;
+        if (rec.work_hours) deptMap[dept].hours += parseFloat(rec.work_hours)||0;
+      });
+      setData(Object.values(deptMap).sort((a,b) => b.total - a.total));
+    } catch { toast.error('Gagal memuat rekap'); }
+    finally { setLoading(false); }
+  }, [month]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(data.map(d => ({
+      'Departemen': d.dept,
+      'Total Records': d.total,
+      'Hadir': d.present,
+      'Terlambat': d.late,
+      'Absen': d.absent,
+      'Cuti': d.leave,
+      'Total Jam Kerja': d.hours.toFixed(1),
+      'Avg Jam/Hari': d.present > 0 ? (d.hours/d.present).toFixed(1) : '0',
+      '% Kehadiran': d.total > 0 ? ((d.present/d.total)*100).toFixed(1)+'%' : '0%',
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Rekap Departemen');
+    XLSX.writeFile(wb, `rekap_absensi_${month}.xlsx`);
+    toast.success('Data diexport ke Excel');
+  };
+
+  const totals = data.reduce((s,d) => ({
+    total: s.total+d.total, present: s.present+d.present,
+    late: s.late+d.late, absent: s.absent+d.absent,
+  }), { total:0, present:0, late:0, absent:0 });
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Rekap Absensi per Departemen</h1>
+          <p className="page-subtitle">Perbandingan kehadiran antar departemen</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+            className="input-base text-sm h-10 w-40"/>
+          <button onClick={handleExport} className="btn-secondary gap-2 h-10">
+            <Download className="w-4 h-4"/> Export Excel
+          </button>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        {[
+          { l:'Total Records', v: totals.total,   c:'text-blue-600',    icon:'📋' },
+          { l:'Total Hadir',   v: totals.present, c:'text-emerald-600', icon:'✅' },
+          { l:'Terlambat',     v: totals.late,    c:'text-amber-600',   icon:'⏰' },
+          { l:'Absen',         v: totals.absent,  c:'text-red-500',     icon:'❌' },
+        ].map(({ l,v,c,icon }) => (
+          <div key={l} className="table-wrapper p-4 text-center">
+            <p className="text-2xl mb-1">{icon}</p>
+            <p className={`text-2xl font-black ${c}`}>{v}</p>
+            <p className="text-xs text-[var(--text-muted)]">{l}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="table-wrapper overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                {['Departemen','Total','Hadir','Terlambat','Absen','Cuti','Total Jam','Avg Jam/Hari','% Kehadiran'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {data.map(row => {
+                const pct = row.total > 0 ? (row.present/row.total*100) : 0;
+                return (
+                  <tr key={row.dept} className="hover:bg-[var(--bg-secondary)]/40">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-[var(--text-muted)]"/>
+                        <span className="font-semibold">{row.dept}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center font-bold">{row.total}</td>
+                    <td className="px-4 py-3 text-center text-emerald-600 font-bold">{row.present}</td>
+                    <td className="px-4 py-3 text-center text-amber-600">{row.late}</td>
+                    <td className="px-4 py-3 text-center text-red-500">{row.absent}</td>
+                    <td className="px-4 py-3 text-center text-blue-600">{row.leave}</td>
+                    <td className="px-4 py-3 text-center">{row.hours.toFixed(1)} jam</td>
+                    <td className="px-4 py-3 text-center">
+                      {row.present > 0 ? (row.hours/row.present).toFixed(1) : '0'} jam
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, background: pct>=80?'#16a34a':pct>=60?'#d97706':'#dc2626' }}/>
+                        </div>
+                        <span className={`text-xs font-bold w-10 ${pct>=80?'text-emerald-600':pct>=60?'text-amber-600':'text-red-500'}`}>
+                          {pct.toFixed(0)}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// TAB: PETA LOKASI CHECK-IN
+// ════════════════════════════════════════════════════════════════
+const LocationMapTab = () => {
+  const API      = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const mapRef   = useRef(null);
+  const mapObj   = useRef(null);
+  const markers  = useRef([]);
+  const [records,  setRecords]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [selDate,  setSelDate]  = useState(new Date().toISOString().slice(0,10));
+  const [selected, setSelected] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [y, m] = selDate.slice(0,7).split('-');
+    try {
+      const r = await fetch(`${API}/attendance/admin/all?year=${y}&month=${m}&limit=500`, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      const d = await r.json();
+      const all = (d.data?.records || d.data?.attendances || [])
+        .filter(a => a.date === selDate && (a.check_in_lat || a.lat));
+      setRecords(all);
+    } catch { toast.error('Gagal memuat data'); }
+    finally { setLoading(false); }
+  }, [selDate]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (loading || !mapRef.current) return;
+    const initMap = () => {
+      // Default center: Jakarta
+      const center = records.length > 0
+        ? { lat: parseFloat(records[0].check_in_lat||records[0].lat||'-6.2'), lng: parseFloat(records[0].check_in_lng||records[0].lng||'106.8') }
+        : { lat: -6.2088, lng: 106.8456 };
+      if (!mapObj.current) {
+        mapObj.current = new window.google.maps.Map(mapRef.current, {
+          zoom: 14, center,
+          styles: [{ featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] }],
+        });
+      }
+      // Clear old markers
+      markers.current.forEach(m => m.setMap(null));
+      markers.current = [];
+      // Add markers
+      records.forEach(rec => {
+        const lat = parseFloat(rec.check_in_lat||rec.lat);
+        const lng = parseFloat(rec.check_in_lng||rec.lng);
+        if (!lat || !lng) return;
+        const color = rec.status==='late' ? '#f59e0b' : rec.status==='absent' ? '#ef4444' : '#10b981';
+        const marker = new window.google.maps.Marker({
+          position: { lat, lng },
+          map: mapObj.current,
+          title: rec.user?.name || rec.employee_name || '',
+          icon: { path: window.google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 10 },
+        });
+        const info = new window.google.maps.InfoWindow({
+          content: `<div style="font-size:12px;min-width:160px">
+            <strong>${rec.user?.name||rec.employee_name||'—'}</strong><br/>
+            <span style="color:#888">${rec.user?.employee?.department||''}</span><br/>
+            Check-in: <strong>${rec.check_in||'—'}</strong><br/>
+            Status: <span style="color:${color};font-weight:700">${rec.status}</span>
+          </div>`,
+        });
+        marker.addListener('click', () => { info.open(mapObj.current, marker); setSelected(rec); });
+        markers.current.push(marker);
+      });
+      if (records.length > 0) mapObj.current.setCenter({ lat: parseFloat(records[0].check_in_lat||records[0].lat), lng: parseFloat(records[0].check_in_lng||records[0].lng) });
+    };
+    if (window.google?.maps) { initMap(); }
+    else {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY||''}`;
+      script.async = true;
+      script.onload = initMap;
+      document.head.appendChild(script);
+    }
+  }, [records, loading]);
+
+  const statusColors = { present:'bg-emerald-100 text-emerald-700', late:'bg-amber-100 text-amber-700', absent:'bg-red-100 text-red-600', leave:'bg-blue-100 text-blue-700' };
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Peta Lokasi Check-in</h1>
+          <p className="page-subtitle">Visualisasi lokasi absensi karyawan</p>
+        </div>
+        <input type="date" value={selDate} onChange={e => setSelDate(e.target.value)}
+          className="input-base text-sm h-10 w-44"/>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mb-4 text-xs">
+        {[['#10b981','Hadir'],['#f59e0b','Terlambat'],['#ef4444','Absen']].map(([c,l]) => (
+          <div key={l} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full" style={{background:c}}/>
+            <span className="text-[var(--text-muted)]">{l}</span>
+          </div>
+        ))}
+        <span className="text-[var(--text-muted)] ml-2">{records.length} titik lokasi hari ini</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+        {/* Map */}
+        <div className="table-wrapper overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-96">
+              <Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/>
+            </div>
+          ) : records.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-96 text-[var(--text-muted)]">
+              <MapPin className="w-12 h-12 mb-3 opacity-30"/>
+              <p className="text-sm">Tidak ada data lokasi untuk tanggal ini</p>
+              <p className="text-xs mt-1 opacity-60">Karyawan harus absen dengan GPS aktif</p>
+            </div>
+          ) : (
+            <div ref={mapRef} className="w-full h-96 lg:h-[520px]"/>
+          )}
+        </div>
+
+        {/* Sidebar — list */}
+        <div className="table-wrapper overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-[var(--border)]">
+            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Daftar Check-in</p>
+          </div>
+          <div className="overflow-y-auto flex-1 max-h-[520px]">
+            {records.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)] text-center py-8">Tidak ada data</p>
+            ) : records.map((rec, i) => (
+              <div key={i}
+                onClick={() => setSelected(rec)}
+                className={`px-4 py-3 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--bg-secondary)]/40 transition-colors ${selected?.id===rec?.id?'bg-[var(--brand-600)]/5':''}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{rec.user?.name||rec.employee_name||'—'}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">{rec.user?.employee?.department||''}</p>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${statusColors[rec.status]||'bg-gray-100 text-gray-500'}`}>
+                    {rec.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-1 text-[10px] text-[var(--text-muted)]">
+                  <span>🕐 {rec.check_in||'—'}</span>
+                  {rec.check_in_lat && <span>📍 {parseFloat(rec.check_in_lat).toFixed(4)}, {parseFloat(rec.check_in_lng).toFixed(4)}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════
+// TAB: NOTIFIKASI KARYAWAN SERING TERLAMBAT
+// ════════════════════════════════════════════════════════════════
+const LateAlertsTab = () => {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const [month,    setMonth]    = useState(new Date().toISOString().slice(0,7));
+  const [data,     setData]     = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [threshold, setThreshold] = useState(3); // alert if late >= N times
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [y, m] = month.split('-');
+    try {
+      const r = await fetch(`${API}/attendance/admin/all?year=${y}&month=${m}&limit=1000`, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      const d = await r.json();
+      const records = d.data?.records || d.data?.attendances || [];
+
+      // Group by employee
+      const empMap = {};
+      records.forEach(rec => {
+        const uid = rec.user_id || rec.user?.id;
+        const name = rec.user?.name || rec.employee_name || 'Unknown';
+        const dept = rec.user?.employee?.department || rec.department || '—';
+        if (!empMap[uid]) empMap[uid] = { uid, name, dept, late:0, absent:0, total:0, lateDates:[], absentDates:[] };
+        empMap[uid].total++;
+        if (rec.status === 'late')   { empMap[uid].late++;   empMap[uid].lateDates.push(rec.date); }
+        if (rec.status === 'absent') { empMap[uid].absent++; empMap[uid].absentDates.push(rec.date); }
+      });
+      // Filter: only those with issues
+      const issues = Object.values(empMap)
+        .filter(e => e.late >= threshold || e.absent >= 3)
+        .sort((a,b) => (b.late+b.absent*2) - (a.late+a.absent*2));
+      setData(issues);
+    } catch { toast.error('Gagal memuat data'); }
+    finally { setLoading(false); }
+  }, [month, threshold]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const getLevel = (emp) => {
+    const score = emp.late + emp.absent * 2;
+    if (score >= 10 || emp.absent >= 5) return { label:'Kritis', color:'text-red-600', bg:'bg-red-100', icon:'🔴' };
+    if (score >= 5  || emp.absent >= 3) return { label:'Perlu Perhatian', color:'text-amber-600', bg:'bg-amber-100', icon:'🟡' };
+    return { label:'Peringatan', color:'text-blue-600', bg:'bg-blue-100', icon:'🔵' };
+  };
+
+  const handleSendAlert = (emp) => {
+    toast.success(`Notifikasi dikirim ke ${emp.name}`);
+    // TODO: integrate with notification system
+  };
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Peringatan Keterlambatan</h1>
+          <p className="page-subtitle">Karyawan dengan keterlambatan atau absen berlebihan</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+            className="input-base text-sm h-10 w-40"/>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[var(--text-muted)]">Alert jika terlambat ≥</label>
+            <select value={threshold} onChange={e => setThreshold(Number(e.target.value))}
+              className="input-base text-sm h-10 w-20">
+              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}x</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {[
+          { l:'Karyawan Bermasalah', v: data.length, c:'text-red-600', icon:'⚠️' },
+          { l:'Kritis (≥5 absen/10 terlambat)', v: data.filter(e=>getLevel(e).label==='Kritis').length, c:'text-red-700', icon:'🔴' },
+          { l:'Perlu Perhatian', v: data.filter(e=>getLevel(e).label==='Perlu Perhatian').length, c:'text-amber-600', icon:'🟡' },
+        ].map(({ l,v,c,icon }) => (
+          <div key={l} className="table-wrapper p-4 text-center">
+            <p className="text-2xl mb-1">{icon}</p>
+            <p className={`text-2xl font-black ${c}`}>{v}</p>
+            <p className="text-xs text-[var(--text-muted)]">{l}</p>
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>
+      ) : data.length === 0 ? (
+        <div className="table-wrapper text-center py-16">
+          <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3"/>
+          <p className="font-semibold text-[var(--text-primary)]">Semua karyawan dalam kondisi baik!</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Tidak ada yang melebihi batas keterlambatan bulan ini</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {data.map(emp => {
+            const level = getLevel(emp);
+            return (
+              <div key={emp.uid} className={`table-wrapper p-4 border-l-4 ${level.label==='Kritis'?'border-red-500':level.label==='Perlu Perhatian'?'border-amber-500':'border-blue-500'}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl ${level.bg} flex items-center justify-center flex-shrink-0`}>
+                      <AlertCircle className={`w-5 h-5 ${level.color}`}/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-bold text-[var(--text-primary)]">{emp.name}</p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${level.bg} ${level.color}`}>
+                          {level.icon} {level.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] mb-2">{emp.dept}</p>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1 text-amber-600 font-semibold">
+                          ⏰ {emp.late}x terlambat
+                        </span>
+                        <span className="flex items-center gap-1 text-red-500 font-semibold">
+                          ❌ {emp.absent}x absen
+                        </span>
+                        <span className="text-[var(--text-muted)]">dari {emp.total} hari kerja</span>
+                      </div>
+                      {/* Late dates */}
+                      {emp.lateDates.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {emp.lateDates.slice(0,8).map(d => (
+                            <span key={d} className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-mono">{d}</span>
+                          ))}
+                          {emp.lateDates.length > 8 && <span className="text-[10px] text-[var(--text-muted)]">+{emp.lateDates.length-8} lagi</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => handleSendAlert(emp)}
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors">
+                    <Bell className="w-3.5 h-3.5"/> Kirim Notif
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AttendancePage() {
   const { user, isHR } = useAuth();
   const canMonitor = isHR || user?.role === 'admin' || user?.role === 'supervisor';
 
   const TABS = [
-    { id: 'clock',     label: 'Absen',     icon: Clock },
-    { id: 'history',   label: 'Riwayat',   icon: Eye },
-    ...(isHR ? [{ id: 'admin',   label: 'Koreksi',   icon: Edit2  }] : []),
-    ...(canMonitor ? [{ id: 'monitor', label: 'Monitor',  icon: Users  }] : []),
+    { id: 'clock',     label: 'Absen',       icon: Clock },
+    { id: 'history',   label: 'Riwayat',     icon: Eye },
+    ...(isHR ? [{ id: 'admin',   label: 'Koreksi',     icon: Edit2  }] : []),
+    ...(canMonitor ? [{ id: 'monitor', label: 'Monitor',    icon: Users  }] : []),
+    ...(isHR ? [{ id: 'rekap',   label: 'Rekap Dept',  icon: BarChart3 }] : []),
+    ...(isHR ? [{ id: 'map',     label: 'Peta Lokasi', icon: MapPin    }] : []),
+    ...(isHR ? [{ id: 'alerts',  label: 'Peringatan',  icon: Bell      }] : []),
   ];
 
   const [activeTab,   setActiveTab]   = useState('clock');
@@ -1611,6 +2070,9 @@ export default function AttendancePage() {
           {activeTab === 'history' && <HistoryTab />}
           {activeTab === 'admin'   && <AdminAttendanceTab />}
       {activeTab === 'monitor' && <MonitoringTab />}
+          {activeTab === 'rekap'   && <RekapDeptTab />}
+          {activeTab === 'map'     && <LocationMapTab />}
+          {activeTab === 'alerts'  && <LateAlertsTab />}
         </>
       )}
 
