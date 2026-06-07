@@ -400,7 +400,7 @@ function MapCard({ lat, lng, officeLat, officeLng, distance, radius, title = 'Lo
     if (window.google) { loadMap(); return; }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&loading=async&libraries=marker`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=marker&callback=Function.prototype`;
     script.async = true;
     script.onload = loadMap;
     document.head.appendChild(script);
@@ -1767,13 +1767,17 @@ const LocationMapTab = () => {
       });
       if (records.length > 0) mapObj.current.setCenter({ lat: parseFloat(records[0].check_in_lat||records[0].lat), lng: parseFloat(records[0].check_in_lng||records[0].lng) });
     };
-    if (window.google?.maps) { initMap(); }
-    else {
+    if (window.google?.maps?.Map) {
+      initMap();
+    } else if (document.querySelector('script[src*="maps.googleapis"]')) {
+      // Script already loading - poll until ready
+      const t = setInterval(() => { if (window.google?.maps?.Map) { clearInterval(t); initMap(); } }, 150);
+    } else {
+      window.__locationMapInit = initMap;
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY||''}&loading=async&libraries=marker`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY||''}&libraries=marker&callback=__locationMapInit`;
       script.async = true;
       script.defer = true;
-      script.onload = initMap;
       document.head.appendChild(script);
     }
   }, [records, loading]);
