@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import {
   Clock, CalendarOff, DollarSign, Users,
   TrendingUp, ChevronRight, LogIn, LogOut,
   AlertTriangle, CheckCircle2, RefreshCw,
   Building2, Target, Star, ArrowUpRight,
-  Activity
+  Activity, BarChart3, TrendingDown, Award, UserCheck, UserX, PieChart as PieIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as localeID } from 'date-fns/locale';
@@ -80,6 +81,9 @@ export default function DashboardPage() {
   const { settings } = useCompany();
   const navigate = useNavigate();
   const isHRAdmin = ['admin','hr'].includes(user?.role);
+  const [deptData,     setDeptData]     = useState([]);
+  const [attTrend,     setAttTrend]     = useState([]);
+  const [leaveStatus,  setLeaveStatus]  = useState([]);
 
   const [loading, setLoading]         = useState(true);
   const [todayAtt, setTodayAtt]       = useState(null);
@@ -112,6 +116,54 @@ export default function DashboardPage() {
                 count: latest.total_employees,
               } : null);
             }).catch(() => {}),
+          // Dept headcount chart
+          employeeService.getAll({ limit: 200 }).then(r => {
+            const emps = r.data.data?.employees || [];
+            const map = {};
+            emps.forEach(e => {
+              const d = e.employee?.department || 'Lainnya';
+              if (!map[d]) map[d] = { dept: d.length > 10 ? d.slice(0,10)+'…' : d, total: 0, active: 0 };
+              map[d].total++;
+              if (e.employee?.status === 'active') map[d].active++;
+            });
+            setDeptData(Object.values(map).sort((a,b) => b.total - a.total).slice(0,8));
+          }).catch(() => {}),
+
+          // Attendance trend last 6 months
+          (async () => {
+            const months = [];
+            for (let i = 5; i >= 0; i--) {
+              const d = new Date();
+              d.setMonth(d.getMonth() - i);
+              months.push({ year: d.getFullYear(), month: d.getMonth() + 1, label: d.toLocaleDateString('id-ID', { month: 'short' }) });
+            }
+            const trend = await Promise.all(months.map(async ({ year, month, label }) => {
+              try {
+                const r = await api.get('/attendance/admin/all', { params: { year, month, limit: 500 } });
+                const recs = r.data.data?.records || r.data.data?.attendances || [];
+                return {
+                  label,
+                  hadir:     recs.filter(a => a.status === 'present').length,
+                  terlambat: recs.filter(a => a.status === 'late').length,
+                  absen:     recs.filter(a => a.status === 'absent').length,
+                };
+              } catch { return { label, hadir: 0, terlambat: 0, absen: 0 }; }
+            }));
+            setAttTrend(trend);
+          })(),
+
+          // Leave status distribution
+          api.get('/leaves/admin/all', { params: { limit: 200 } }).then(r => {
+            const leaves = r.data.data?.leaves || [];
+            const map = { pending: 0, approved: 0, rejected: 0 };
+            leaves.forEach(l => { if (map[l.status] !== undefined) map[l.status]++; });
+            setLeaveStatus([
+              { name: 'Pending',   value: map.pending,  color: '#f59e0b' },
+              { name: 'Disetujui', value: map.approved, color: '#10b981' },
+              { name: 'Ditolak',   value: map.rejected, color: '#ef4444' },
+            ].filter(s => s.value > 0));
+          }).catch(() => {}),
+
           // Recent attendance (last 10)
           api.get('/attendance/admin/realtime', { params: { limit: 6 } })
             .then(r => {
@@ -277,6 +329,86 @@ export default function DashboardPage() {
               <p className="text-xs text-[var(--text-muted)] font-semibold mt-0.5">{s.label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+
+      {/* ── HR Charts ─────────────────────────────────────── */}
+      {isHRAdmin && (attTrend.length > 0 || deptData.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Attendance trend — 6 months */}
+          {attTrend.length > 0 && (
+            <div className="lg:col-span-2 card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-primary)]">Tren Absensi 6 Bulan</h3>
+                  <p className="text-xs text-[var(--text-muted)]">Hadir, Terlambat, Absen</p>
+                </div>
+                <BarChart3 className="w-4 h-4 text-[var(--text-muted)]"/>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={attTrend} barGap={2}>
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false}/>
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={25}/>
+                  <Tooltip
+                    contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
+                    cursor={{ fill: 'var(--bg-secondary)', radius: 4 }}
+                  />
+                  <Bar dataKey="hadir"     name="Hadir"      fill="#10b981" radius={[3,3,0,0]}/>
+                  <Bar dataKey="terlambat" name="Terlambat"  fill="#f59e0b" radius={[3,3,0,0]}/>
+                  <Bar dataKey="absen"     name="Absen"      fill="#ef4444" radius={[3,3,0,0]}/>
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Leave status donut */}
+          {leaveStatus.length > 0 && (
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-primary)]">Status Cuti</h3>
+                  <p className="text-xs text-[var(--text-muted)]">Distribusi pengajuan</p>
+                </div>
+                <PieIcon className="w-4 h-4 text-[var(--text-muted)]"/>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={leaveStatus} cx="50%" cy="50%" innerRadius={45} outerRadius={70}
+                    paddingAngle={3} dataKey="value">
+                    {leaveStatus.map((s, i) => <Cell key={i} fill={s.color}/>)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}/>
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Headcount per dept */}
+          {deptData.length > 0 && (
+            <div className="lg:col-span-3 card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-primary)]">Headcount per Departemen</h3>
+                  <p className="text-xs text-[var(--text-muted)]">Total vs Aktif</p>
+                </div>
+                <Users className="w-4 h-4 text-[var(--text-muted)]"/>
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={deptData} layout="vertical" barGap={2}>
+                  <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false}/>
+                  <YAxis type="category" dataKey="dept" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={80}/>
+                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} cursor={{ fill: 'var(--bg-secondary)' }}/>
+                  <Bar dataKey="total"  name="Total"  fill="var(--brand-200)" radius={[0,3,3,0]}/>
+                  <Bar dataKey="active" name="Aktif"  fill="var(--brand-600)" radius={[0,3,3,0]}/>
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend, AreaChart, Area, CartesianGrid } from 'recharts';
 import {
   BarChart3, Users, Clock, CalendarOff, DollarSign,
   ChevronLeft, ChevronRight, Download, RefreshCw,
@@ -15,7 +17,7 @@ import {
 } from '../utils/reportsService';
 
 // ── Shared: pure-CSS bar chart ─────────────────────────────────
-const BarChart = ({ data, valueKey, labelKey, colorClass = 'bg-brand-500 dark:bg-brand-400', height = 80, formatVal }) => {
+const CSSBarChart = ({ data, valueKey, labelKey, colorClass = 'bg-brand-500 dark:bg-brand-400', height = 80, formatVal }) => {
   if (!data?.length) return (
     <div className="flex items-center justify-center h-20 text-xs text-[var(--text-muted)]">Tidak ada data</div>
   );
@@ -267,9 +269,29 @@ const AttendanceTab = ({ month, onMonthChange }) => {
   const handleExport = async () => {
     setExp(true);
     try {
-      const res = await reportsService.export({ type: 'attendance', month });
-      downloadCSV(res.data.data.rows, res.data.data.filename);
-      toast.success(`${res.data.data.count} baris berhasil diexport!`);
+      // Try API export first, fallback to local XLSX from existing data
+      if (data?.by_employee?.length) {
+        const rows = data.by_employee.map(e => ({
+          'Nama Karyawan': e.name,
+          'Departemen':    e.department || '—',
+          'Hadir':         e.present || 0,
+          'Terlambat':     e.late || 0,
+          'Absen':         e.absent || 0,
+          'Cuti':          e.leave || 0,
+          'Total Jam':     e.total_hours ? e.total_hours.toFixed(1) : '0',
+          '% Kehadiran':   e.present_rate ? e.present_rate.toFixed(1)+'%' : '0%',
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [{ wch:20 },{ wch:15 },{ wch:8 },{ wch:10 },{ wch:8 },{ wch:8 },{ wch:10 },{ wch:12 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Laporan Absensi');
+        XLSX.writeFile(wb, `laporan_absensi_${month}.xlsx`);
+        toast.success(`${rows.length} data berhasil diexport ke Excel!`);
+      } else {
+        const res = await reportsService.export({ type: 'attendance', month });
+        downloadCSV(res.data.data.rows, res.data.data.filename);
+        toast.success(`${res.data.data.count} baris berhasil diexport!`);
+      }
     } catch { toast.error('Export gagal'); }
     finally { setExp(false); }
   };
@@ -349,6 +371,25 @@ const AttendanceTab = ({ month, onMonthChange }) => {
               color={`${['bg-brand-500','bg-emerald-500','bg-purple-500','bg-amber-500','bg-rose-500','bg-teal-500'][i % 6]}`}
             />
           ))}
+        </div>
+      )}
+
+      {/* Recharts bar chart */}
+      {data.by_employee?.length > 0 && (
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Breakdown Absensi per Karyawan</h3>
+          <ResponsiveContainer width="100%" height={Math.max(180, data.by_employee.length * 28)}>
+            <BarChart data={data.by_employee} layout="vertical" barGap={2} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)"/>
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false}/>
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} width={100}/>
+              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} cursor={{ fill: 'var(--bg-secondary)' }}/>
+              <Bar dataKey="present" name="Hadir"     fill="#10b981" radius={[0,3,3,0]}/>
+              <Bar dataKey="late"    name="Terlambat" fill="#f59e0b" radius={[0,3,3,0]}/>
+              <Bar dataKey="absent"  name="Absen"     fill="#ef4444" radius={[0,3,3,0]}/>
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }}/>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 

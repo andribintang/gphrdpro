@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, Clock, Loader2, AlertTriangle,
   RefreshCw, FileText, Users, TrendingDown, Calendar,
   MessageSquare
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -662,13 +663,199 @@ const ApprovalsTab = () => {
 // ═══════════════════════════════════════════════════════════════
 // MAIN LEAVE PAGE
 // ═══════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════
+// KALENDER CUTI TIM
+// ════════════════════════════════════════════════════════════════
+const LeaveCalendarTab = () => {
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const now  = new Date();
+  const [year,   setYear]   = useState(now.getFullYear());
+  const [month,  setMonth]  = useState(now.getMonth()); // 0-indexed
+  const [leaves, setLeaves] = useState([]);
+  const [loading,setLoading]= useState(false);
+
+  const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const DAYS_ID   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+
+  const LEAVE_COLORS = [
+    '#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981',
+    '#ef4444','#06b6d4','#84cc16','#f97316','#6366f1',
+  ];
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/leaves/admin/all?status=approved&limit=500`, {
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+    }).then(r => r.json()).then(d => {
+      setLeaves(d.data?.leaves || []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  // Build calendar grid
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  // Map employee colors
+  const empColors = {};
+  let colorIdx = 0;
+  leaves.forEach(l => {
+    if (!empColors[l.user_id]) empColors[l.user_id] = LEAVE_COLORS[colorIdx++ % LEAVE_COLORS.length];
+  });
+
+  // Get leaves for a specific date
+  const getLeavesForDate = (day) => {
+    if (!day) return [];
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    return leaves.filter(l => {
+      return l.start_date <= dateStr && l.end_date >= dateStr;
+    });
+  };
+
+  const isToday = (day) => {
+    const t = new Date();
+    return day && t.getFullYear() === year && t.getMonth() === month && t.getDate() === day;
+  };
+
+  const isWeekend = (cellIndex) => {
+    const dayOfWeek = cellIndex % 7;
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  };
+
+  // Get unique employees on leave this month
+  const thisMonthLeaves = leaves.filter(l => {
+    const start = new Date(l.start_date);
+    const end   = new Date(l.end_date);
+    const mStart = new Date(year, month, 1);
+    const mEnd   = new Date(year, month + 1, 0);
+    return start <= mEnd && end >= mStart;
+  });
+  const uniqueEmps = [...new Map(thisMonthLeaves.map(l => [l.user_id, l])).values()];
+
+  const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); };
+  const nextMonth = () => { if (month === 11) { setMonth(0); setYear(y => y+1); } else setMonth(m => m+1); };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Kalender Cuti Tim</h2>
+          <p className="text-sm text-[var(--text-muted)]">{thisMonthLeaves.length} pengajuan disetujui bulan ini</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={prevMonth} className="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)]">
+            <ChevronLeft className="w-4 h-4"/>
+          </button>
+          <span className="font-bold text-sm min-w-[120px] text-center">{MONTHS_ID[month]} {year}</span>
+          <button onClick={nextMonth} className="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)]">
+            <ChevronRight className="w-4 h-4"/>
+          </button>
+        </div>
+      </div>
+
+      {/* Legend */}
+      {uniqueEmps.length > 0 && (
+        <div className="table-wrapper p-3 flex flex-wrap gap-2">
+          {uniqueEmps.map(l => (
+            <div key={l.user_id} className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: empColors[l.user_id] }}/>
+              <span className="text-[var(--text-secondary)]">{l.user?.name || '—'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Calendar grid */}
+      <div className="table-wrapper overflow-hidden">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 border-b border-[var(--border)]">
+          {DAYS_ID.map((d, i) => (
+            <div key={d} className={`px-2 py-2.5 text-center text-xs font-bold uppercase tracking-wide ${
+              i === 0 || i === 6 ? 'text-red-500' : 'text-[var(--text-muted)]'
+            }`}>{d}</div>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[var(--brand-500)]"/></div>
+        ) : (
+          <div className="grid grid-cols-7">
+            {cells.map((day, i) => {
+              const dayLeaves = getLeavesForDate(day);
+              return (
+                <div key={i} className={`min-h-[80px] p-1.5 border-r border-b border-[var(--border)] relative
+                  ${!day ? 'bg-[var(--bg-secondary)]/30' : ''}
+                  ${isWeekend(i) ? 'bg-red-50/30 dark:bg-red-950/10' : ''}
+                  ${i % 7 === 6 ? 'border-r-0' : ''}
+                `}>
+                  {day && (
+                    <>
+                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full mb-1
+                        ${isToday(day) ? 'bg-[var(--brand-600)] text-white' : 'text-[var(--text-secondary)]'}`}>
+                        {day}
+                      </span>
+                      <div className="space-y-0.5">
+                        {dayLeaves.slice(0,3).map((l, li) => (
+                          <div key={li} title={`${l.user?.name} — ${l.leave_type}`}
+                            className="text-[9px] px-1.5 py-0.5 rounded text-white font-semibold truncate"
+                            style={{ background: empColors[l.user_id] }}>
+                            {l.user?.name?.split(' ')[0] || '?'}
+                          </div>
+                        ))}
+                        {dayLeaves.length > 3 && (
+                          <div className="text-[9px] text-[var(--text-muted)] px-1">+{dayLeaves.length-3}</div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* List view of this month's leaves */}
+      {thisMonthLeaves.length > 0 && (
+        <div className="table-wrapper overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg)]">
+            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Detail Cuti Bulan Ini</p>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {thisMonthLeaves.map((l, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div className="w-3 h-10 rounded-full flex-shrink-0" style={{ background: empColors[l.user_id] }}/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{l.user?.name || '—'}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{l.leave_type} · {l.days} hari</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-mono text-[var(--text-secondary)]">{l.start_date}</p>
+                  <p className="text-xs text-[var(--text-muted)]">s/d {l.end_date}</p>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">
+                  Disetujui
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function LeavesPage() {
   const { user, isHR, isSupervisor } = useAuth();
   const canApprove = isHR || isSupervisor || user?.role === 'admin';
 
   const TABS = [
-    { id: 'mine',      label: 'Cuti Saya', icon: CalendarOff },
+    { id: 'mine',      label: 'Cuti Saya',    icon: CalendarOff },
     ...(canApprove ? [{ id: 'approvals', label: 'Persetujuan', icon: Users }] : []),
+    ...(canApprove ? [{ id: 'calendar',  label: 'Kalender',    icon: Calendar }] : []),
   ];
 
   const [activeTab, setActiveTab] = useState('mine');
