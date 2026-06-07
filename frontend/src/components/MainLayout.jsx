@@ -357,6 +357,9 @@ const BottomNav = () => {
 };
 
 export default function MainLayout() {
+  const [showNotif,  setShowNotif]  = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
+  const [notifs,     setNotifs]     = useState([]);
   const { user, logout } = useAuth();
   const location = useLocation();
   useAutoLogout(logout); // Auto-logout after 30 min inactivity on shared PC
@@ -403,15 +406,51 @@ export default function MainLayout() {
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <button className="btn-icon relative">
+            <button className="btn-icon relative" onClick={() => setShowNotif(v => !v)}>
               <Bell size={17} />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[var(--brand-600)] rounded-full" />
+              {notifCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">
+                  {notifCount > 9 ? '9+' : notifCount}
+                </span>
+              )}
             </button>
             <div className="lg:hidden w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand-500)] to-[var(--brand-700)] flex items-center justify-center text-white font-bold text-xs">
               {user?.name?.[0]?.toUpperCase()}
             </div>
           </div>
         </header>
+
+        {/* ── Notification Panel ── */}
+        {showNotif && (
+          <div className="absolute top-14 right-4 z-50 w-80 bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden animate-fade-in">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+              <p className="text-sm font-bold">Notifikasi</p>
+              <button onClick={() => setShowNotif(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs">Tutup</button>
+            </div>
+            {notifs.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <Bell size={28} className="text-[var(--text-muted)] mx-auto mb-2 opacity-30"/>
+                <p className="text-sm text-[var(--text-muted)]">Tidak ada notifikasi</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--border)] max-h-80 overflow-y-auto">
+                {notifs.map((n, i) => (
+                  <div key={i} className={`px-4 py-3 hover:bg-[var(--bg-secondary)] cursor-pointer ${!n.read ? 'bg-[var(--brand-600)]/5' : ''}`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.read ? 'bg-[var(--brand-600)]' : 'bg-transparent'}`}/>
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">{n.title}</p>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{n.message}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] mt-1">{n.time}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <main className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="page-container py-4 lg:py-5 pb-[80px] lg:pb-5 animate-fade-in">
             <Outlet />

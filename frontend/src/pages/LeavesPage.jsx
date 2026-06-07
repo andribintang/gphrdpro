@@ -241,7 +241,7 @@ const QuotaCard = ({ quota, loading }) => {
     : 0;
 
   return (
-    <div className="card p-4 space-y-3">
+    <div className="card p-3 sm:p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
           Kuota Cuti {quota.year}
@@ -675,7 +675,7 @@ const LeaveCalendarTab = () => {
   const [loading,setLoading]= useState(false);
 
   const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  const DAYS_ID   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  const DAYS_ID   = ['M','S','S','R','K','J','S'];
 
   const LEAVE_COLORS = [
     '#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981',
@@ -785,7 +785,7 @@ const LeaveCalendarTab = () => {
             {cells.map((day, i) => {
               const dayLeaves = getLeavesForDate(day);
               return (
-                <div key={i} className={`min-h-[80px] p-1.5 border-r border-b border-[var(--border)] relative
+                <div key={i} className={`min-h-[60px] sm:min-h-[80px] p-1 sm:p-1.5 border-r border-b border-[var(--border)] relative
                   ${!day ? 'bg-[var(--bg-secondary)]/30' : ''}
                   ${isWeekend(i) ? 'bg-red-50/30 dark:bg-red-950/10' : ''}
                   ${i % 7 === 6 ? 'border-r-0' : ''}

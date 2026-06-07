@@ -2029,16 +2029,19 @@ export default function PayrollEnginePage() {
         </div>
       </div>
 
-      <div className="flex p-1 gap-1 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] mb-5 overflow-x-auto scrollbar-thin">
+      <div className="flex border-b border-[var(--border)] mb-5 overflow-x-auto scrollbar-none">
         {TABS.map(tab => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex-shrink-0 flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200
-                ${active ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <Icon className="w-4 h-4" />
-              {tab.label}
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all flex-shrink-0
+                ${active
+                  ? 'border-[var(--brand-600)] text-[var(--brand-600)]'
+                  : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
             </button>
           );
         })}

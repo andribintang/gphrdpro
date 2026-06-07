@@ -263,7 +263,7 @@ export default function DashboardPage() {
       {/* ── Stats grid ─────────────────────────────────────── */}
       {/* HR/Admin: 4 stats */}
       {isHRAdmin && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard
             icon={Clock} label="Absensi Hari Ini"
             value={loading ? null : (checkedIn ? (attStatus === 'late' ? '⚠️ Terlambat' : '✅ Hadir') : '—')}
@@ -297,7 +297,7 @@ export default function DashboardPage() {
 
       {/* Employee: 2 stats */}
       {!isHRAdmin && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <StatCard
             icon={CalendarOff} label="Sisa Cuti Tahunan"
             value={loading ? null : (leaveQuota?.annual_quota ? `${leaveQuota.annual_quota - (leaveQuota.annual_used || 0)}` : '—')}
@@ -317,7 +317,7 @@ export default function DashboardPage() {
 
       {/* ── HR/Admin extra: employee stats cards ──────────── */}
       {isHRAdmin && empStats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label:'Total Karyawan', value: empStats.total,          color:'text-[var(--text-primary)]', bg:'bg-[var(--bg-secondary)]' },
             { label:'Cuti Pending',   value: empStats.leave_pending || 0, color:'text-amber-600 dark:text-amber-400', bg:'bg-amber-50 dark:bg-amber-950' },
@@ -347,7 +347,7 @@ export default function DashboardPage() {
                 </div>
                 <BarChart3 className="w-4 h-4 text-[var(--text-muted)]"/>
               </div>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 140 : 180}>
                 <BarChart data={attTrend} barGap={2}>
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false}/>
                   <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={25}/>
@@ -374,7 +374,7 @@ export default function DashboardPage() {
                 </div>
                 <PieIcon className="w-4 h-4 text-[var(--text-muted)]"/>
               </div>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 140 : 180}>
                 <PieChart>
                   <Pie data={leaveStatus} cx="50%" cy="50%" innerRadius={45} outerRadius={70}
                     paddingAngle={3} dataKey="value">
@@ -415,10 +415,10 @@ export default function DashboardPage() {
       {/* ── Quick actions ──────────────────────────────────── */}
       <div>
         <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Aksi Cepat</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <button onClick={() => navigate('/attendance')}
-            className="card p-4 text-left hover:border-brand-300 dark:hover:border-brand-700 active:scale-[0.98] transition-all">
-            <div className="w-9 h-9 bg-brand-100 dark:bg-brand-950 rounded-xl flex items-center justify-center mb-3">
+            className="card p-3 sm:p-4 text-left hover:border-brand-300 dark:hover:border-brand-700 active:scale-[0.98] transition-all min-h-[80px] flex flex-col justify-between">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-brand-100 dark:bg-brand-950 rounded-xl flex items-center justify-center mb-3">
               <Clock className="w-4.5 h-4.5 text-brand-600 dark:text-brand-400" size={18} />
             </div>
             <p className="text-sm font-bold text-[var(--text-primary)]">Absensi</p>

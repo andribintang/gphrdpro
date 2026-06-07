@@ -117,4 +117,42 @@
   .text-gradient { background: linear-gradient(135deg, var(--brand-600), #f97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
   .hover-lift { transition: all 0.2s; }
   .hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  /* ── Mobile touch targets ─────────────────────────────────── */
+  @media (max-width: 640px) {
+    /* Bigger touch targets */
+    .btn-primary, .btn-secondary { min-height: 44px; }
+    .input-base { min-height: 44px; font-size: 16px; } /* Prevent iOS zoom */
+    select { font-size: 16px; } /* Prevent iOS zoom on select */
+
+    /* Table mobile scroll */
+    .table-wrapper { border-radius: 12px; }
+
+    /* Page container tighter on mobile */
+    .page-container { padding-left: 16px; padding-right: 16px; }
+
+    /* Page header stack on mobile */
+    .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .page-header > div:last-child { width: 100%; }
+    .page-header > div:last-child .btn-primary,
+    .page-header > div:last-child .btn-secondary { width: 100%; justify-content: center; }
+
+    /* Modal - always bottom sheet on mobile */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .modal-box { border-radius: 20px 20px 0 0; max-height: 92vh; }
+  }
+
+  /* ── Touch-friendly hover states ────────────────────────────── */
+  @media (hover: none) {
+    /* Remove hover-only visibility on touch devices */
+    .group:hover .group-hover\:opacity-100 { opacity: 1; }
+  }
+
+  /* ── Prevent text selection on buttons ─────────────────────── */
+  button { -webkit-tap-highlight-color: transparent; user-select: none; }
+
+  /* ── Bottom nav spacing ─────────────────────────────────────── */
+  @media (max-width: 1023px) {
+    .page-container { padding-bottom: 88px; }
+  }
+
 }

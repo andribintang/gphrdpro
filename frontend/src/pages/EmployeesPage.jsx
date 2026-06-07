@@ -672,9 +672,9 @@ const ProfileDrawer = ({ userId, onClose, onEdit, onDeactivate, onReactivate, ca
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
-        <div className="relative w-full max-w-3xl bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up max-h-[90vh] flex flex-col"
+        <div className="relative w-full max-w-3xl bg-[var(--bg-card)] rounded-none sm:rounded-2xl border-0 sm:border border-[var(--border)] shadow-2xl animate-slide-up h-full sm:h-auto sm:max-h-[90vh] flex flex-col"
           onClick={e => e.stopPropagation()}>
 
           {/* ── Header ── */}
@@ -1424,7 +1424,7 @@ const PremiumEmployeeTable = ({ employees, loading, canManage, onView, onEdit, o
                     </p>
                   </td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onView(emp)} title="Lihat Profil"
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand-600)] hover:bg-[var(--brand-600)]/10 transition-all">
                         <Eye className="w-3.5 h-3.5"/>
