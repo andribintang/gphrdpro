@@ -400,7 +400,7 @@ function MapCard({ lat, lng, officeLat, officeLng, distance, radius, title = 'Lo
     if (window.google) { loadMap(); return; }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&loading=async&libraries=marker`;
     script.async = true;
     script.onload = loadMap;
     document.head.appendChild(script);
@@ -1603,16 +1603,16 @@ const RekapDeptTab = () => {
   }), { total:0, present:0, late:0, absent:0 });
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="page-title">Rekap Absensi per Departemen</h1>
-          <p className="page-subtitle">Perbandingan kehadiran antar departemen</p>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Rekap Absensi per Departemen</h2>
+          <p className="text-sm text-[var(--text-muted)]">Perbandingan kehadiran antar departemen</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <input type="month" value={month} onChange={e => setMonth(e.target.value)}
-            className="input-base text-sm h-10 w-40"/>
-          <button onClick={handleExport} className="btn-secondary gap-2 h-10">
+            className="input-base text-sm h-9 w-40"/>
+          <button onClick={handleExport} className="btn-secondary gap-2 h-9 text-sm">
             <Download className="w-4 h-4"/> Export Excel
           </button>
         </div>
@@ -1728,7 +1728,8 @@ const LocationMapTab = () => {
       if (!mapObj.current) {
         mapObj.current = new window.google.maps.Map(mapRef.current, {
           zoom: 14, center,
-          styles: [{ featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] }],
+          mapId: 'GPDISTRO_HRD_MAP',
+          disableDefaultUI: false,
         });
       }
       // Clear old markers
@@ -1740,14 +1741,21 @@ const LocationMapTab = () => {
         const lng = parseFloat(rec.check_in_lng||rec.lng);
         if (!lat || !lng) return;
         const color = rec.status==='late' ? '#f59e0b' : rec.status==='absent' ? '#ef4444' : '#10b981';
-        const marker = new window.google.maps.Marker({
+        // Create pin element for AdvancedMarkerElement
+        const pin = new window.google.maps.marker.PinElement({
+          background: color,
+          borderColor: '#fff',
+          glyphColor: '#fff',
+          scale: 1.1,
+        });
+        const marker = new window.google.maps.marker.AdvancedMarkerElement({
           position: { lat, lng },
           map: mapObj.current,
           title: rec.user?.name || rec.employee_name || '',
-          icon: { path: window.google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 10 },
+          content: pin.element,
         });
         const info = new window.google.maps.InfoWindow({
-          content: `<div style="font-size:12px;min-width:160px">
+          content: `<div style="font-size:12px;min-width:160px;padding:4px">
             <strong>${rec.user?.name||rec.employee_name||'—'}</strong><br/>
             <span style="color:#888">${rec.user?.employee?.department||''}</span><br/>
             Check-in: <strong>${rec.check_in||'—'}</strong><br/>
@@ -1762,8 +1770,9 @@ const LocationMapTab = () => {
     if (window.google?.maps) { initMap(); }
     else {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY||''}`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY||''}&loading=async&libraries=marker`;
       script.async = true;
+      script.defer = true;
       script.onload = initMap;
       document.head.appendChild(script);
     }
@@ -1772,14 +1781,14 @@ const LocationMapTab = () => {
   const statusColors = { present:'bg-emerald-100 text-emerald-700', late:'bg-amber-100 text-amber-700', absent:'bg-red-100 text-red-600', leave:'bg-blue-100 text-blue-700' };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="page-title">Peta Lokasi Check-in</h1>
-          <p className="page-subtitle">Visualisasi lokasi absensi karyawan</p>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Peta Lokasi Check-in</h2>
+          <p className="text-sm text-[var(--text-muted)]">Visualisasi lokasi absensi karyawan</p>
         </div>
         <input type="date" value={selDate} onChange={e => setSelDate(e.target.value)}
-          className="input-base text-sm h-10 w-44"/>
+          className="input-base text-sm h-9 w-44"/>
       </div>
 
       {/* Legend */}
@@ -1900,19 +1909,19 @@ const LateAlertsTab = () => {
   };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="page-title">Peringatan Keterlambatan</h1>
-          <p className="page-subtitle">Karyawan dengan keterlambatan atau absen berlebihan</p>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Peringatan Keterlambatan</h2>
+          <p className="text-sm text-[var(--text-muted)]">Karyawan dengan keterlambatan atau absen berlebihan</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <input type="month" value={month} onChange={e => setMonth(e.target.value)}
-            className="input-base text-sm h-10 w-40"/>
+            className="input-base text-sm h-9 w-40"/>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-[var(--text-muted)]">Alert jika terlambat ≥</label>
+            <label className="text-xs text-[var(--text-muted)]">Alert ≥</label>
             <select value={threshold} onChange={e => setThreshold(Number(e.target.value))}
-              className="input-base text-sm h-10 w-20">
+              className="input-base text-sm h-9 w-20">
               {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}x</option>)}
             </select>
           </div>
@@ -2026,34 +2035,36 @@ export default function AttendancePage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Absensi</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Face Recognition + GPS</p>
+          <p className="page-subtitle">Face Recognition + GPS</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={fetchToday} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
+          <button onClick={fetchToday}
+            title="Refresh"
+            className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>
           {isHR && (
-            <>
-              <button onClick={() => setShowImport(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:opacity-90 transition-opacity">
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Import Absen</span>
-              </button>
-              <button onClick={() => setActiveTab('monitor')} className="w-9 h-9 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
-                <Users className="w-4 h-4" />
-              </button>
-            </>
+            <button onClick={() => setShowImport(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">Import Absen</span>
+            </button>
           )}
         </div>
       </div>
 
-      <div className="flex p-1 gap-1 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] mb-5 max-w-md">
+      {/* Tab bar — scrollable on mobile, full on desktop */}
+      <div className="flex border-b border-[var(--border)] mb-6 overflow-x-auto scrollbar-none -mx-1">
         {TABS.map(tab => { const Icon = tab.icon; const active = activeTab === tab.id;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${active ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-all flex-shrink-0
+                ${active
+                  ? 'border-[var(--brand-600)] text-[var(--brand-600)]'
+                  : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border)]'
+                }`}>
               <Icon className="w-4 h-4" />
-              {tab.label}
+              <span>{tab.label}</span>
             </button>
           );
         })}
