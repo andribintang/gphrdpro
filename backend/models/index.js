@@ -19,6 +19,7 @@ const {
   StoreOrder, StoreOrderItem, StorePayment, StoreReview,
 } = require('./store');
 const { IncentiveParameter, IncentiveEmployeeRate } = require('./IncentiveParameter');
+const Notification = require('./Notification');
 
 // User <-> Employee
 User.hasOne(Employee, { foreignKey: 'user_id', as: 'employee' });
@@ -58,6 +59,10 @@ User.hasMany(LoanManagement, { foreignKey: 'approved_by', as: 'approvedLoans' })
 // IncentiveEmployeeRate <-> User
 User.hasMany(IncentiveEmployeeRate, { foreignKey: 'user_id', as: 'incentiveRates' });
 IncentiveEmployeeRate.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// Notification associations
+Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
 
 module.exports = {
   User, Employee, Attendance, LeaveRequest, LeaveQuota,

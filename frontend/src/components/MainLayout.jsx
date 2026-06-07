@@ -356,10 +356,25 @@ const BottomNav = () => {
   );
 };
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+
+const fetchNotifs = async () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return { notifications: [], unread_count: 0 };
+    const r = await fetch(`${API_BASE}/notifications?limit=20`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const d = await r.json();
+    return d.data || { notifications: [], unread_count: 0 };
+  } catch { return { notifications: [], unread_count: 0 }; }
+};
+
 export default function MainLayout() {
   const [showNotif,  setShowNotif]  = useState(false);
   const [notifCount, setNotifCount] = useState(0);
   const [notifs,     setNotifs]     = useState([]);
+  const [notifLoading, setNotifLoading] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
   useAutoLogout(logout); // Auto-logout after 30 min inactivity on shared PC
@@ -384,6 +399,64 @@ export default function MainLayout() {
       }
     }
     return 'GPDISTRO RACING ID';
+  };
+
+  // Poll unread count every 30 seconds
+  useEffect(() => {
+    const load = async () => {
+      const d = await fetchNotifs();
+      setNotifCount(d.unread_count || 0);
+    };
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load full notifs when panel opened
+  useEffect(() => {
+    if (!showNotif) return;
+    setNotifLoading(true);
+    fetchNotifs().then(d => {
+      setNotifs(d.notifications || []);
+      setNotifCount(d.unread_count || 0);
+    }).finally(() => setNotifLoading(false));
+  }, [showNotif]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await fetch(`${API_BASE}/notifications/read-all`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      setNotifs(prev => prev.map(n => ({...n, is_read: true})));
+      setNotifCount(0);
+    } catch {}
+  };
+
+  const handleMarkRead = async (id) => {
+    try {
+      await fetch(`${API_BASE}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('accessToken') }
+      });
+      setNotifs(prev => prev.map(n => n.id === id ? {...n, is_read: true} : n));
+      setNotifCount(prev => Math.max(0, prev-1));
+    } catch {}
+  };
+
+  const getNotifIcon = (type) => ({
+    payroll_ready:'💰', payroll_paid:'🏦', leave_approved:'✅', leave_rejected:'❌',
+    leave_pending:'📋', leave_reminder:'⏰', loan_approved:'💳', birthday:'🎂',
+    attendance_late:'⚠️', announcement:'📢', system:'⚙️',
+  }[type] || '🔔');
+
+  const getTimeAgo = (d) => {
+    const m = Math.floor((Date.now()-new Date(d))/60000);
+    if (m<1) return 'Baru saja';
+    if (m<60) return `${m} mnt lalu`;
+    const h = Math.floor(m/60);
+    if (h<24) return `${h} jam lalu`;
+    return `${Math.floor(h/24)} hari lalu`;
   };
 
   return (
@@ -422,33 +495,80 @@ export default function MainLayout() {
 
         {/* ── Notification Panel ── */}
         {showNotif && (
-          <div className="absolute top-14 right-4 z-50 w-80 bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden animate-fade-in">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-              <p className="text-sm font-bold">Notifikasi</p>
-              <button onClick={() => setShowNotif(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs">Tutup</button>
-            </div>
-            {notifs.length === 0 ? (
-              <div className="px-4 py-8 text-center">
-                <Bell size={28} className="text-[var(--text-muted)] mx-auto mb-2 opacity-30"/>
-                <p className="text-sm text-[var(--text-muted)]">Tidak ada notifikasi</p>
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowNotif(false)}/>
+            <div className="absolute top-14 right-2 sm:right-4 z-50 w-[calc(100vw-16px)] sm:w-96 bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold">Notifikasi</p>
+                  {notifCount > 0 && (
+                    <span className="text-[10px] bg-[var(--brand-600)] text-white px-1.5 py-0.5 rounded-full font-bold">
+                      {notifCount} baru
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {notifCount > 0 && (
+                    <button onClick={handleMarkAllRead}
+                      className="text-[10px] text-[var(--brand-600)] hover:underline font-semibold">
+                      Tandai Semua Dibaca
+                    </button>
+                  )}
+                  <button onClick={() => setShowNotif(false)}
+                    className="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]">
+                    ✕
+                  </button>
+                </div>
               </div>
-            ) : (
-              <div className="divide-y divide-[var(--border)] max-h-80 overflow-y-auto">
-                {notifs.map((n, i) => (
-                  <div key={i} className={`px-4 py-3 hover:bg-[var(--bg-secondary)] cursor-pointer ${!n.read ? 'bg-[var(--brand-600)]/5' : ''}`}>
-                    <div className="flex items-start gap-3">
-                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.read ? 'bg-[var(--brand-600)]' : 'bg-transparent'}`}/>
-                      <div>
-                        <p className="text-xs font-semibold text-[var(--text-primary)]">{n.title}</p>
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{n.message}</p>
-                        <p className="text-[10px] text-[var(--text-muted)] mt-1">{n.time}</p>
+
+              {/* Content */}
+              {notifLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-[var(--brand-600)] border-t-transparent rounded-full animate-spin"/>
+                </div>
+              ) : notifs.length === 0 ? (
+                <div className="px-4 py-10 text-center">
+                  <Bell size={28} className="text-[var(--text-muted)] mx-auto mb-2 opacity-30"/>
+                  <p className="text-sm text-[var(--text-muted)]">Tidak ada notifikasi</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[var(--border)] max-h-[420px] overflow-y-auto">
+                  {notifs.map((n) => (
+                    <div key={n.id}
+                      onClick={() => { handleMarkRead(n.id); if (n.link) { window.location.href = n.link; } setShowNotif(false); }}
+                      className={`px-4 py-3 hover:bg-[var(--bg-secondary)] cursor-pointer transition-colors flex items-start gap-3
+                        ${!n.is_read ? 'bg-[var(--brand-600)]/5' : ''}`}>
+                      <div className="w-8 h-8 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0 text-base">
+                        {getNotifIcon(n.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <p className={`text-xs font-semibold ${!n.is_read ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                            {n.title}
+                          </p>
+                          {!n.is_read && (
+                            <div className="w-2 h-2 rounded-full bg-[var(--brand-600)] flex-shrink-0 mt-1"/>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] mt-1">{getTimeAgo(n.created_at)}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              {notifs.length > 0 && (
+                <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--bg)]">
+                  <p className="text-[10px] text-[var(--text-muted)] text-center">
+                    Notifikasi diperbarui setiap 30 detik
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         <main className="flex-1 overflow-y-auto scrollbar-thin">

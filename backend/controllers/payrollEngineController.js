@@ -6,6 +6,7 @@ const {
   IncentiveParameter, IncentiveEmployeeRate,
 } = require('../models');
 const engine = require('../services/payrollEngine');
+const { notifyPayrollReady } = require('./notificationController');
 
 // ── Seed default components (called from migrate) ───────────────
 const seedDefaultComponents = async () => {
@@ -320,6 +321,8 @@ const approveRun = async (req, res, next) => {
     }
     await run.update({ status:'approved', approved_by: req.user.id, approved_at: new Date() });
     await PayrollItem.update({ status:'approved' }, { where: { payroll_run_id: run.id } });
+    // Notify all employees about their payslip
+    notifyPayrollReady(run.id).catch(() => {});
     return res.json({ success: true, message: `${run.period_label} berhasil di-approve`, data: { run } });
   } catch (err) { next(err); }
 };
@@ -519,6 +522,8 @@ const approveLoan = async (req, res, next) => {
     const loan = await LoanManagement.findByPk(req.params.id);
     if (!loan) return res.status(404).json({ success: false, message: 'Pinjaman tidak ditemukan' });
     await loan.update({ status: 'active', approved_by: req.user.id, approved_at: new Date() });
+    const { notifyLoanApproved } = require('./notificationController');
+    notifyLoanApproved(loan.id).catch(() => {});
     return res.json({ success: true, message: 'Pinjaman disetujui', data: { loan } });
   } catch (err) { next(err); }
 };

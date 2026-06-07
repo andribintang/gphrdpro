@@ -20,6 +20,7 @@ const incentiveRoutes      = require('./routes/incentive');
 const companyRoutes        = require('./routes/company');
 const erpRoutes            = require('./routes/erp');
 const flipRoutes           = require('./routes/flip');
+const notificationRoutes   = require('./routes/notifications');
 
 const app  = express();
 app.set('trust proxy', 1); // Railway/Railway proxy
@@ -375,6 +376,25 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      `CREATE TABLE IF NOT EXISTS notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        type ENUM('payroll_ready','payroll_paid','leave_approved','leave_rejected','leave_pending',
+                  'leave_reminder','loan_approved','loan_reminder','birthday','attendance_late',
+                  'announcement','system') NOT NULL,
+        title VARCHAR(100) NOT NULL,
+        message TEXT NOT NULL,
+        link VARCHAR(255) NULL,
+        is_read TINYINT(1) DEFAULT 0,
+        read_at DATETIME NULL,
+        created_by INT NULL,
+        metadata JSON NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_user_id (user_id),
+        INDEX idx_is_read (is_read),
+        INDEX idx_created_at (created_at)
+      )`,
       // Photo URL for employees
       `ALTER TABLE employees ADD COLUMN photo_url TEXT NULL COMMENT 'URL foto profil'`,
       // Bank account fields on employees
@@ -906,6 +926,8 @@ app.use('/api/incentive',      incentiveRoutes);
 app.use('/api/company',        companyRoutes);
 app.use('/api/erp',            erpRoutes);
 app.use('/api/flip',           flipRoutes);
+app.use('/api/notifications',  notificationRoutes);
+app.use('/api/notifications',  notificationRoutes);
 
 // ── 404 + Error ───────────────────────────────────────────────
 app.use(notFound);

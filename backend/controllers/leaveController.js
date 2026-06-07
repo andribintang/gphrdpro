@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { notifyLeaveNew, notifyLeaveStatus } = require('./notificationController');
 const { sequelize } = require('../config/database');
 const { LeaveRequest, LeaveQuota, User, Employee } = require('../models');
 const { validationResult } = require('express-validator');
