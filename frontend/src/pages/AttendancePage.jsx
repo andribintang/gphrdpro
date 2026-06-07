@@ -357,35 +357,30 @@ function MapCard({ lat, lng, officeLat, officeLng, distance, radius, title = 'Lo
     if (!lat || !lng || !GMAPS_KEY) return;
 
     const loadMap = () => {
-      if (!window.google) return;
+      if (!window.google?.maps?.Map) return;
       const map = new window.google.maps.Map(mapRef.current, {
         center: { lat: parseFloat(lat), lng: parseFloat(lng) },
         zoom: 16,
+        mapId: 'GPDISTRO_CLOCK_MAP',
         disableDefaultUI: true,
         gestureHandling: 'cooperative',
-        styles: [
-          { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-          { elementType: 'labels.text.fill', stylers: [{ color: '#8a9bb0' }] },
-          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d3561' }] },
-          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1b2a' }] },
-        ],
       });
 
-      // User marker
-      new window.google.maps.Marker({
+      // User marker — AdvancedMarkerElement
+      const userPin = document.createElement('div');
+      userPin.style.cssText = 'width:16px;height:16px;background:#38bdf8;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)';
+      new window.google.maps.marker.AdvancedMarkerElement({
         position: { lat: parseFloat(lat), lng: parseFloat(lng) },
-        map,
-        icon: { path: window.google.maps.SymbolPath.CIRCLE, fillColor: '#38bdf8', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 9 },
-        title: 'Lokasi Anda',
+        map, title: 'Lokasi Anda', content: userPin,
       });
 
       // Office marker & radius circle
       if (officeLat && officeLng) {
-        new window.google.maps.Marker({
+        const officePin = document.createElement('div');
+        officePin.style.cssText = 'width:14px;height:14px;background:#10b981;border:2px solid #fff;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.4)';
+        new window.google.maps.marker.AdvancedMarkerElement({
           position: { lat: parseFloat(officeLat), lng: parseFloat(officeLng) },
-          map,
-          icon: { path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW, fillColor: '#10b981', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1, scale: 7 },
-          title: 'Kantor',
+          map, title: 'Kantor', content: officePin,
         });
         new window.google.maps.Circle({
           map,
@@ -397,12 +392,16 @@ function MapCard({ lat, lng, officeLat, officeLng, distance, radius, title = 'Lo
       }
     };
 
-    if (window.google) { loadMap(); return; }
-
+    if (window.google?.maps?.Map) { loadMap(); return; }
+    if (document.querySelector('script[src*="maps.googleapis"]')) {
+      const t = setInterval(() => { if (window.google?.maps?.Map) { clearInterval(t); loadMap(); }}, 150);
+      return;
+    }
+    window.__clockMapInit = loadMap;
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=marker&callback=Function.prototype`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&libraries=marker&callback=__clockMapInit`;
     script.async = true;
-    script.onload = loadMap;
+    script.defer = true;
     document.head.appendChild(script);
   }, [lat, lng, officeLat, officeLng]);
 
