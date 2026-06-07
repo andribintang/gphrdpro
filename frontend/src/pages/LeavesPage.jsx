@@ -3,7 +3,7 @@ import {
   CalendarOff, Plus, X, ChevronRight,
   CheckCircle2, XCircle, Clock, Loader2, AlertTriangle,
   RefreshCw, FileText, Users, TrendingDown, Calendar,
-  MessageSquare
+  MessageSquare,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
