@@ -5,12 +5,8 @@ import {
   ChevronLeft, ChevronDown, AlertTriangle, ToggleLeft,
   ToggleRight, Edit3, Eye, ArrowUpRight, ArrowDownRight,
   Calendar, TrendingUp, Banknote, Star, Moon,
-  Percent, Clock, Info, CheckCheck, Wallet, UserCheck
-, Pencil, Lock, Check  Printer,
-  Download,
-  BarChart3,
-  TrendingUp,
-  Clock,
+  Percent, Clock, Info, CheckCheck, Wallet, UserCheck,
+  Pencil, Lock, Check, Printer, Download, BarChart3,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
