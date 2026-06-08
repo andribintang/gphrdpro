@@ -278,17 +278,43 @@ const updateProduct = async (req, res, next) => {
       store_featured:      b.store_featured ? 1 : 0,
     };
     // JSON fields — only update if provided
-    if (b.store_images  !== undefined) data.store_images  = Array.isArray(b.store_images)  ? b.store_images  : [];
-    if (b.store_variants !== undefined) data.store_variants = typeof b.store_variants === 'object' ? b.store_variants : {};
-    if (b.store_tags    !== undefined) data.store_tags    = Array.isArray(b.store_tags)    ? b.store_tags    : [];
+    // Force JSON string then parse to ensure Sequelize detects change
+    if (b.store_images  !== undefined) data.store_images  = JSON.parse(JSON.stringify(Array.isArray(b.store_images)  ? b.store_images  : []));
+    if (b.store_variants !== undefined) data.store_variants = JSON.parse(JSON.stringify(typeof b.store_variants === 'object' && b.store_variants ? b.store_variants : {}));
+    if (b.store_tags    !== undefined) data.store_tags    = JSON.parse(JSON.stringify(Array.isArray(b.store_tags)    ? b.store_tags    : []));
 
     // Remove undefined keys
     Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
 
     const product = await Product.findByPk(req.params.id);
     if (!product) return res.status(404).json({ success:false, message:'Tidak ditemukan' });
+
+    // Use raw SQL for JSON fields to ensure proper storage
+    const { sequelize: seq } = require('../../config/database');
+    const jsonUpdates = [];
+    if (data.store_images  !== undefined) {
+      jsonUpdates.push(`store_images = ${seq.escape(JSON.stringify(data.store_images))}`);
+      delete data.store_images;
+    }
+    if (data.store_variants !== undefined) {
+      jsonUpdates.push(`store_variants = ${seq.escape(JSON.stringify(data.store_variants))}`);
+      delete data.store_variants;
+    }
+    if (data.store_tags !== undefined) {
+      jsonUpdates.push(`store_tags = ${seq.escape(JSON.stringify(data.store_tags))}`);
+      delete data.store_tags;
+    }
+
+    // Update non-JSON fields via Sequelize
     await product.update(data);
-    return res.json({ success:true, data:{ product } });
+
+    // Update JSON fields via raw SQL
+    if (jsonUpdates.length > 0) {
+      await seq.query(`UPDATE erp_products SET ${jsonUpdates.join(', ')} WHERE id = ${product.id}`);
+    }
+
+    const updated = await Product.findByPk(product.id);
+    return res.json({ success:true, data:{ product: updated } });
   } catch (err) { next(err); }
 };
 
