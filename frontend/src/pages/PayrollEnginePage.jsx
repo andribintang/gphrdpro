@@ -1272,7 +1272,7 @@ const LoanTab = () => {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-2xl max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
-          <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Ajukan Pinjaman</h3>
               <button onClick={() => setShowAdd(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><X className="w-4 h-4" /></button>
@@ -1332,6 +1332,7 @@ const LoanTab = () => {
             <div className="flex gap-2">
               <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1 h-10 text-sm">Batal</button>
               <button onClick={handleAdd} className="btn-primary flex-1 h-10 text-sm"><Plus className="w-4 h-4" /> Ajukan</button>
+            </div>
             </div>
           </div>
         </div>
