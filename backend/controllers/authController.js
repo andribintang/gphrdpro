@@ -249,4 +249,4 @@ const verifyPassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { login, register, refreshToken, logout, getMe, changePassword };
+module.exports = { login, register, refreshToken, logout, getMe, changePassword, verifyPassword };
