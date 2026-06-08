@@ -236,4 +236,17 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+// POST /api/auth/verify-password — Verify current user's password (for PIN gate)
+const verifyPassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ success: false, message: 'Password diperlukan' });
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    const valid = await user.validatePassword(password);
+    if (!valid) return res.status(401).json({ success: false, message: 'Password salah' });
+    return res.json({ success: true, message: 'Password valid' });
+  } catch (err) { next(err); }
+};
+
 module.exports = { login, register, refreshToken, logout, getMe, changePassword };

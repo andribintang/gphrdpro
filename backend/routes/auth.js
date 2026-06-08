@@ -31,4 +31,7 @@ router.put('/change-password', [
   body('newPassword').isLength({ min: 6 }).withMessage('Password baru minimal 6 karakter'),
 ], changePassword);
 
+// Verify current user password (for PIN gate in salary slip)
+router.post('/verify-password', authController.verifyPassword);
+
 module.exports = router;

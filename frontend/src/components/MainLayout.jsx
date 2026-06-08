@@ -338,11 +338,11 @@ const BottomNav = () => {
         <span className="text-[10px] font-medium leading-none mt-0.5 text-[var(--brand-600)]">+Sales</span>
       </button>
 
-      {/* Salary — Slip Gaji */}
-      <button onClick={() => navigate('/payroll-pro')}
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/payroll-pro') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
-        <DollarSign size={20} strokeWidth={isActive('/payroll-pro') ? 2.5 : 1.8} />
-        <span className="text-[10px] font-medium leading-none">Salary</span>
+      {/* Sales — Data Penjualan */}
+      <button onClick={() => navigate('/erp/reports')}
+        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/erp/reports') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
+        <TrendingUp size={20} strokeWidth={isActive('/erp/reports') ? 2.5 : 1.8} />
+        <span className="text-[10px] font-medium leading-none">Sales</span>
       </button>
 
       {/* Akun */}

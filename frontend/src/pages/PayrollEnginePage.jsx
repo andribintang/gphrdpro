@@ -628,28 +628,115 @@ const GenerateModal = ({ onClose, onSuccess, existingRuns = [] }) => {
 // TAB: MY SLIP (for employee)
 // ════════════════════════════════════════════════════════════════
 const MySlipTab = () => {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSlip, setSelectedSlip] = useState(null);
-  const [filterType, setFilterType] = useState('');
+  const [items,       setItems]       = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [selectedSlip,setSelectedSlip]= useState(null);
+  const [filterType,  setFilterType]  = useState('');
+  // PIN gate
+  const [unlocked,    setUnlocked]    = useState(false);
+  const [pin,         setPin]         = useState('');
+  const [pinError,    setPinError]    = useState('');
+  const [pinLoading,  setPinLoading]  = useState(false);
+  const [showPin,     setShowPin]     = useState(false);
+
+  const handleUnlock = async () => {
+    if (!pin) { setPinError('Masukkan password'); return; }
+    setPinLoading(true);
+    setPinError('');
+    try {
+      const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+      const r = await fetch(`${API}/auth/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization:'Bearer '+localStorage.getItem('accessToken') },
+        body: JSON.stringify({ password: pin }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        setUnlocked(true);
+        setPin('');
+        // Auto-lock after 5 minutes
+        setTimeout(() => setUnlocked(false), 5 * 60 * 1000);
+      } else {
+        setPinError('Password salah. Coba lagi.');
+        setPin('');
+      }
+    } catch { setPinError('Gagal verifikasi. Coba lagi.'); }
+    finally { setPinLoading(false); }
+  };
 
   const fetch = useCallback(async () => {
+    if (!unlocked) return;
     setLoading(true);
     try {
       const res = await payrollEngineService.getMy({ type: filterType || undefined });
       setItems(res.data.data.items);
     } catch { toast.error('Gagal memuat slip'); } finally { setLoading(false); }
-  }, [filterType]);
+  }, [filterType, unlocked]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
   const yearTotal = items.filter(i => i.run?.period_year === currentYear()).reduce((s,i) => s + parseFloat(i.net_salary || 0), 0);
 
+  if (!unlocked) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="table-wrapper p-8 text-center w-full max-w-xs">
+        {/* Lock icon */}
+        <div className="w-16 h-16 rounded-2xl bg-[var(--bg-secondary)] flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">🔒</span>
+        </div>
+        <h3 className="font-bold text-base text-[var(--text-primary)] mb-1">Data Gaji Terkunci</h3>
+        <p className="text-xs text-[var(--text-muted)] mb-5">
+          Masukkan password akun kamu untuk melihat slip gaji
+        </p>
+        <div className="space-y-3">
+          <div className="relative">
+            <input
+              type={showPin ? 'text' : 'password'}
+              value={pin}
+              onChange={e => { setPin(e.target.value); setPinError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+              placeholder="Password"
+              autoFocus
+              className="input-base text-sm text-center tracking-widest w-full pr-10"
+            />
+            <button
+              onClick={() => setShowPin(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              {showPin ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {pinError && (
+            <p className="text-xs text-red-500 font-semibold">{pinError}</p>
+          )}
+          <button
+            onClick={handleUnlock}
+            disabled={pinLoading || !pin}
+            className="btn-primary w-full h-11 text-sm disabled:opacity-60 gap-2">
+            {pinLoading
+              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memverifikasi...</>
+              : '🔓 Buka Slip Gaji'}
+          </button>
+        </div>
+        <p className="text-[10px] text-[var(--text-muted)] mt-4">
+          Slip akan terkunci otomatis setelah 5 menit
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="card-sm">
-        <p className="text-xs text-[var(--text-muted)] font-medium">Total Penghasilan {currentYear()}</p>
-        <p className="text-2xl font-black text-brand-600 dark:text-brand-400 mt-1">{toRupiahShort(yearTotal)}</p>
+      {/* Lock button */}
+      <div className="flex items-center justify-between">
+        <div className="card-sm flex-1 mr-3">
+          <p className="text-xs text-[var(--text-muted)] font-medium">Total Penghasilan {currentYear()}</p>
+          <p className="text-2xl font-black text-brand-600 dark:text-brand-400 mt-1">{toRupiahShort(yearTotal)}</p>
+        </div>
+        <button onClick={() => setUnlocked(false)}
+          title="Kunci data gaji"
+          className="w-10 h-10 rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] flex-shrink-0">
+          🔒
+        </button>
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
@@ -1181,11 +1268,11 @@ const LoanTab = () => {
 
       {/* Add loan modal */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowAdd(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="relative w-full sm:max-w-sm bg-[var(--bg-card)] rounded-t-3xl sm:rounded-2xl border border-[var(--border)] shadow-2xl animate-slide-up p-5 space-y-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-sm bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-2xl max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
-            <div className="flex justify-center sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
+          <div className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Ajukan Pinjaman</h3>
               <button onClick={() => setShowAdd(false)} className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)]"><X className="w-4 h-4" /></button>
