@@ -73,4 +73,5 @@ module.exports = {
   CompanySetting,StoreConfig, StoreCategory, StoreProduct, StoreBanner, 
   StoreCustomer, StoreAddress, StoreCart, StoreVoucher,
   StoreOrder, StoreOrderItem, StorePayment, StoreReview,
+  Notification,
 };
