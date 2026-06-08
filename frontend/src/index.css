@@ -64,7 +64,7 @@
   .card { @apply rounded-2xl border; background: var(--bg-card); border-color: var(--border); box-shadow: var(--shadow-card); }
   .card-padded { @apply card p-6; }
   .card-sm { @apply card p-4; }
-  .table-wrapper { background: var(--bg-card); border-color: var(--border); /*  @apply card overflow-hidden; }
+  .table-wrapper { @apply rounded-2xl border overflow-hidden; background: var(--bg-card); border-color: var(--border); }
 
   .field-label { @apply block text-xs font-semibold uppercase tracking-wider mb-1.5; color: var(--text-secondary); letter-spacing: 0.06em; }
   .input-base { @apply w-full rounded-xl border px-3.5 py-2.5 text-sm font-medium transition-all duration-150 outline-none; background: var(--bg-card); border-color: var(--border); color: var(--text-primary); box-shadow: var(--shadow-xs); }
@@ -170,7 +170,7 @@
     select { font-size: 16px; } /* Prevent iOS zoom on select */
 
     /* Table mobile scroll */
-    .table-wrapper { background: var(--bg-card); border-color: var(--border); /*  border-radius: 12px; }
+    .table-wrapper { @apply rounded-xl; background: var(--bg-card); border-color: var(--border); }
 
     /* Page container tighter on mobile */
     .page-container { padding-left: 16px; padding-right: 16px; }
