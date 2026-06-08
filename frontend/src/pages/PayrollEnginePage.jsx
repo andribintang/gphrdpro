@@ -664,7 +664,7 @@ const MySlipTab = () => {
     finally { setPinLoading(false); }
   };
 
-  const fetch = useCallback(async () => {
+  const loadSlips = useCallback(async () => {
     if (!unlocked) return;
     setLoading(true);
     try {
@@ -673,7 +673,7 @@ const MySlipTab = () => {
     } catch { toast.error('Gagal memuat slip'); } finally { setLoading(false); }
   }, [filterType, unlocked]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { loadSlips(); }, [loadSlips]);
 
   const yearTotal = items.filter(i => i.run?.period_year === currentYear()).reduce((s,i) => s + parseFloat(i.net_salary || 0), 0);
 
