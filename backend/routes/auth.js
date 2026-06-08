@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { login, register, refreshToken, logout, getMe, changePassword } = require('../controllers/authController');
+const { login, register, refreshToken, logout, getMe, changePassword, verifyPassword } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
 
 // Validation rules
@@ -32,6 +32,6 @@ router.put('/change-password', [
 ], changePassword);
 
 // Verify current user password (for PIN gate in salary slip)
-router.post('/verify-password', authController.verifyPassword);
+router.post('/verify-password', verifyPassword);
 
 module.exports = router;
