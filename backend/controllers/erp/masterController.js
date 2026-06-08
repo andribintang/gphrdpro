@@ -109,24 +109,47 @@ const getProducts = async (req, res, next) => {
       `SELECT COUNT(*) as total FROM erp_products ep WHERE ${where}`
     );
 
-    const [rows] = await sequelize.query(
-      `SELECT ep.id, ep.branch_id, ep.category_id, ep.sku, ep.barcode, ep.name,
-              ep.unit, ep.buy_price, ep.sell_price, ep.sell_price_mp, ep.sell_price_wa,
-              ep.stock_min, ep.weight, ep.notes, ep.is_active,
-              ep.store_price, ep.store_price_compare, ep.store_active_gpd, ep.store_active_gpr,
-              ep.store_images, ep.store_variants, ep.store_tags,
-              ep.store_short_desc, ep.store_description, ep.store_slug, ep.store_featured,
-              ep.store_sold_count, ep.store_view_count, ep.store_meta_title, ep.store_meta_desc,
-              ep.created_at, ep.updated_at,
-              ec.name as category_name,
-              COALESCE(s.qty, 0) as stock_qty
-       FROM erp_products ep
-       LEFT JOIN erp_categories ec ON ec.id = ep.category_id
-       LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
-       WHERE ${where}
-       ORDER BY ep.name ASC
-       LIMIT ${limitNum} OFFSET ${offset}`
-    );
+    // Try full query with store columns, fallback if columns don't exist yet
+    let rows;
+    try {
+      [rows] = await sequelize.query(
+        `SELECT ep.id, ep.branch_id, ep.category_id, ep.sku, ep.barcode, ep.name,
+                ep.unit, ep.buy_price, ep.sell_price, ep.sell_price_mp, ep.sell_price_wa,
+                ep.stock_min, ep.weight, ep.notes, ep.is_active,
+                ep.store_price, ep.store_price_compare, ep.store_active_gpd, ep.store_active_gpr,
+                IFNULL(ep.store_images, '[]') as store_images,
+                IFNULL(ep.store_variants, '{}') as store_variants,
+                IFNULL(ep.store_tags, '[]') as store_tags,
+                ep.store_short_desc, ep.store_description, ep.store_slug, ep.store_featured,
+                ep.store_sold_count, ep.store_view_count, ep.store_meta_title, ep.store_meta_desc,
+                ep.created_at, ep.updated_at,
+                ec.name as category_name,
+                COALESCE(s.qty, 0) as stock_qty
+         FROM erp_products ep
+         LEFT JOIN erp_categories ec ON ec.id = ep.category_id
+         LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
+         WHERE ${where}
+         ORDER BY ep.name ASC
+         LIMIT ${limitNum} OFFSET ${offset}`
+      );
+    } catch (queryErr) {
+      // Fallback: query without store columns (columns may not exist yet)
+      console.warn('getProducts fallback query:', queryErr.message);
+      [rows] = await sequelize.query(
+        `SELECT ep.id, ep.branch_id, ep.category_id, ep.sku, ep.barcode, ep.name,
+                ep.unit, ep.buy_price, ep.sell_price, ep.sell_price_mp, ep.sell_price_wa,
+                ep.stock_min, ep.weight, ep.notes, ep.is_active,
+                ep.created_at, ep.updated_at,
+                ec.name as category_name,
+                COALESCE(s.qty, 0) as stock_qty
+         FROM erp_products ep
+         LEFT JOIN erp_categories ec ON ec.id = ep.category_id
+         LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
+         WHERE ${where}
+         ORDER BY ep.name ASC
+         LIMIT ${limitNum} OFFSET ${offset}`
+      );
+    }
 
     // Parse JSON fields safely
     const parse = (v, fb) => { try { return v ? (typeof v==='string' ? JSON.parse(v) : v) : fb; } catch { return fb; } };
