@@ -343,6 +343,7 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
     try {
       // 1. Save to ERP
       let erpId = product?.id;
+      console.log('[ProductsPage] Saving product, images:', form.images);
       const erpPayload = {
         branch_id: form.branch_id, category_id: form.category_id || null,
         name: form.name, sku: form.sku, barcode: form.barcode,
@@ -374,7 +375,7 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
                              ) || 0,
         store_active_gpd:    form.publish_gpdistro ? 1 : 0,
         store_active_gpr:    form.publish_gpracing ? 1 : 0,
-        store_images:        form.images || [],
+        store_images:        Array.isArray(form.images) ? form.images.filter(img => img && typeof img === 'string' && img.startsWith('http')) : [],
         store_variants:      form.variants || {},
         store_tags:          form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         store_short_desc:    form.short_desc || '',
