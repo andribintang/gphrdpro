@@ -629,7 +629,7 @@ const GenerateModal = ({ onClose, onSuccess, existingRuns = [] }) => {
 // ════════════════════════════════════════════════════════════════
 const MySlipTab = () => {
   const [items,       setItems]       = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [loading,     setLoading]     = useState(false);
   const [selectedSlip,setSelectedSlip]= useState(null);
   const [filterType,  setFilterType]  = useState('');
   // PIN gate
