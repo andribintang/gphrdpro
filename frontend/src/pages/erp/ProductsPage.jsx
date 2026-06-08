@@ -126,15 +126,48 @@ function ImageUploader({ images, onChange }) {
   const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
 
+  // Compress image before upload
+  const compressImage = (file, maxKB = 100) => new Promise((resolve) => {
+    if (file.size <= maxKB * 1024) { resolve(file); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      const MAX = 1200;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      const tryQ = (q) => new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+      const search = async () => {
+        let lo = 0.1, hi = 0.9, best = null;
+        for (let i = 0; i < 8; i++) {
+          const mid = (lo + hi) / 2;
+          const blob = await tryQ(mid);
+          if (blob.size <= maxKB * 1024) { best = blob; lo = mid; }
+          else hi = mid;
+          if (hi - lo < 0.02) break;
+        }
+        if (!best) best = await tryQ(0.1);
+        resolve(new File([best], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+      };
+      search();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+
   const uploadToCloudinary = async (file) => {
-    if (!CLOUD_NAME) {
-      // Fallback: base64 if Cloudinary not configured
-      return toBase64(file);
-    }
+    if (!CLOUD_NAME) throw new Error('Cloudinary belum dikonfigurasi (VITE_CLOUDINARY_CLOUD_NAME)');
+    const compressed = await compressImage(file, 100);
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', compressed);
     fd.append('upload_preset', UPLOAD_PRESET);
-    fd.append('folder', 'erp_products');
+    // No folder param - let preset handle it to avoid conflict
     const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
       method: 'POST', body: fd,
     });
@@ -1020,12 +1053,24 @@ export default function ProductsPage() {
           onClick={e => e.stopPropagation()}/>
       ),
     },
-    { key: 'name', label: 'Nama Produk', sortable: true, render: (v, row) => (
-      <div>
-        <p className="font-semibold text-[var(--text-primary)] leading-tight">{v}</p>
-        {row.sku && <p className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">{row.sku}</p>}
-      </div>
-    )},
+    { key: 'name', label: 'Nama Produk', sortable: true, render: (v, row) => {
+      const thumb = Array.isArray(row.store_images) && row.store_images[0];
+      return (
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg overflow-hidden bg-[var(--bg-secondary)] flex-shrink-0 border border-[var(--border)]">
+            {thumb
+              ? <img src={thumb} alt={v} className="w-full h-full object-cover"/>
+              : <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
+                  <Package size={16}/>
+                </div>}
+          </div>
+          <div>
+            <p className="font-semibold text-[var(--text-primary)] leading-tight">{v}</p>
+            {row.sku && <p className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">{row.sku}</p>}
+          </div>
+        </div>
+      );
+    }},
     { key: 'category', label: 'Kategori', nowrap: true,
       render: v => <span className="text-[var(--text-secondary)]">{v?.name || '—'}</span> },
     { key: 'sell_price', label: 'Harga Jual', sortable: true, align: 'right', nowrap: true,

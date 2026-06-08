@@ -114,6 +114,7 @@ const getProducts = async (req, res, next) => {
               ep.unit, ep.buy_price, ep.sell_price, ep.sell_price_mp, ep.sell_price_wa,
               ep.stock_min, ep.weight, ep.notes, ep.is_active,
               ep.store_price, ep.store_price_compare, ep.store_active_gpd, ep.store_active_gpr,
+              ep.store_images, ep.store_variants, ep.store_tags,
               ep.store_short_desc, ep.store_description, ep.store_slug, ep.store_featured,
               ep.store_sold_count, ep.store_view_count, ep.store_meta_title, ep.store_meta_desc,
               ep.created_at, ep.updated_at,
