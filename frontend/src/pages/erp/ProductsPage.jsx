@@ -343,7 +343,6 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
     try {
       // 1. Save to ERP
       let erpId = product?.id;
-      console.log('[ProductsPage] Saving product, images:', form.images);
       const erpPayload = {
         branch_id: form.branch_id, category_id: form.category_id || null,
         name: form.name, sku: form.sku, barcode: form.barcode,

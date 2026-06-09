@@ -247,7 +247,6 @@ const createProduct = async (req, res, next) => {
 const updateProduct = async (req, res, next) => {
   try {
     const b = req.body;
-    console.log('[updateProduct] id:', req.params.id, 'store_images:', JSON.stringify(b.store_images));
     const num = (v, d=0) => { const n = parseFloat(v); return isNaN(n) ? d : n; };
     const int = (v, d=0) => { const n = parseInt(v);   return isNaN(n) ? d : n; };
     const safe = (v) => (v == null ? null : v);
