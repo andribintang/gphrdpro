@@ -243,6 +243,8 @@ const POFormModal = ({ po, onClose, onSuccess }) => {
 };
 
 // ── Receive Modal (Partial) ───────────────────────────────────
+const toNum = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
 const ReceiveModal = ({ po, onClose, onSuccess }) => {
   const today = new Date().toISOString().split('T')[0];
   const [receivedDate, setDate] = useState(today);
