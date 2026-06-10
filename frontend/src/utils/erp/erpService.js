@@ -49,6 +49,13 @@ export const erpService = {
 
   // Orders
   getOrders:        (p)      => api.get(`${BASE}/orders`, { params: p }),
+  updateOrderStatus:(id,d)   => {
+    const s = d.status;
+    if (s === 'confirmed')  return api.post(`${BASE}/orders/${id}/confirm`, d);
+    if (s === 'completed')  return api.post(`${BASE}/orders/${id}/complete`, d);
+    if (s === 'cancelled')  return api.post(`${BASE}/orders/${id}/cancel`, d);
+    return api.post(`${BASE}/orders/${id}/confirm`, d); // fallback
+  },
   getOrder:         (id)     => api.get(`${BASE}/orders/${id}`),
   createOrder:      (d)      => api.post(`${BASE}/orders`, d),
   confirmOrder:     (id)     => api.post(`${BASE}/orders/${id}/confirm`),

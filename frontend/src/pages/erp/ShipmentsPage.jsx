@@ -44,7 +44,7 @@ export default function ShipmentsPage() {
     if (!shipped.length) return null;
 
     const lines = shipped.map((s, idx) => {
-      const name     = s.customer_name || s.recipient_name || '—';
+      const name     = s.order?.customer_name || s.customer_name || s.recipient_name || '—';
       const resi     = s.shipment?.tracking_no || s.tracking_no || '—';
       const courier  = s.shipment?.courier || s.courier || '';
       return `${idx + 1}.${name} : ${courier}${resi}`;
@@ -70,7 +70,7 @@ export default function ShipmentsPage() {
     { key:'_no', label:'No', width:'48px', render:(_,row,idx)=><span className="text-[var(--text-muted)] font-mono text-xs">{idx+1}</span> },
     { key:'customer_name', label:'Nama Customer', render:(v,row)=>(
       <div>
-        <p className="font-semibold text-sm">{v || row.recipient_name || '—'}</p>
+        <p className="font-semibold text-sm">{row.order?.customer_name || v || row.recipient_name || '—'}</p>
         <p className="text-[11px] text-[var(--text-muted)]">{row.order_no || ''}</p>
       </div>
     )},
@@ -234,7 +234,7 @@ export default function ShipmentsPage() {
                 shipments.filter(s=>s.shipment?.tracking_no||s.tracking_no).map((s,idx)=>{
                   const resi    = s.shipment?.tracking_no || s.tracking_no;
                   const courier = s.shipment?.courier || s.courier || '';
-                  const name    = s.customer_name || s.recipient_name || '—';
+                  const name    = s.order?.customer_name || s.customer_name || s.recipient_name || '—';
                   return (
                     <div key={s.id||idx} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors">
                       <span className="text-[11px] font-bold text-[var(--text-muted)] w-6 flex-shrink-0">{idx+1}</span>
@@ -267,7 +267,7 @@ export default function ShipmentsPage() {
           }))}
           data={shipments}
           loading={loading}
-          searchKeys={['customer_name','order_no']}
+          searchKeys={['order_no']} customFilter={(items, q) => items.filter(s => (s.order?.customer_name||s.customer_name||'').toLowerCase().includes(q.toLowerCase()) || (s.order?.order_no||s.order_no||'').toLowerCase().includes(q.toLowerCase()))}
           searchPlaceholder="Cari nama customer, no. order..."
           emptyIcon={<Truck size={40}/>}
           emptyText="Tidak ada data pengiriman"
