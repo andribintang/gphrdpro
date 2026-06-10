@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RotateCcw, Plus, Eye, CheckCircle2, XCircle, X, Loader2, RefreshCw } from 'lucide-react';
+import { RotateCcw, Plus, Eye, CheckCircle2, XCircle, X, Loader2, RefreshCw, Search, PackageSearch } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable, { StatusBadge } from '../../components/DataTable';
-import { erpService, toRp, toRpShort } from '../../utils/erp/erpService';
+import { erpService, toRp, toRpShort, ORDER_STATUS } from '../../utils/erp/erpService';
 
 const RETURN_STATUS = {
   pending:   { label:'Menunggu',     color:'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
@@ -17,29 +17,60 @@ const RESOLUTIONS = {
 };
 
 const CreateModal = ({ onClose, onSuccess }) => {
-  const [step, setStep]   = useState(1);
-  const [orderNo, setONo] = useState('');
-  const [order, setOrder] = useState(null);
-  const [searching, setS] = useState(false);
-  const [selItems, setSel]= useState({});
-  const [reason, setReason]= useState('cod_ditolak');
-  const [resolution, setRes]= useState('refund');
-  const [restock, setRest]= useState(true);
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving]= useState(false);
+  const [step,       setStep]    = useState(1);
+  const [query,      setQuery]   = useState('');
+  const [allOrders,  setAll]     = useState([]);
+  const [loadingAll, setLoadAll] = useState(true);
+  const [order,      setOrder]   = useState(null);
+  const [loadDetail, setLoadDet] = useState(false);
+  const [selItems,   setSel]     = useState({});
+  const [reason,     setReason]  = useState('cod_ditolak');
+  const [resolution, setRes]     = useState('refund');
+  const [restock,    setRest]    = useState(true);
+  const [notes,      setNotes]   = useState('');
+  const [saving,     setSaving]  = useState(false);
+  const [page,       setPage]    = useState(1);
+  const PAGE = 8;
 
-  const searchOrder = async () => {
-    if (!orderNo.trim()) return; setS(true);
+  // Load all eligible orders on mount
+  useEffect(() => {
+    erpService.getOrders({ limit: 500, status: 'completed,shipped,processing,confirmed' })
+      .then(r => {
+        const orders = (r.data.data.orders || [])
+          .filter(o => ['confirmed','processing','shipped','completed'].includes(o.status));
+        setAll(orders);
+      })
+      .catch(() => toast.error('Gagal memuat daftar order'))
+      .finally(() => setLoadAll(false));
+  }, []);
+
+  // Fuzzy filter
+  const q = query.toLowerCase().trim();
+  const filtered = q
+    ? allOrders.filter(o =>
+        (o.order_no||'').toLowerCase().includes(q) ||
+        (o.customer_name||'').toLowerCase().includes(q) ||
+        (o.customer_phone||'').includes(q)
+      )
+    : allOrders;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const paged = filtered.slice((page-1)*PAGE, page*PAGE);
+
+  const selectOrder = async (o) => {
+    setLoadDet(true);
     try {
-      const res = await erpService.getOrders({ search: orderNo.trim(), limit:5 });
-      const found = (res.data.data.orders||[]).find(o=>o.order_no.toUpperCase()===orderNo.toUpperCase().trim());
-      if (!found) { toast.error('Order tidak ditemukan'); return; }
-      const detail = await erpService.getOrder(found.id);
+      const detail = await erpService.getOrder(o.id);
       const od = detail.data.data.order;
-      if (!['confirmed','processing','shipped','completed'].includes(od.status)) { toast.error(`Order status ${od.status} tidak bisa diretur`); return; }
-      setOrder(od); const init={}; (od.items||[]).forEach(i=>{init[i.id]=i.qty;}); setSel(init); setStep(2);
-    } catch { toast.error('Gagal mencari order'); } finally { setS(false); }
+      setOrder(od);
+      const init = {}; (od.items||[]).forEach(i => { init[i.id] = i.qty; }); setSel(init);
+      setStep(2);
+    } catch { toast.error('Gagal memuat detail order'); }
+    finally { setLoadDet(false); }
   };
+
+  // Keep old searchOrder for compatibility
+  const searchOrder = () => {};
 
   const totalReturn = (order?.items||[]).reduce((s,i)=>{const qty=selItems[i.id]||0;return s+(parseFloat(i.sell_price)*qty);},0);
 
@@ -53,17 +84,117 @@ const CreateModal = ({ onClose, onSuccess }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}><div className="modal-backdrop"/>
-      <div className="modal-box max-w-lg" onClick={e=>e.stopPropagation()}>
+      <div className="modal-box max-w-2xl" onClick={e=>e.stopPropagation()}>
         <div className="modal-header"><h3 className="text-sm font-bold">Buat Retur</h3><button onClick={onClose} className="btn-icon-sm"><X size={14}/></button></div>
         <div className="modal-body">
           {step===1 ? (
-            <div className="space-y-4">
-              <div><label className="field-label">No. Order</label>
-                <div className="flex gap-2">
-                  <input value={orderNo} onChange={e=>setONo(e.target.value)} onKeyDown={e=>e.key==='Enter'&&searchOrder()} placeholder="GPC202605210001" className="input-base flex-1 font-mono" autoFocus/>
-                  <button onClick={searchOrder} disabled={searching} className="btn-primary px-4">{searching?<Loader2 size={15} className="animate-spin"/>:'Cari'}</button>
-                </div>
+            <div className="space-y-3">
+              {/* Search */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
+                <input
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setPage(1); }}
+                  placeholder="Cari no. order, nama pelanggan, no. HP..."
+                  className="input-base pl-9 text-sm"
+                  autoFocus
+                />
               </div>
+
+              {/* Order list */}
+              <div className="text-[11px] text-[var(--text-muted)] flex items-center justify-between">
+                <span>{filtered.length} order tersedia untuk retur</span>
+                {q && <span>Filter: "<b>{query}</b>"</span>}
+              </div>
+
+              {loadingAll ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 size={24} className="animate-spin text-[var(--brand-500)]"/>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-8 text-[var(--text-muted)]">
+                  <PackageSearch size={32} className="mx-auto mb-2 opacity-30"/>
+                  <p className="text-sm">Tidak ada order ditemukan</p>
+                </div>
+              ) : (
+                <>
+                  <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-[var(--bg-secondary)] border-b border-[var(--border)]">
+                          <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">No. Order</th>
+                          <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">Pelanggan</th>
+                          <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">Tgl</th>
+                          <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase tracking-wide">Total</th>
+                          <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase tracking-wide">Status</th>
+                          <th className="px-3 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {paged.map(o => (
+                          <tr key={o.id}
+                            className="hover:bg-[var(--brand-600)]/5 cursor-pointer transition-colors"
+                            onClick={() => !loadDetail && selectOrder(o)}>
+                            <td className="px-3 py-2.5 font-mono font-semibold text-[var(--brand-600)]">
+                              {o.order_no}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <p className="font-semibold text-[var(--text-primary)] truncate max-w-[120px]">{o.customer_name||'—'}</p>
+                              {o.customer_phone && <p className="text-[10px] text-[var(--text-muted)]">{o.customer_phone}</p>}
+                            </td>
+                            <td className="px-3 py-2.5 text-[var(--text-muted)] whitespace-nowrap">{o.order_date}</td>
+                            <td className="px-3 py-2.5 text-right font-semibold">{toRp(o.total_amount)}</td>
+                            <td className="px-3 py-2.5 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                o.status==='completed' ? 'bg-emerald-100 text-emerald-700' :
+                                o.status==='shipped'   ? 'bg-purple-100 text-purple-700' :
+                                o.status==='processing'? 'bg-amber-100 text-amber-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {ORDER_STATUS[o.status]?.label || o.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              {loadDetail
+                                ? <Loader2 size={13} className="animate-spin text-[var(--brand-500)] mx-auto"/>
+                                : <button className="text-[10px] text-[var(--brand-600)] font-semibold hover:underline px-2 py-1 rounded-lg hover:bg-[var(--brand-600)]/10">
+                                    Pilih →
+                                  </button>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                      <span>{(page-1)*PAGE+1}–{Math.min(page*PAGE, filtered.length)} dari {filtered.length}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
+                          className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-40">
+                          ‹
+                        </button>
+                        {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                          const p = totalPages <= 5 ? i+1 : Math.max(1, Math.min(page-2, totalPages-4))+i;
+                          return (
+                            <button key={p} onClick={() => setPage(p)}
+                              className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors
+                                ${p===page ? 'bg-[var(--brand-600)] text-white' : 'border border-[var(--border)] hover:bg-[var(--bg-secondary)]'}`}>
+                              {p}
+                            </button>
+                          );
+                        })}
+                        <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}
+                          className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-40">
+                          ›
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
