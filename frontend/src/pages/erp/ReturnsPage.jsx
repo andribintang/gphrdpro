@@ -34,7 +34,7 @@ const CreateModal = ({ onClose, onSuccess }) => {
 
   // Load all eligible orders on mount
   useEffect(() => {
-    erpService.getOrders({ limit: 500, status: 'completed,shipped,processing,confirmed' })
+    erpService.getOrders({ limit: 500 })
       .then(r => {
         const orders = (r.data.data.orders || [])
           .filter(o => ['confirmed','processing','shipped','completed'].includes(o.status));

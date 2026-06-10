@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Package, Plus, Edit3, X, Loader2, CheckCircle2, AlertTriangle, Trash2,
   Store, ChevronDown, Upload, Image as ImageIcon,
+  Search, MoreHorizontal, Copy, ChevronLeft, ChevronRight, Eye,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../../components/DataTable';
@@ -991,7 +992,16 @@ export default function ProductsPage() {
   const [modal,         setModal]         = useState(null);
   const [selected,      setSelected]      = useState(new Set());
   const [bulkPublish,   setBulkPublish]   = useState(false);
-  const [deleting,      setDeleting]      = useState(null); // product to delete
+  const [deleting,      setDeleting]      = useState(null);
+  // Filters & search
+  const [search,        setSearch]        = useState('');
+  const [filterCat,     setFilterCat]     = useState('');
+  const [filterBranch,  setFilterBranch]  = useState('');
+  const [filterStock,   setFilterStock]   = useState(''); // low | out
+  const [showVariants,  setShowVariants]  = useState({}); // expanded rows
+  const [actionMenu,    setActionMenu]    = useState(null); // product id with open menu
+  const [page,          setPage]          = useState(1);
+  const PAGE_SIZE = 20;
 
   const handleDelete = async (product) => {
     if (!confirm(`Hapus produk "${product.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
@@ -1088,77 +1098,266 @@ export default function ProductsPage() {
     }},
   ];
 
+  // Filtered & searched products
+  const filtered = products.filter(p => {
+    const q = search.toLowerCase();
+    if (q && !p.name?.toLowerCase().includes(q) && !p.sku?.toLowerCase().includes(q) && !p.barcode?.toLowerCase().includes(q)) return false;
+    if (filterCat && String(p.category_id) !== String(filterCat)) return false;
+    if (filterBranch && String(p.branch_id) !== String(filterBranch)) return false;
+    if (filterStock === 'low')  return (p.stock?.qty||p.stock_qty||0) <= (p.stock_min||0) && (p.stock?.qty||p.stock_qty||0) > 0;
+    if (filterStock === 'out')  return (p.stock?.qty||p.stock_qty||0) <= 0;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const allSelected = paged.length > 0 && paged.every(p => selected.has(p.id));
+  const toggleAll = () => {
+    const ns = new Set(selected);
+    if (allSelected) paged.forEach(p => ns.delete(p.id));
+    else paged.forEach(p => ns.add(p.id));
+    setSelected(ns);
+  };
+
   return (
-    <div className="section animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Produk</h1>
-          <p className="body-sm text-[var(--text-muted)]">{products.length} produk</p>
+          <p className="page-subtitle">{filtered.length} dari {products.length} produk</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Bulk publish button — shows when items selected */}
+        <div className="flex items-center gap-2 flex-wrap">
           {selected.size > 0 && (
             <button onClick={() => setBulkPublish(true)}
-              className="btn-primary gap-2 animate-fade-in"
-              style={{ background: '#059669' }}>
-              <Store size={16}/>
-              Publish {selected.size} ke Toko
+              className="btn-secondary gap-2 h-9 text-sm">
+              <Store size={14}/> Publish ({selected.size})
             </button>
           )}
-          <button onClick={() => setModal('new')} className="btn-primary">
-            <Plus size={16}/> Tambah Produk
+          <button onClick={() => setModal('new')} className="btn-primary gap-2 h-9">
+            <Plus size={15}/> Tambah Produk
           </button>
         </div>
       </div>
 
-      {/* Selection info bar */}
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between bg-[var(--brand-600)]/10 border border-[var(--brand-600)]/20 rounded-lg px-4 py-2.5 mb-4 animate-fade-in">
-          <p className="text-sm font-medium text-[var(--brand-600)]">
-            {selected.size} produk dipilih
-          </p>
-          <div className="flex gap-3">
-            <button onClick={() => setSelected(new Set(products.map(p => p.id)))}
-              className="text-xs text-[var(--brand-600)] hover:underline">
-              Pilih Semua ({products.length})
-            </button>
-            <button onClick={() => setSelected(new Set())}
-              className="text-xs text-[var(--text-muted)] hover:text-red-500">
-              Batalkan Pilihan
-            </button>
-          </div>
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/>
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Cari Produk / SKU / Barcode"
+            className="input-base pl-8 h-9 text-sm w-full"/>
         </div>
-      )}
-
-      <DataTable
-        columns={columns}
-        data={products}
-        loading={loading}
-        searchKeys={['name','sku','barcode']}
-        searchPlaceholder="Cari nama, SKU, barcode..."
-        emptyIcon={<Package size={40}/>}
-        emptyText="Belum ada produk"
-        emptyAction={
-          <button onClick={() => setModal('new')} className="btn-primary">
-            Tambah Produk Pertama
+        {/* Category filter */}
+        <select value={filterCat} onChange={e => { setFilterCat(e.target.value); setPage(1); }}
+          className="input-base h-9 text-sm w-36">
+          <option value="">Semua Kategori</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {/* Branch filter */}
+        <select value={filterBranch} onChange={e => { setFilterBranch(e.target.value); setPage(1); }}
+          className="input-base h-9 text-sm w-36">
+          <option value="">Semua Cabang</option>
+          <option value="1">GP Racing</option>
+          <option value="2">GP Distro</option>
+        </select>
+        {/* Stock filter */}
+        <select value={filterStock} onChange={e => { setFilterStock(e.target.value); setPage(1); }}
+          className="input-base h-9 text-sm w-36">
+          <option value="">Semua Stok</option>
+          <option value="low">Stok Menipis</option>
+          <option value="out">Habis</option>
+        </select>
+        {/* Clear filters */}
+        {(search || filterCat || filterBranch || filterStock) && (
+          <button onClick={() => { setSearch(''); setFilterCat(''); setFilterBranch(''); setFilterStock(''); setPage(1); }}
+            className="text-xs text-[var(--text-muted)] hover:text-red-500 flex items-center gap-1">
+            <X size={13}/> Reset
           </button>
-        }
-        actions={(row) => (
-          <div className="flex items-center gap-1">
-            <button onClick={() => setModal(row)} className="btn-icon-sm" title="Edit">
-              <Edit3 size={13}/>
-            </button>
-            <button onClick={() => handleDelete(row)}
-              className="btn-icon-sm text-red-400 hover:text-red-600 hover:bg-red-50" title="Hapus">
-              <Trash2 size={13}/>
-            </button>
+        )}
+      </div>
+
+      {/* Premium Product Table */}
+      <div className="table-wrapper overflow-hidden" onClick={() => setActionMenu(null)}>
+        {loading ? (
+          <div className="p-8 flex justify-center">
+            <Loader2 size={24} className="animate-spin text-[var(--brand-500)]"/>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-12 text-center">
+            <Package size={40} className="mx-auto mb-3 text-[var(--text-muted)] opacity-30"/>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Tidak ada produk</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Coba ubah filter atau tambah produk baru</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-[var(--border)] bg-[var(--bg-secondary)]">
+                  <th className="px-3 py-3 w-8">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-3.5 h-3.5 rounded"/>
+                  </th>
+                  <th className="px-3 py-3 w-14 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-center">Foto</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">Nama Produk</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">Variant</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">SKU</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-center">Qty Stok</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">Satuan</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right">Harga Beli</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right">Harga Jual</th>
+                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right">Harga Toko</th>
+                  <th className="px-3 py-3 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((p) => {
+                  const thumb = Array.isArray(p.store_images) && p.store_images[0];
+                  const qty = p.stock_qty ?? p.stock?.qty ?? 0;
+                  const isLow = qty > 0 && qty <= (p.stock_min || 0);
+                  const isOut = qty <= 0;
+                  const variants = p.store_variants && typeof p.store_variants === 'object' && Object.keys(p.store_variants).length > 0
+                    ? p.store_variants : null;
+                  const menuOpen = actionMenu === p.id;
+
+                  return (
+                    <tr key={p.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-secondary)]/40 group transition-colors">
+                      {/* Checkbox */}
+                      <td className="px-3 py-3">
+                        <input type="checkbox" checked={selected.has(p.id)}
+                          onChange={() => { const ns = new Set(selected); ns.has(p.id) ? ns.delete(p.id) : ns.add(p.id); setSelected(ns); }}
+                          onClick={e => e.stopPropagation()} className="w-3.5 h-3.5 rounded"/>
+                      </td>
+                      {/* Foto */}
+                      <td className="px-3 py-3 text-center">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--bg-secondary)] border border-[var(--border)] mx-auto flex items-center justify-center">
+                          {thumb
+                            ? <img src={thumb} alt={p.name} className="w-full h-full object-cover"/>
+                            : <Package size={16} className="text-[var(--text-muted)] opacity-50"/>}
+                        </div>
+                      </td>
+                      {/* Nama */}
+                      <td className="px-3 py-3 max-w-[200px]">
+                        <div>
+                          <button onClick={() => setModal(p)}
+                            className="font-semibold text-[var(--brand-600)] hover:underline text-left leading-tight truncate block max-w-full">
+                            {p.name}
+                          </button>
+                          {p.category?.name && <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{p.category.name}</p>}
+                          {/* Variant expand toggle */}
+                          {variants && (
+                            <button onClick={() => setShowVariants(v => ({...v, [p.id]: !v[p.id]}))}
+                              className="text-[10px] text-[var(--brand-600)] hover:underline mt-0.5 flex items-center gap-0.5">
+                              <ChevronDown size={10} className={`transition-transform ${showVariants[p.id] ? 'rotate-180' : ''}`}/>
+                              {Object.values(variants).flat().length} variant
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      {/* Variant summary */}
+                      <td className="px-3 py-3 text-xs text-[var(--text-muted)]">
+                        {variants
+                          ? <div className="flex flex-wrap gap-1 max-w-[120px]">
+                              {Object.entries(variants).slice(0,1).map(([k,vals]) =>
+                                (vals||[]).slice(0,3).map(v => (
+                                  <span key={v} className="bg-[var(--bg-secondary)] border border-[var(--border)] px-1.5 py-0.5 rounded text-[10px]">{v}</span>
+                                ))
+                              )}
+                            </div>
+                          : '—'}
+                      </td>
+                      {/* SKU */}
+                      <td className="px-3 py-3 font-mono text-xs text-[var(--text-secondary)]">
+                        {p.sku || '—'}
+                      </td>
+                      {/* Stok */}
+                      <td className="px-3 py-3 text-center">
+                        <span className={`inline-flex items-center justify-center w-10 h-6 rounded-lg text-xs font-bold
+                          ${isOut ? 'bg-red-100 text-red-600' : isLow ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {qty}
+                        </span>
+                      </td>
+                      {/* Satuan */}
+                      <td className="px-3 py-3 text-xs text-[var(--text-muted)]">{p.unit || '—'}</td>
+                      {/* Harga Beli */}
+                      <td className="px-3 py-3 text-right text-xs text-[var(--text-secondary)]">
+                        {p.buy_price ? toRpShort(p.buy_price) : '—'}
+                      </td>
+                      {/* Harga Jual */}
+                      <td className="px-3 py-3 text-right text-xs font-semibold">
+                        {toRpShort(p.sell_price)}
+                      </td>
+                      {/* Harga Toko */}
+                      <td className="px-3 py-3 text-right text-xs text-[var(--text-secondary)]">
+                        {p.store_price ? toRpShort(p.store_price) : '—'}
+                      </td>
+                      {/* Action menu */}
+                      <td className="px-2 py-3 relative" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setActionMenu(menuOpen ? null : p.id)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal size={15}/>
+                        </button>
+                        {menuOpen && (
+                          <div className="absolute right-0 top-8 z-20 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl py-1 min-w-[160px]">
+                            <button onClick={() => { setModal(p); setActionMenu(null); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+                              <Edit3 size={13}/> Edit Produk
+                            </button>
+                            <button onClick={() => { navigator.clipboard.writeText(p.sku||''); toast.success('SKU disalin'); setActionMenu(null); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+                              <Copy size={13}/> Salin SKU
+                            </button>
+                            <button onClick={() => { setModal(p); setActionMenu(null); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+                              <Eye size={13}/> Detail
+                            </button>
+                            <div className="border-t border-[var(--border)] my-1"/>
+                            <button onClick={() => { handleDelete(p); setActionMenu(null); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-red-50 text-red-600">
+                              <Trash2 size={13}/> Hapus
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-        pageSize={25}
-        zebra
-      />
 
-      {/* Edit/Add modal */}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--bg)]">
+            <p className="text-xs text-[var(--text-muted)]">
+              {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, filtered.length)} dari {filtered.length} produk
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
+                className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-30">
+                <ChevronLeft size={13}/>
+              </button>
+              {[...Array(Math.min(5, totalPages))].map((_,i) => {
+                const pg = Math.max(1, Math.min(page-2, totalPages-4)) + i;
+                return pg <= totalPages ? (
+                  <button key={pg} onClick={() => setPage(pg)}
+                    className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors
+                      ${pg===page ? 'bg-[var(--brand-600)] text-white' : 'border border-[var(--border)] hover:bg-[var(--bg-secondary)]'}`}>
+                    {pg}
+                  </button>
+                ) : null;
+              })}
+              <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}
+                className="w-7 h-7 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-[var(--bg-secondary)] disabled:opacity-30">
+                <ChevronRight size={13}/>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {modal && (
         <ProductModal
           product={modal === 'new' ? null : modal}
