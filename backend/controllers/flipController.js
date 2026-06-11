@@ -209,20 +209,10 @@ const handleWebhook = async (req, res, next) => {
     // Flip kirim token di header x-callback-token
     const token = req.headers['x-callback-token'];
 
-    // Log token for debugging
-    console.log('Flip webhook token received:', token);
-    console.log('Flip webhook token expected:', FLIP_VALIDATION_TOKEN ? FLIP_VALIDATION_TOKEN.substring(0,10) + '...' : '(not set)');
-
-    // Validasi token - skip jika FLIP_VALIDATION_TOKEN kosong
-    if (FLIP_VALIDATION_TOKEN && FLIP_VALIDATION_TOKEN.length > 0) {
-      // Trim whitespace dari kedua sisi
-      const receivedToken  = (token || '').trim();
-      const expectedToken  = FLIP_VALIDATION_TOKEN.trim();
-      if (receivedToken !== expectedToken) {
-        console.warn('Flip webhook: token mismatch');
-        // Tetap proses tapi log warning — jangan block webhook
-        // return res.status(200).json({ success: false, message: 'Invalid token' });
-      }
+    // Jika FLIP_VALIDATION_TOKEN belum di-set, skip validasi (development)
+    if (FLIP_VALIDATION_TOKEN && token !== FLIP_VALIDATION_TOKEN) {
+      console.warn('Flip webhook: invalid token', token);
+      return res.status(200).json({ success: false, message: 'Invalid token' }); // 200 agar Flip tidak retry terus
     }
 
     // Flip kirim data sebagai form-urlencoded
@@ -283,54 +273,4 @@ const handleWebhook = async (req, res, next) => {
 // Get FLIP_VALIDATION_TOKEN for webhook
 const FLIP_VALIDATION_TOKEN = process.env.FLIP_VALIDATION_TOKEN || '';
 
-// ── GET /api/flip/balance ────────────────────────────────────
-const getBalance = async (req, res, next) => {
-  try {
-    const balance = await flip.getBalance();
-    return res.json({ success: true, data: { balance: balance.balance || 0 } });
-  } catch (err) {
-    // Sandbox may return different structure
-    return res.json({ success: true, data: { balance: 0, note: 'Sandbox balance' } });
-  }
-};
-
-// ── GET /api/flip/balance/check/:runId ───────────────────────
-// Check if balance sufficient for a payroll run
-const checkBalance = async (req, res, next) => {
-  try {
-    const { PayrollItem } = require('../models');
-    const items = await PayrollItem.findAll({
-      where: { payroll_run_id: req.params.runId, status: { [require('sequelize').Op.in]: ['approved'] } }
-    });
-
-    const totalNeeded = items
-      .filter(i => i.flip_status !== 'DONE')
-      .reduce((s, i) => s + parseFloat(i.net_salary || 0), 0);
-
-    let currentBalance = 0;
-    try {
-      const bal = await flip.getBalance();
-      currentBalance = bal.balance || 0;
-    } catch { currentBalance = 0; }
-
-    const sufficient = currentBalance >= totalNeeded;
-    const gap        = totalNeeded - currentBalance;
-    const pending    = items.filter(i => i.flip_status !== 'DONE').length;
-    const done       = items.filter(i => i.flip_status === 'DONE').length;
-
-    return res.json({
-      success: true,
-      data: {
-        current_balance: currentBalance,
-        total_needed:    Math.round(totalNeeded),
-        gap:             Math.round(Math.max(0, gap)),
-        sufficient,
-        pending_items:   pending,
-        done_items:      done,
-        total_items:     items.length,
-      }
-    });
-  } catch (err) { next(err); }
-};
-
-module.exports = { getBanks, validateAccount, disburseRun, disburseItem, getRunDisbursementStatus, handleWebhook, getBalance, checkBalance };
+module.exports = { getBanks, validateAccount, disburseRun, disburseItem, getRunDisbursementStatus, handleWebhook };
