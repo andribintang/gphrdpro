@@ -4,7 +4,7 @@ import {
   Home, Users, Clock, CalendarOff, DollarSign,
   TrendingUp, Building2, SlidersHorizontal, Settings,
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
-  ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
+  ClipboardList, BarChart3, LogOut, Bell, Sun, Moon, Target,
   ChevronDown, Menu, Truck, Database, CalendarDays,
   RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store,
   PanelLeftClose, PanelLeftOpen, Shield
@@ -51,6 +51,7 @@ const NAV = [
           { to:'/erp/expenses',      icon:Wallet,      label:'Pengeluaran',     roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/profit-loss',   icon:TrendingUp,  label:'Laba Rugi',       roles:['admin','hr'] },
           { to:'/erp/reports',       icon:BarChart3,   label:'Laporan Sales',   roles:['admin','hr','supervisor','employee'] },
+          { to:'/erp/sales-target',   icon:Target,      label:'Target Sales',    roles:['admin','hr','supervisor'] },
           { to:'/erp/daily-report',  icon:CalendarDays,label:'Laporan Harian',  roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/report-channel',icon:LayoutList,  label:'Laporan Channel', roles:['admin','hr','supervisor','employee'] },
         ],

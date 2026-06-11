@@ -29,7 +29,8 @@ import OrdersPage      from './pages/erp/OrdersPage';
 import NewOrderPage    from './pages/erp/NewOrderPage';
 import OrderDetailPage from './pages/erp/OrderDetailPage';
 import CustomersPage   from './pages/erp/CustomersPage';
-import SalesReportPage from './pages/erp/SalesReportPage';
+import SalesReportPage   from './pages/erp/SalesReportPage';
+import SalesTargetPage   from './pages/erp/SalesTargetPage';
 import ImportPage      from './pages/erp/ImportPage';
 import PurchasesPage   from './pages/erp/PurchasesPage';
 import ExpensesPage    from './pages/erp/ExpensesPage';
@@ -142,6 +143,7 @@ export default function App() {
                 <Route path="erp/customers" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><CustomersPage /></ProtectedRoute>
                 } />
+                <Route path="erp/sales-target" element={<ProtectedRoute roles={['admin','hr','supervisor']}><SalesTargetPage /></ProtectedRoute>}/>
                 <Route path="erp/reports" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><SalesReportPage /></ProtectedRoute>
                 } />

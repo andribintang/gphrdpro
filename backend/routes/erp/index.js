@@ -7,6 +7,7 @@ const allRoles = authorize('admin','hr','supervisor','employee');
 
 const master    = require('../../controllers/erp/masterController');
 const inventory = require('../../controllers/erp/inventoryController');
+const target    = require('../../controllers/erp/channelTargetController');
 const order    = require('../../controllers/erp/orderController');
 const purchase = require('../../controllers/erp/purchaseController');
 const ret      = require('../../controllers/erp/returnController');
@@ -89,6 +90,13 @@ router.put   ('/expenses/:id',         authenticate, hrAdmin,  purchase.updateEx
 router.delete('/expenses/:id',         authenticate, hrAdmin,  purchase.deleteExpense);
 
 // ── Stock Opname ──────────────────────────────────────────────
+// Channel Sales Targets
+router.get   ('/channel-targets',         authenticate, allRoles, target.getTargets);
+router.get   ('/channel-targets/summary', authenticate, allRoles, target.getSummary);
+router.post  ('/channel-targets',         authenticate, hrAdmin,  target.upsertTarget);
+router.post  ('/channel-targets/bulk',    authenticate, hrAdmin,  target.bulkUpsert);
+router.delete('/channel-targets/:id',     authenticate, hrAdmin,  target.deleteTarget);
+
 // Inventory Intelligence
 router.get   ('/inventory/summary',        authenticate, allRoles, inventory.getSummary);
 router.get   ('/inventory/movements',      authenticate, allRoles, inventory.getMovements);

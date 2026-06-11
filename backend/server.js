@@ -376,6 +376,20 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      `CREATE TABLE IF NOT EXISTS erp_channel_targets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sub_channel_id INT NOT NULL,
+        year INT NOT NULL,
+        month INT NOT NULL,
+        branch_id INT NOT NULL DEFAULT 1,
+        target_revenue DECIMAL(15,2) DEFAULT 0,
+        target_orders INT DEFAULT 0,
+        notes TEXT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_target (sub_channel_id, year, month, branch_id),
+        INDEX idx_period (year, month)
+      )`,
       `CREATE TABLE IF NOT EXISTS notifications (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
