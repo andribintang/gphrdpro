@@ -333,4 +333,4 @@ const checkBalance = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getBanks, validateAccount, disburseRun, disburseItem, getRunDisbursementStatus, handleWebhook };
+module.exports = { getBanks, validateAccount, disburseRun, disburseItem, getRunDisbursementStatus, handleWebhook, getBalance, checkBalance };
