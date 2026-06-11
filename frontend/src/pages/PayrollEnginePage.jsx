@@ -1712,6 +1712,7 @@ const PayrollHistoryTab = () => {
 // ════════════════════════════════════════════════════════════════
 const TABS_HR = [
   { id:'runs',       label:'Payroll',      icon:DollarSign },
+  { id:'payment',    label:'Pembayaran',   icon:Banknote },
   { id:'report',     label:'Laporan',      icon:BarChart3 },
   { id:'history',    label:'History',      icon:Clock },
   { id:'myslip',     label:'Slip Saya',    icon:FileText },
@@ -1938,6 +1939,247 @@ const PayrollSettingsTab = () => {
   );
 };
 
+
+
+// ════════════════════════════════════════════════════════════════
+// PAYMENT PORTAL TAB — 1 Portal untuk semua tipe pembayaran
+// ════════════════════════════════════════════════════════════════
+const PaymentPortalTab = () => {
+  const [runs,       setRuns]       = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [balance,    setBalance]    = useState(null);
+  const [disburse,   setDisburse]   = useState(null);
+  const [filterType, setFilterType] = useState('');
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Load approved/paid runs + balance simultaneously
+      const [runsRes, balRes] = await Promise.all([
+        payrollEngineService.getRuns({ year: filterYear, limit: 200 }),
+        fetch(`${API}/flip/balance`, { headers: authH }).then(r=>r.json()).catch(()=>null),
+      ]);
+      const allRuns = runsRes.data.data.runs || [];
+      // Show approved (ready to pay) + paid (already done)
+      setRuns(allRuns.filter(r => ['approved','paid'].includes(r.status)));
+      if (balRes?.data) setBalance(balRes.data.balance);
+    } catch { toast.error('Gagal memuat data'); }
+    finally { setLoading(false); }
+  }, [filterYear]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const filtered = filterType ? runs.filter(r => r.type === filterType) : runs;
+  const readyToPay = filtered.filter(r => r.status === 'approved');
+  const paid       = filtered.filter(r => r.status === 'paid');
+  const totalPending = readyToPay.reduce((s,r) => s + parseFloat(r.total_net||0), 0);
+
+  const TYPE_CONFIG = {
+    monthly:   { icon:'💰', label:'Gaji Bulanan',   color:'bg-blue-100 text-blue-700',    border:'border-blue-400' },
+    thr:       { icon:'🎊', label:'THR',             color:'bg-purple-100 text-purple-700', border:'border-purple-400' },
+    bonus:     { icon:'🏆', label:'Bonus',           color:'bg-amber-100 text-amber-700',   border:'border-amber-400' },
+    incentive: { icon:'🚀', label:'Insentif',        color:'bg-emerald-100 text-emerald-700', border:'border-emerald-400' },
+  };
+
+  return (
+    <div className="space-y-5 animate-fade-in">
+
+      {/* Balance card */}
+      <div className="table-wrapper p-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Saldo Flip</p>
+            <p className={`text-2xl font-black ${balance === null ? 'text-[var(--text-muted)]' : balance >= totalPending ? 'text-emerald-600' : 'text-red-500'}`}>
+              {balance === null ? '—' : toRupiahShort(balance)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-[var(--text-muted)]">Total menunggu pembayaran</p>
+            <p className="text-lg font-bold text-[var(--brand-600)]">{toRupiahShort(totalPending)}</p>
+            {balance !== null && totalPending > 0 && (
+              <p className={`text-xs font-semibold mt-0.5 ${balance >= totalPending ? 'text-emerald-600' : 'text-red-500'}`}>
+                {balance >= totalPending ? `✅ Saldo cukup (+${toRupiahShort(balance - totalPending)})` : `⚠️ Kurang ${toRupiahShort(totalPending - balance)}`}
+              </p>
+            )}
+          </div>
+          <button onClick={loadData} className="btn-icon" title="Refresh">
+            <RefreshCw size={15}/>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <select value={filterYear} onChange={e=>setFilterYear(parseInt(e.target.value))}
+          className="input-base h-9 text-sm w-24">
+          {[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+        </select>
+        <div className="flex gap-1.5 flex-wrap">
+          {[{v:'',l:'Semua'},{v:'monthly',l:'💰 Gaji'},{v:'thr',l:'🎊 THR'},{v:'bonus',l:'🏆 Bonus'},{v:'incentive',l:'🚀 Insentif'}].map(t=>(
+            <button key={t.v} onClick={()=>setFilterType(t.v)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all
+                ${filterType===t.v ? 'bg-[var(--brand-600)] text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">{[...Array(3)].map((_,i)=><div key={i} className="skeleton h-24 rounded-2xl"/>)}</div>
+      ) : (
+        <>
+          {/* Ready to pay */}
+          {readyToPay.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"/>
+                <p className="text-sm font-bold text-[var(--text-primary)]">Menunggu Pembayaran ({readyToPay.length})</p>
+              </div>
+              {readyToPay.map(run => {
+                const tc = TYPE_CONFIG[run.type] || TYPE_CONFIG.monthly;
+                return (
+                  <div key={run.id} className={`table-wrapper border-l-4 ${tc.border}`}>
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center text-xl flex-shrink-0">
+                            {tc.icon}
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm">{run.period_label}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${tc.color}`}>
+                                {tc.label}
+                              </span>
+                              <span className="text-[10px] text-[var(--text-muted)]">
+                                {run.total_employees} karyawan
+                              </span>
+                              <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                                ⏳ Menunggu Transfer
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-lg font-black text-[var(--brand-600)]">{toRupiahShort(run.total_net)}</p>
+                          <p className="text-[10px] text-[var(--text-muted)]">Total bersih</p>
+                        </div>
+                      </div>
+
+                      {/* Breakdown */}
+                      <div className="grid grid-cols-3 gap-2 mt-3 mb-3">
+                        {[
+                          {l:'Pendapatan', v:toRupiahShort(run.total_gross),      c:'text-emerald-600'},
+                          {l:'Potongan',   v:toRupiahShort(run.total_deductions), c:'text-red-500'},
+                          {l:'Bersih',     v:toRupiahShort(run.total_net),        c:'text-[var(--brand-600)]'},
+                        ].map(s=>(
+                          <div key={s.l} className="bg-[var(--bg-secondary)] rounded-xl py-2 text-center">
+                            <p className={`text-xs font-bold ${s.c}`}>{s.v}</p>
+                            <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">{s.l}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setDisburse(run)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+                          <Banknote size={14}/>
+                          Transfer via Flip
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await payrollEngineService.markPaid(run.id);
+                              toast.success('Ditandai dibayar manual');
+                              loadData();
+                            } catch(e) { toast.error(e.response?.data?.message || 'Gagal'); }
+                          }}
+                          className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors">
+                          <CreditCard size={13}/> Manual
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Already paid */}
+          {paid.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-[var(--text-muted)] flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-emerald-500"/>
+                Sudah Dibayar ({paid.length})
+              </p>
+              <div className="table-wrapper overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+                      {['Periode','Tipe','Karyawan','Total Bersih','Tgl Bayar','Status'].map(h=>(
+                        <th key={h} className="px-4 py-2.5 text-left text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paid.map(run=>{
+                      const tc = TYPE_CONFIG[run.type]||TYPE_CONFIG.monthly;
+                      return (
+                        <tr key={run.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-secondary)]">
+                          <td className="px-4 py-3 font-semibold">{run.period_label}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${tc.color}`}>
+                              {tc.icon} {tc.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-[var(--text-secondary)]">{run.total_employees} orang</td>
+                          <td className="px-4 py-3 font-bold text-emerald-600">{toRupiahShort(run.total_net)}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--text-muted)]">
+                            {run.payment_date || run.paid_at?.split('T')[0] || '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">
+                              ✅ Dibayar
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && (
+            <div className="table-wrapper p-12 text-center">
+              <Banknote size={40} className="mx-auto mb-3 text-[var(--text-muted)] opacity-30"/>
+              <p className="font-semibold text-[var(--text-primary)]">Tidak ada pembayaran</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Generate dan approve payroll terlebih dahulu di tab <b>Payroll</b>
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {disburse && (
+        <DisburseModal
+          run={disburse}
+          onClose={() => setDisburse(null)}
+          onSuccess={() => { setDisburse(null); loadData(); }}
+        />
+      )}
+    </div>
+  );
+};
 
 // ── Disburse Modal (Transfer Gaji via Flip) ───────────────────
 const DisburseModal = ({ run, onClose, onSuccess }) => {
@@ -2261,6 +2503,7 @@ export default function PayrollEnginePage() {
       </div>
 
       {activeTab === 'runs'       && <RunsTab />}
+      {activeTab === 'payment'    && <PaymentPortalTab />}
       {activeTab === 'report'     && <PayrollReportTab />}
       {activeTab === 'history'    && <PayrollHistoryTab />}
       {activeTab === 'myslip'     && <MySlipTab />}
