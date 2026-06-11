@@ -393,7 +393,6 @@ export default function ResultsPage() {
           onClose={() => setSelectedSlip(null)}
         />
       )}
-    </div>
 
       {/* Incentive Disburse Modal */}
       {showDisburse && period && (
@@ -404,6 +403,7 @@ export default function ResultsPage() {
           onSuccess={() => { setShowDisburse(false); fetch(); }}
         />
       )}
+    </div>
   );
 }
 
