@@ -317,25 +317,54 @@ const SlipModal = ({ itemId, onClose }) => {
 // TAB: DAFTAR PAYROLL (Runs)
 // ════════════════════════════════════════════════════════════════
 const RunsTab = () => {
-  const [runs, setRuns]       = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [disburseRun, setDisburseRun] = useState(null);
-  const [filterType, setType] = useState('');
-  const [showGenerate, setShowGenerate] = useState(false);
-  const [selectedRun, setSelectedRun]   = useState(null);
-  const [runItems, setRunItems]         = useState([]);
-  const [selectedSlip, setSelectedSlip] = useState(null);
+  const [runs,          setRuns]          = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [disburseRun,   setDisburseRun]   = useState(null);
+  const [filterType,    setType]          = useState('');
+  const [showGenerate,  setShowGenerate]  = useState(false);
+  const [selectedRun,   setSelectedRun]   = useState(null);
+  const [runItems,      setRunItems]      = useState([]);
+  const [selectedSlip,  setSelectedSlip]  = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [flipStatuses,  setFlipStatuses]  = useState({}); // runId -> {allDone, anyFailed, anyDone}
 
-  const fetch = useCallback(async () => {
+  const API  = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
+
+  const loadFlipStatus = useCallback(async (approvedRuns) => {
+    const statuses = {};
+    await Promise.all(approvedRuns.map(async (run) => {
+      try {
+        const r = await fetch(`${API}/flip/status/${run.id}`, { headers: authH });
+        const d = await r.json();
+        const items = d.data?.items || [];
+        statuses[run.id] = {
+          allDone:  items.length > 0 && items.every(i => i.flip_status === 'DONE'),
+          anyDone:  items.some(i => i.flip_status === 'DONE'),
+          anyFailed:items.some(i => i.flip_status === 'FAILED'),
+          noneStarted: items.every(i => !i.flip_status || i.flip_status === 'NONE'),
+        };
+      } catch { statuses[run.id] = { allDone:false, anyDone:false, anyFailed:false, noneStarted:true }; }
+    }));
+    setFlipStatuses(statuses);
+  }, []);
+
+  const loadRuns = useCallback(async () => {
     setLoading(true);
     try {
       const res = await payrollEngineService.getRuns({ type: filterType || undefined, year: currentYear() });
-      setRuns(res.data.data.runs);
+      const allRuns = res.data.data.runs;
+      setRuns(allRuns);
+      // Load flip status for approved runs
+      const approved = allRuns.filter(r => r.status === 'approved');
+      if (approved.length) loadFlipStatus(approved);
     } catch { toast.error('Gagal memuat payroll'); } finally { setLoading(false); }
-  }, [filterType]);
+  }, [filterType, loadFlipStatus]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  // Keep 'fetch' alias for compatibility with existing code
+  const fetch2 = loadRuns;
+
+  useEffect(() => { loadRuns(); }, [loadRuns]);
 
   const openRun = async (run) => {
     setSelectedRun(run);
@@ -347,14 +376,14 @@ const RunsTab = () => {
 
   const handleApprove = async (id) => {
     setActionLoading(id + '-approve');
-    try { await payrollEngineService.approveRun(id); toast.success('Payroll disetujui'); fetch(); }
+    try { await payrollEngineService.approveRun(id); toast.success('Payroll disetujui'); loadRuns(); }
     catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
     finally { setActionLoading(null); }
   };
 
   const handlePay = async (id) => {
     setActionLoading(id + '-pay');
-    try { await payrollEngineService.markPaid(id); toast.success('Payroll ditandai dibayar!'); fetch(); }
+    try { await payrollEngineService.markPaid(id); toast.success('Payroll ditandai dibayar!'); loadRuns(); }
     catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
     finally { setActionLoading(null); }
   };
@@ -436,20 +465,41 @@ const RunsTab = () => {
                       Approve
                     </button>
                   )}
-                  {run.status === 'approved' && (
-                    <>
-                      <button onClick={() => setDisburseRun(run)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white">
-                        <Banknote className="w-3.5 h-3.5" />
-                        Transfer Flip
-                      </button>
-                      <button onClick={() => handlePay(run.id)} disabled={actionLoading === run.id+'-pay'}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white">
-                        {actionLoading === run.id+'-pay' ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
-                        Bayar Manual
-                      </button>
-                    </>
-                  )}
+                  {run.status === 'approved' && (() => {
+                    const fs = flipStatuses[run.id] || {};
+                    // Flip sudah diproses (ada yang done/pending) — bukan gagal semua
+                    const flipStarted   = fs.anyDone || (!fs.noneStarted && !fs.anyFailed);
+                    const flipAllDone   = fs.allDone;
+                    const flipHasFailed = fs.anyFailed && !fs.anyDone;
+                    // Manual bayar: disable jika flip sudah jalan & tidak semua gagal
+                    const manualDisabled = flipStarted && !flipHasFailed;
+
+                    return (
+                      <>
+                        <button onClick={() => setDisburseRun(run)}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white transition-colors
+                            ${flipAllDone
+                              ? 'bg-emerald-500 hover:bg-emerald-600'
+                              : flipStarted
+                                ? 'bg-indigo-500 hover:bg-indigo-600'
+                                : 'bg-blue-600 hover:bg-blue-700'}`}>
+                          <Banknote className="w-3.5 h-3.5" />
+                          {flipAllDone ? '✅ Lihat Status Transfer' : flipStarted ? '🔄 Lihat Status Transfer' : 'Transfer Flip'}
+                        </button>
+                        <button
+                          onClick={() => handlePay(run.id)}
+                          disabled={manualDisabled || actionLoading === run.id+'-pay'}
+                          title={manualDisabled ? 'Sudah diproses via Flip' : 'Tandai bayar manual'}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-colors
+                            ${manualDisabled
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}>
+                          {actionLoading === run.id+'-pay' ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                          {manualDisabled ? '🔒 Bayar Manual' : 'Bayar Manual'}
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -487,13 +537,13 @@ const RunsTab = () => {
         </div>
       )}
 
-      {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onSuccess={fetch} existingRuns={runs} />}
+      {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onSuccess={loadRuns} existingRuns={runs} />}
       {selectedSlip && <SlipModal itemId={selectedSlip} onClose={() => setSelectedSlip(null)} />}
       {disburseRun && (
         <DisburseModal
           run={disburseRun}
           onClose={() => setDisburseRun(null)}
-          onSuccess={() => { setDisburseRun(null); fetch(); }}
+          onSuccess={() => { setDisburseRun(null); loadRuns(); }}
         />
       )}
     </div>
