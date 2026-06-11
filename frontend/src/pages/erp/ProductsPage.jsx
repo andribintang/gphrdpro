@@ -1036,13 +1036,7 @@ export default function ProductsPage() {
       return next;
     });
 
-  const toggleAll = (filtered) => {
-    if (filtered.every(p => selected.has(p.id))) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filtered.map(p => p.id)));
-    }
-  };
+
 
   const selectedProducts = products.filter(p => selected.has(p.id));
 
