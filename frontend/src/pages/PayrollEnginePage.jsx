@@ -335,7 +335,7 @@ const RunsTab = () => {
     const statuses = {};
     await Promise.all(approvedRuns.map(async (run) => {
       try {
-        const r = await fetch(`${API}/flip/status/${run.id}`, { headers: authH });
+        const r = await window.fetch(`${API}/flip/status/${run.id}`, { headers: authH });
         const d = await r.json();
         const items = d.data?.items || [];
         statuses[run.id] = {
@@ -2005,15 +2005,16 @@ const PaymentPortalTab = () => {
   const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
   const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
 
-  const [incentivePeriods, setIncentivePeriods] = useState([]);
+  const [incentivePeriods,    setIncentivePeriods]    = useState([]);
+  const [disburseIncentive,  setDisburseIncentive]  = useState(null); // period to disburse
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [runsRes, balRes, incRes] = await Promise.all([
         payrollEngineService.getRuns({ year: filterYear, limit: 200 }),
-        fetch(`${API}/flip/balance`, { headers: authH }).then(r=>r.json()).catch(()=>null),
-        fetch(`${API}/incentive/periods?year=${filterYear}&limit=100`, { headers: authH }).then(r=>r.json()).catch(()=>null),
+        window.fetch(`${API}/flip/balance`, { headers: authH }).then(r=>r.json()).catch(()=>null),
+        window.fetch(`${API}/incentive/periods?year=${filterYear}&limit=100`, { headers: authH }).then(r=>r.json()).catch(()=>null),
       ]);
       const allRuns = runsRes.data.data.runs || [];
       setRuns(allRuns.filter(r => ['approved','paid'].includes(r.status)));
@@ -2251,7 +2252,7 @@ const PaymentPortalTab = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => window.location.href = `/incentive/periods/${period.id}/results`}
+                      onClick={() => setDisburseIncentive(period)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
                       <Banknote size={14}/> Transfer Insentif via Flip
                     </button>
@@ -2268,6 +2269,15 @@ const PaymentPortalTab = () => {
           run={disburse}
           onClose={() => setDisburse(null)}
           onSuccess={() => { setDisburse(null); loadData(); }}
+        />
+      )}
+
+      {disburseIncentive && (
+        <IncentiveDisburseModal
+          period={disburseIncentive}
+          results={[]}
+          onClose={() => setDisburseIncentive(null)}
+          onSuccess={() => { setDisburseIncentive(null); loadData(); }}
         />
       )}
     </div>
@@ -2291,7 +2301,7 @@ const DisburseModal = ({ run, onClose, onSuccess }) => {
     setLoadingCheck(true);
     try {
       const [balRes, statusRes] = await Promise.all([
-        fetch(`${API}/flip/balance/check/${run.id}`, { headers: authH }).then(r=>r.json()),
+        window.fetch(`${API}/flip/balance/check/${run.id}`, { headers: authH }).then(r=>r.json()),
         flipService.getStatus(run.id).then(r=>r.data.data).catch(()=>null),
       ]);
       setBalanceInfo(balRes.data);
