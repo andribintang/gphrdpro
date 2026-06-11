@@ -1975,12 +1975,15 @@ const DisburseModal = ({ run, onClose, onSuccess }) => {
     try {
       const r = await flipService.disburseRun(run.id);
       const d = r.data;
-      await loadCheck();
+      await loadCheck(); // Refresh balance + status
       if (d.data?.failed > 0) toast.error(`${d.data.failed} transfer gagal — cek detail`);
-      else { toast.success(d.message); onSuccess(); }
+      else toast.success(d.message || 'Transfer selesai');
     } catch(e) {
       toast.error(e.response?.data?.message || 'Gagal transfer');
-    } finally { setTransferring(false); }
+    } finally {
+      setTransferring(false);
+      // Stay on transfer step to show final status
+    }
   };
 
   const handleRetry = async (itemId) => {
@@ -2206,12 +2209,12 @@ const DisburseModal = ({ run, onClose, onSuccess }) => {
               )}
               <button
                 onClick={handleDisburse}
-                disabled={transferring || !bi || (bi?.pending_items === 0)}
-                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                disabled={transferring || !bi || pendingItems.length === 0}
+                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 <Banknote size={15}/>
-                {bi?.pending_items > 0
-                  ? `Transfer ${bi.pending_items} Karyawan · ${toRupiahShort(bi?.total_needed||0)}`
-                  : 'Semua Sudah Ditransfer'}
+                {pendingItems.length > 0
+                  ? `Transfer ${pendingItems.length} Karyawan · ${toRupiahShort(bi?.total_needed||0)}`
+                  : '✅ Semua Sudah Ditransfer'}
               </button>
             </div>
           )}
