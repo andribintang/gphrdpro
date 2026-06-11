@@ -35,6 +35,7 @@ import PurchasesPage   from './pages/erp/PurchasesPage';
 import ExpensesPage    from './pages/erp/ExpensesPage';
 import ProfitLossPage  from './pages/erp/ProfitLossPage';
 import StockOpnamePage from './pages/erp/StockOpnamePage';
+import InventoryPage    from './pages/erp/InventoryPage';
 import ShipmentsPage   from './pages/erp/ShipmentsPage';
 import ReturnsPage     from './pages/erp/ReturnsPage';
 import ErpMasterPage   from './pages/erp/MasterDataPage';

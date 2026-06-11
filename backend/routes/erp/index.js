@@ -5,7 +5,8 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const hrAdmin  = authorize('admin','hr');
 const allRoles = authorize('admin','hr','supervisor','employee');
 
-const master   = require('../../controllers/erp/masterController');
+const master    = require('../../controllers/erp/masterController');
+const inventory = require('../../controllers/erp/inventoryController');
 const order    = require('../../controllers/erp/orderController');
 const purchase = require('../../controllers/erp/purchaseController');
 const ret      = require('../../controllers/erp/returnController');
@@ -88,6 +89,13 @@ router.put   ('/expenses/:id',         authenticate, hrAdmin,  purchase.updateEx
 router.delete('/expenses/:id',         authenticate, hrAdmin,  purchase.deleteExpense);
 
 // ── Stock Opname ──────────────────────────────────────────────
+// Inventory Intelligence
+router.get   ('/inventory/summary',        authenticate, allRoles, inventory.getSummary);
+router.get   ('/inventory/movements',      authenticate, allRoles, inventory.getMovements);
+router.get   ('/inventory/stock-value',    authenticate, allRoles, inventory.getStockValue);
+router.get   ('/inventory/movement-trend', authenticate, allRoles, inventory.getMovementTrend);
+router.post  ('/inventory/reorder',        authenticate, hrAdmin,  inventory.createReorderSuggestion);
+
 router.get   ('/stock-opname',         authenticate, allRoles, purchase.getStockOpname);
 router.post  ('/stock-opname',         authenticate, hrAdmin,  purchase.submitStockOpname);
 

@@ -213,6 +213,8 @@ const ImportLog = sequelize.define('ErpImportLog', {
 // ── ASSOCIATIONS ──────────────────────────────────────────────
 Product.belongsTo(Category,    { foreignKey: 'category_id', as: 'category' });
 Category.hasMany(Product,      { foreignKey: 'category_id', as: 'products' });
+StockMovement.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+Product.hasMany(StockMovement,  { foreignKey: 'product_id', as: 'movements' });
 Product.hasMany(Stock,         { foreignKey: 'product_id',  as: 'stocks' });
 Product.hasOne(Stock,          { foreignKey: 'product_id',  as: 'stock' });
 Stock.belongsTo(Product,       { foreignKey: 'product_id',  as: 'product' });
