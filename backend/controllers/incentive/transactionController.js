@@ -759,4 +759,5 @@ module.exports = {
   getResults, getResultDetail,
   getDashboardStats,
   syncFromERP,
+  disbursePeriod, getDisbursePeriodStatus,
 };
