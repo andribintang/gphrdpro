@@ -160,6 +160,9 @@ export default function App() {
                 <Route path="erp/stock-opname" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><StockOpnamePage /></ProtectedRoute>
                 } />
+                <Route path="erp/inventory" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor']}><InventoryPage /></ProtectedRoute>
+                } />
                 <Route path="erp/shipments" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ShipmentsPage /></ProtectedRoute>
                 } />
