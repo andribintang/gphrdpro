@@ -1955,18 +1955,22 @@ const PaymentPortalTab = () => {
   const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
   const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
 
+  const [incentivePeriods, setIncentivePeriods] = useState([]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Load approved/paid runs + balance simultaneously
-      const [runsRes, balRes] = await Promise.all([
+      const [runsRes, balRes, incRes] = await Promise.all([
         payrollEngineService.getRuns({ year: filterYear, limit: 200 }),
         fetch(`${API}/flip/balance`, { headers: authH }).then(r=>r.json()).catch(()=>null),
+        fetch(`${API}/incentive/periods?year=${filterYear}&limit=100`, { headers: authH }).then(r=>r.json()).catch(()=>null),
       ]);
       const allRuns = runsRes.data.data.runs || [];
-      // Show approved (ready to pay) + paid (already done)
       setRuns(allRuns.filter(r => ['approved','paid'].includes(r.status)));
       if (balRes?.data) setBalance(balRes.data.balance);
+      // Incentive periods that are approved or locked
+      const incPeriods = (incRes?.data?.periods || []).filter(p => ['approved','locked'].includes(p.status));
+      setIncentivePeriods(incPeriods);
     } catch { toast.error('Gagal memuat data'); }
     finally { setLoading(false); }
   }, [filterYear]);
@@ -2158,13 +2162,52 @@ const PaymentPortalTab = () => {
             </div>
           )}
 
-          {filtered.length === 0 && (
+          {filtered.length === 0 && incentivePeriods.length === 0 && (
             <div className="table-wrapper p-12 text-center">
               <Banknote size={40} className="mx-auto mb-3 text-[var(--text-muted)] opacity-30"/>
               <p className="font-semibold text-[var(--text-primary)]">Tidak ada pembayaran</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                Generate dan approve payroll terlebih dahulu di tab <b>Payroll</b>
+                Generate dan approve payroll/insentif terlebih dahulu
               </p>
+            </div>
+          )}
+
+          {/* Incentive periods ready to pay */}
+          {incentivePeriods.length > 0 && (!filterType || filterType === 'incentive') && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"/>
+                <p className="text-sm font-bold text-[var(--text-primary)]">🚀 Insentif Menunggu Pembayaran ({incentivePeriods.length})</p>
+              </div>
+              {incentivePeriods.map(period => (
+                <div key={period.id} className="table-wrapper border-l-4 border-emerald-400">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-xl flex-shrink-0">🚀</div>
+                        <div>
+                          <p className="font-bold text-sm">{period.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">Insentif</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${period.status==='locked'?'bg-gray-100 text-gray-600':'bg-amber-100 text-amber-700'}`}>
+                              {period.status==='locked'?'🔒 Terkunci':'⏳ Approved'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-black text-emerald-600">{toRupiahShort(period.total_incentive_paid||0)}</p>
+                        <p className="text-[10px] text-[var(--text-muted)]">Total insentif</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => window.location.href = `/incentive/periods/${period.id}/results`}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
+                      <Banknote size={14}/> Transfer Insentif via Flip
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </>

@@ -61,7 +61,9 @@ router.get('/periods',               trans.getPeriods);
 router.get('/periods/:id',           trans.getPeriod);
 router.post('/periods',              trans.createPeriod);
 router.post('/periods/:id/calculate',trans.calculatePeriod);
-router.post('/periods/:id/approve',  trans.approvePeriod);
+router.post('/periods/:id/approve',         trans.approvePeriod);
+router.post('/periods/:id/disburse',        trans.disbursePeriod);
+router.get ('/periods/:id/disburse-status', trans.getDisbursePeriodStatus);
 router.post('/periods/:id/lock',     trans.lockPeriod);
 
 // ── WA Sales ─────────────────────────────────────────────────
