@@ -13,6 +13,8 @@ router.get('/banks',                                          ctrl.getBanks);
 router.post('/validate-account', authorize('admin','hr'),    ctrl.validateAccount);
 router.post('/disburse/:runId',  authorize('admin','hr'),    ctrl.disburseRun);
 router.post('/disburse-item/:itemId', authorize('admin','hr'), ctrl.disburseItem);
+router.get('/balance',              authorize('admin','hr'), ctrl.getBalance);
+router.get('/balance/check/:runId', authorize('admin','hr'), ctrl.checkBalance);
 router.get('/status/:runId',     authorize('admin','hr'),    ctrl.getRunDisbursementStatus);
 
 module.exports = router;

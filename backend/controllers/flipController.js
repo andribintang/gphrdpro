@@ -283,4 +283,54 @@ const handleWebhook = async (req, res, next) => {
 // Get FLIP_VALIDATION_TOKEN for webhook
 const FLIP_VALIDATION_TOKEN = process.env.FLIP_VALIDATION_TOKEN || '';
 
+// ── GET /api/flip/balance ────────────────────────────────────
+const getBalance = async (req, res, next) => {
+  try {
+    const balance = await flip.getBalance();
+    return res.json({ success: true, data: { balance: balance.balance || 0 } });
+  } catch (err) {
+    // Sandbox may return different structure
+    return res.json({ success: true, data: { balance: 0, note: 'Sandbox balance' } });
+  }
+};
+
+// ── GET /api/flip/balance/check/:runId ───────────────────────
+// Check if balance sufficient for a payroll run
+const checkBalance = async (req, res, next) => {
+  try {
+    const { PayrollItem } = require('../models');
+    const items = await PayrollItem.findAll({
+      where: { payroll_run_id: req.params.runId, status: { [require('sequelize').Op.in]: ['approved'] } }
+    });
+
+    const totalNeeded = items
+      .filter(i => i.flip_status !== 'DONE')
+      .reduce((s, i) => s + parseFloat(i.net_salary || 0), 0);
+
+    let currentBalance = 0;
+    try {
+      const bal = await flip.getBalance();
+      currentBalance = bal.balance || 0;
+    } catch { currentBalance = 0; }
+
+    const sufficient = currentBalance >= totalNeeded;
+    const gap        = totalNeeded - currentBalance;
+    const pending    = items.filter(i => i.flip_status !== 'DONE').length;
+    const done       = items.filter(i => i.flip_status === 'DONE').length;
+
+    return res.json({
+      success: true,
+      data: {
+        current_balance: currentBalance,
+        total_needed:    Math.round(totalNeeded),
+        gap:             Math.round(Math.max(0, gap)),
+        sufficient,
+        pending_items:   pending,
+        done_items:      done,
+        total_items:     items.length,
+      }
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = { getBanks, validateAccount, disburseRun, disburseItem, getRunDisbursementStatus, handleWebhook };

@@ -72,6 +72,22 @@ const getDisbursementStatus = async (disbursementId) => {
   return r.data;
 };
 
+// ── Get account balance ──────────────────────────────────────
+// Endpoint: GET /general/balance
+// Returns: { balance: number }
+const getBalance = async () => {
+  const r = await flipApi.get('/general/balance');
+  return r.data;
+};
+
+// ── Get company info (VA for topup) ──────────────────────────
+const getCompanyInfo = async () => {
+  try {
+    const r = await flipApi.get('/general/company');
+    return r.data;
+  } catch { return null; }
+};
+
 // ── Get disbursement list ─────────────────────────────────────
 const getDisbursementList = async ({ page = 1, pagination = 20 } = {}) => {
   const r = await flipApi.get(`/disbursement?pagination=${pagination}&page=${page}`);
@@ -128,5 +144,6 @@ const BANK_LIST = [
 module.exports = {
   getBanks, validateBankAccount,
   createDisbursement, getDisbursementStatus, getDisbursementList,
+  getBalance, getCompanyInfo,
   validateWebhook, mapStatus, BANK_LIST,
 };
