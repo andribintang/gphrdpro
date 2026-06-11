@@ -64,7 +64,11 @@ export default function SalesTargetPage() {
       const r = await fetch(`${API}/erp/channel-targets/summary?${p}`, { headers: auth() });
       const d = await r.json();
       setData(d.data);
-    } catch { toast.error('Gagal memuat data target'); }
+    } catch (e) {
+      console.error('[SalesTarget] API error:', e);
+      toast.error('Gagal memuat data target — cek console');
+      setData(null);
+    }
     finally { setLoading(false); }
   }, [year, month, branch]);
 
@@ -147,7 +151,20 @@ export default function SalesTargetPage() {
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-[var(--brand-600)] border-t-transparent rounded-full animate-spin"/></div>
-      ) : !data ? null : (
+      ) : !data ? (
+        <div className="table-wrapper p-12 text-center space-y-3">
+          <p className="text-4xl">⚠️</p>
+          <p className="font-bold text-[var(--text-primary)]">Gagal memuat data</p>
+          <p className="text-sm text-[var(--text-muted)]">Pastikan sudah menjalankan <code className="bg-[var(--bg-secondary)] px-2 py-0.5 rounded font-mono text-xs">/run-alter</code> untuk membuat tabel target</p>
+          <button onClick={load} className="btn-primary gap-2 mx-auto">Coba Lagi</button>
+        </div>
+      ) : data.channels?.length === 0 ? (
+        <div className="table-wrapper p-12 text-center space-y-3">
+          <p className="text-4xl">📭</p>
+          <p className="font-bold text-[var(--text-primary)]">Belum ada Sub Channel</p>
+          <p className="text-sm text-[var(--text-muted)]">Tambahkan sub channel terlebih dahulu di menu <b>Master Data → Sub Channel</b> sebelum set target</p>
+        </div>
+      ) : (
         <>
           {tab === 'dashboard'  && <DashboardTab  data={data} year={year} month={month}/>}
           {tab === 'set-target' && <SetTargetTab  data={data} year={year} month={month} branch={branch} onSaved={load}/>}
