@@ -4,7 +4,7 @@ import {
   Home, Users, Clock, CalendarOff, DollarSign,
   TrendingUp, Building2, SlidersHorizontal, Settings,
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
-  ClipboardList, BarChart3, LogOut, Bell, Sun, Moon, Target,
+  ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
   RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store,
   PanelLeftClose, PanelLeftOpen, Shield
