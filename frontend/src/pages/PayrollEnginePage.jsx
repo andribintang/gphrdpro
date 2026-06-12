@@ -2028,16 +2028,23 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
         method: 'POST', headers: authH,
       });
       const d = await r.json();
-      await loadStatus();
       if (d.success) {
+        toast.success(d.message || 'Transfer dikirim ke Flip');
         if (d.data?.failed > 0) toast.error(`${d.data.failed} transfer gagal`);
-        else { toast.success('Transfer insentif selesai'); onSuccess(); }
       } else toast.error(d.message);
     } catch { toast.error('Gagal transfer'); }
-    finally { setTransferring(false); }
+    finally {
+      setTransferring(false);
+      await loadStatus(); // Reload status setelah transfer
+    }
   };
 
-  const pendingItems = statusItems.filter(i => i.flip_status !== 'DONE');
+  // Items belum pernah ditransfer (NONE)
+  const pendingItems    = statusItems.filter(i => !i.flip_status || i.flip_status === 'NONE');
+  // Items sedang dalam proses (PENDING) atau sudah selesai (DONE)
+  const hasStarted      = statusItems.some(i => i.flip_status && i.flip_status !== 'NONE');
+  const inProgressItems = statusItems.filter(i => i.flip_status === 'PENDING');
+  const doneItems       = statusItems.filter(i => i.flip_status === 'DONE');
   const bi = balanceInfo;
   const STATUS_STYLE = { NONE:'bg-gray-100 text-gray-500', PENDING:'bg-yellow-100 text-yellow-700', DONE:'bg-green-100 text-green-700', FAILED:'bg-red-100 text-red-600' };
 
@@ -2126,11 +2133,27 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
 
         <div className="flex items-center justify-between px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)]">
           <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)]">Tutup</button>
-          <button onClick={handleTransfer} disabled={transferring || loading || pendingItems.length === 0}
-            className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-            {transferring ? <Loader2 className="w-4 h-4 animate-spin"/> : <Banknote className="w-4 h-4"/>}
-            {transferring ? 'Mentransfer...' : pendingItems.length > 0 ? `Transfer ${pendingItems.length} Karyawan · ${toRupiahShort(bi?.total_needed||0)}` : '✅ Semua Sudah Ditransfer'}
-          </button>
+          {hasStarted && !pendingItems.length ? (
+            /* Transfer sudah dikirim — tampilkan Refresh Status */
+            <button onClick={async () => { setLoading(true); await loadStatus(); setLoading(false); toast.success('Status diperbarui'); }}
+              disabled={loading}
+              className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCw className="w-4 h-4"/>}
+              {inProgressItems.length > 0
+                ? `🔄 Refresh Status (${inProgressItems.length} Pending)`
+                : `✅ ${doneItems.length} Selesai · Refresh`}
+            </button>
+          ) : (
+            /* Belum ditransfer — tampilkan tombol Transfer */
+            <button onClick={handleTransfer}
+              disabled={transferring || loading || pendingItems.length === 0}
+              className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              {transferring ? <Loader2 className="w-4 h-4 animate-spin"/> : <Banknote className="w-4 h-4"/>}
+              {transferring ? 'Mentransfer...' : pendingItems.length > 0
+                ? `Transfer ${pendingItems.length} Karyawan · ${toRupiahShort(bi?.total_needed||0)}`
+                : '✅ Semua Sudah Ditransfer'}
+            </button>
+          )}
         </div>
       </div>
     </div>
