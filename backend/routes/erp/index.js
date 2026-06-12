@@ -8,7 +8,6 @@ const allRoles = authorize('admin','hr','supervisor','employee');
 const master    = require('../../controllers/erp/masterController');
 const target    = require('../../controllers/erp/channelTargetController');
 const inventory = require('../../controllers/erp/inventoryController');
-const target    = require('../../controllers/erp/channelTargetController');
 const order    = require('../../controllers/erp/orderController');
 const purchase = require('../../controllers/erp/purchaseController');
 const ret      = require('../../controllers/erp/returnController');
