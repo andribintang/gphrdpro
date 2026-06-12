@@ -4,7 +4,9 @@ const { authenticate, authorize } = require('../middleware/auth');
 const ctrl = require('../controllers/flipController');
 
 // Public webhook (no auth — Flip calls this)
-router.post('/webhook', ctrl.handleWebhook);
+// Support both /webhook and /callback (Flip dashboard may use either)
+router.post('/webhook',  ctrl.handleWebhook);
+router.post('/callback', ctrl.handleWebhook);
 
 // Authenticated routes
 router.use(authenticate);
@@ -13,6 +15,8 @@ router.get('/banks',                                          ctrl.getBanks);
 router.post('/validate-account', authorize('admin','hr'),    ctrl.validateAccount);
 router.post('/disburse/:runId',  authorize('admin','hr'),    ctrl.disburseRun);
 router.post('/disburse-item/:itemId', authorize('admin','hr'), ctrl.disburseItem);
+router.get('/balance',              authorize('admin','hr'), ctrl.getBalance);
+router.get('/balance/check/:runId', authorize('admin','hr'), ctrl.checkBalance);
 router.get('/status/:runId',     authorize('admin','hr'),    ctrl.getRunDisbursementStatus);
 
 module.exports = router;

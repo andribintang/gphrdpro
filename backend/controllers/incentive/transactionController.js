@@ -613,6 +613,142 @@ const syncFromERP = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+
+// ── POST /api/incentive/periods/:id/disburse ─────────────────
+// Transfer insentif via Flip untuk semua karyawan dalam periode
+const disbursePeriod = async (req, res, next) => {
+  try {
+    const period = await IncentivePeriod.findByPk(req.params.id);
+    if (!period) return res.status(404).json({ success:false, message:'Periode tidak ditemukan' });
+    if (!['approved','locked'].includes(period.status))
+      return res.status(400).json({ success:false, message:'Periode harus di-approve dulu sebelum transfer' });
+
+    const { sequelize: seq } = require('../../config/database');
+    const flip = require('../../services/flipService');
+    const { Employee, User } = require('../../models');
+
+    // Get all results with employee bank info
+    const results = await IncentiveResult.findAll({
+      where: { period_id: period.id, flip_status: { [require('sequelize').Op.notIn]: ['DONE'] } },
+      include: [{ model: IncEmployee, as: 'employee', required: true }],
+    });
+
+    if (!results.length)
+      return res.status(400).json({ success:false, message:'Semua karyawan sudah ditransfer' });
+
+    const out = { success:0, failed:0, skipped:0, errors:[] };
+
+    for (const result of results) {
+      if (!result.total_incentive || parseFloat(result.total_incentive) <= 0) {
+        out.skipped++; continue;
+      }
+
+      // Get bank info from employees table via user_id
+      const empUser = result.employee?.user_id
+        ? await User.findByPk(result.employee.user_id, {
+            include: [{ model: Employee, as: 'employee' }]
+          })
+        : null;
+
+      const bankCode    = empUser?.employee?.bank_code;
+      const bankAccount = empUser?.employee?.bank_account_number;
+      const bankName    = empUser?.employee?.bank_account_name || result.employee_name;
+
+      if (!bankCode || !bankAccount) {
+        await result.update({ flip_status: 'FAILED', flip_error: 'Rekening bank belum diisi' });
+        out.failed++;
+        out.errors.push(`${result.employee_name}: rekening bank belum diisi`);
+        continue;
+      }
+
+      try {
+        const idempotencyKey = `incentive-${period.id}-result-${result.id}`;
+        const remark = `Insentif ${period.name || period.id}`.substring(0, 18);
+
+        const disbursement = await flip.createDisbursement({
+          idempotencyKey,
+          amount:        parseFloat(result.total_incentive),
+          bankCode,
+          accountNumber: bankAccount,
+          accountName:   bankName,
+          remark,
+        });
+
+        await result.update({
+          flip_disbursement_id: String(disbursement.id),
+          flip_status:          flip.mapStatus(disbursement.status),
+          flip_error:           null,
+          transfer_at:          disbursement.status === 'DONE' ? new Date() : null,
+        });
+        out.success++;
+      } catch (err) {
+        const errMsg = err.response?.data?.errors?.[0]?.message || err.message;
+        await result.update({ flip_status: 'FAILED', flip_error: errMsg });
+        out.failed++;
+        out.errors.push(`${result.employee_name}: ${errMsg}`);
+      }
+    }
+
+    // Update period status if all done
+    const allResults = await IncentiveResult.findAll({ where: { period_id: period.id } });
+    const allDone = allResults.every(r => r.flip_status === 'DONE');
+    if (allDone) await period.update({ status: 'locked' });
+
+    return res.json({
+      success: true,
+      message: `Transfer selesai: ${out.success} berhasil, ${out.failed} gagal, ${out.skipped} dilewati`,
+      data: out,
+    });
+  } catch (err) { next(err); }
+};
+
+// ── GET /api/incentive/periods/:id/disburse-status ───────────
+const getDisbursePeriodStatus = async (req, res, next) => {
+  try {
+    const { sequelize: seq } = require('../../config/database');
+    const flip = require('../../services/flipService');
+    const { Employee, User } = require('../../models');
+
+    const results = await IncentiveResult.findAll({
+      where: { period_id: req.params.id },
+      include: [{ model: IncEmployee, as: 'employee', required: false }],
+    });
+
+    const items = await Promise.all(results.map(async r => {
+      const empUser = r.employee?.user_id
+        ? await User.findByPk(r.employee.user_id, { include: [{ model: Employee, as: 'employee' }] })
+        : null;
+      return {
+        id:                r.id,
+        employee_name:     r.employee_name,
+        net_salary:        r.total_incentive,
+        flip_status:       r.flip_status || 'NONE',
+        flip_error:        r.flip_error,
+        flip_disbursement_id: r.flip_disbursement_id,
+        transfer_at:       r.transfer_at,
+        bank_code:         empUser?.employee?.bank_code,
+        bank_account_number: empUser?.employee?.bank_account_number,
+      };
+    }));
+
+    const summary = {
+      total:   items.length,
+      done:    items.filter(i => i.flip_status === 'DONE').length,
+      pending: items.filter(i => ['NONE','PENDING'].includes(i.flip_status)).length,
+      failed:  items.filter(i => i.flip_status === 'FAILED').length,
+    };
+
+    // Calculate total needed (not yet done)
+    const totalNeeded = items.filter(i => i.flip_status !== 'DONE')
+      .reduce((s,i) => s + parseFloat(i.net_salary||0), 0);
+
+    let currentBalance = 0;
+    try { const b = await flip.getBalance(); currentBalance = b.balance || 0; } catch {}
+
+    return res.json({ success:true, data: { items, summary, totalNeeded, currentBalance, sufficient: currentBalance >= totalNeeded } });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getPeriods, getPeriod, createPeriod, approvePeriod, lockPeriod,
   calculatePeriod,
@@ -623,4 +759,5 @@ module.exports = {
   getResults, getResultDetail,
   getDashboardStats,
   syncFromERP,
+  disbursePeriod, getDisbursePeriodStatus,
 };

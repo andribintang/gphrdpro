@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Award, X, Loader2, RefreshCw,
   FileDown, FileSpreadsheet, Printer, Target,
-  CheckCircle2, ChevronRight
+  CheckCircle2, ChevronRight, Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -251,6 +251,15 @@ export default function ResultsPage() {
         </button>
       </div>
 
+      {/* Transfer via Flip */}
+      {period && ['approved','locked'].includes(period.status) && results.length > 0 && (
+        <button onClick={() => setShowDisburse(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 mb-3 rounded-2xl text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white active:scale-95 transition-all">
+          <Banknote className="w-4 h-4"/>
+          Transfer Insentif via Flip ({results.length} karyawan)
+        </button>
+      )}
+
       {/* Export buttons */}
       {results.length > 0 && (
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -384,6 +393,202 @@ export default function ResultsPage() {
           onClose={() => setSelectedSlip(null)}
         />
       )}
+
+      {/* Incentive Disburse Modal */}
+      {showDisburse && period && (
+        <IncentiveDisburseModal
+          period={period}
+          results={results}
+          onClose={() => setShowDisburse(false)}
+          onSuccess={() => { setShowDisburse(false); fetch(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// INCENTIVE DISBURSE MODAL
+// ════════════════════════════════════════════════════════════════
+function IncentiveDisburseModal({ period, results, onClose, onSuccess }) {
+  const [balanceInfo,  setBalanceInfo]  = useState(null);
+  const [statusItems,  setStatusItems]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [transferring, setTransferring] = useState(false);
+
+  const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
+
+  const toRupiah = (v) => 'Rp ' + (parseFloat(v)||0).toLocaleString('id-ID');
+  const toRpShort = (v) => {
+    const n = parseFloat(v)||0;
+    if (n>=1e9) return 'Rp '+(n/1e9).toFixed(1)+'M';
+    if (n>=1e6) return 'Rp '+(n/1e6).toFixed(1)+'jt';
+    return 'Rp '+(n/1e3).toFixed(0)+'rb';
+  };
+
+  const loadStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statusRes, balRes] = await Promise.all([
+        fetch(`${API}/incentive/periods/${period.id}/disburse-status`, { headers: authH }).then(r=>r.json()),
+        fetch(`${API}/flip/balance`, { headers: authH }).then(r=>r.json()).catch(()=>null),
+      ]);
+      setStatusItems(statusRes.data?.items || []);
+      setBalanceInfo({
+        current_balance: balRes?.data?.balance || 0,
+        total_needed:    statusRes.data?.totalNeeded || 0,
+        sufficient:      statusRes.data?.sufficient || false,
+        pending_items:   (statusRes.data?.items||[]).filter(i=>i.flip_status!=='DONE').length,
+        done_items:      (statusRes.data?.items||[]).filter(i=>i.flip_status==='DONE').length,
+        summary:         statusRes.data?.summary,
+      });
+    } catch { alert('Gagal memuat status'); }
+    finally { setLoading(false); }
+  }, [period.id]);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const handleTransfer = async () => {
+    setTransferring(true);
+    try {
+      const r = await fetch(`${API}/incentive/periods/${period.id}/disburse`, {
+        method: 'POST', headers: authH,
+      });
+      const d = await r.json();
+      await loadStatus();
+      if (d.success) {
+        if (d.data?.failed > 0) alert(`${d.data.failed} transfer gagal — cek detail`);
+        else { onSuccess(); }
+      }
+    } catch { alert('Gagal transfer'); }
+    finally { setTransferring(false); }
+  };
+
+  const bi = balanceInfo;
+  const pendingItems = statusItems.filter(i => i.flip_status !== 'DONE');
+  const STYLE = { NONE:'bg-gray-100 text-gray-500', PENDING:'bg-yellow-100 text-yellow-700', DONE:'bg-green-100 text-green-700', FAILED:'bg-red-100 text-red-600' };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-card)] w-full max-w-2xl my-6 rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-xl">🚀</div>
+            <div>
+              <h2 className="font-bold text-base">Transfer Insentif via Flip</h2>
+              <p className="text-xs text-[var(--text-muted)]">{period.name} · {results.length} karyawan</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg)]">
+            <X size={18}/>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {loading ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500"/>
+              <p className="text-sm text-[var(--text-muted)]">Mengecek saldo Flip...</p>
+            </div>
+          ) : (
+            <>
+              {/* Balance card */}
+              <div className={`rounded-2xl border-2 p-5 ${bi?.sufficient ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'}`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                      {bi?.sufficient ? '✅ Saldo Mencukupi' : '⚠️ Saldo Tidak Mencukupi'}
+                    </p>
+                    <p className={`text-2xl font-black ${bi?.sufficient ? 'text-emerald-700' : 'text-red-700'}`}>
+                      {toRupiah(bi?.current_balance||0)}
+                    </p>
+                  </div>
+                  <button onClick={loadStatus} className="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center hover:bg-white/50">
+                    <RefreshCw size={13}/>
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/70 rounded-xl p-3 text-center">
+                    <p className="text-xs text-[var(--text-muted)]">Total Dibutuhkan</p>
+                    <p className="font-bold text-sm">{toRupiah(bi?.total_needed||0)}</p>
+                  </div>
+                  <div className={`rounded-xl p-3 text-center ${bi?.sufficient ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                    <p className="text-xs text-[var(--text-muted)]">{bi?.sufficient ? 'Sisa Saldo' : 'Kekurangan'}</p>
+                    <p className={`font-bold text-sm ${bi?.sufficient ? 'text-emerald-700' : 'text-red-700'}`}>
+                      {bi?.sufficient
+                        ? toRupiah((bi?.current_balance||0)-(bi?.total_needed||0))
+                        : toRupiah((bi?.total_needed||0)-(bi?.current_balance||0))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Topup info if insufficient */}
+              {!bi?.sufficient && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
+                  <p className="text-sm font-bold text-amber-800 mb-2">📋 Cara Topup Saldo Flip</p>
+                  <p className="text-xs text-amber-700">Login ke <a href="https://business.flip.id" target="_blank" rel="noreferrer" className="underline font-semibold">business.flip.id</a> → Saldo → Tambah Saldo → Transfer ke VA Flip</p>
+                </div>
+              )}
+
+              {/* Employee list */}
+              <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
+                  <p className="text-xs font-bold text-[var(--text-muted)] uppercase">
+                    Karyawan ({bi?.pending_items} akan ditransfer · {bi?.done_items} sudah)
+                  </p>
+                </div>
+                <div className="max-h-56 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
+                        <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Karyawan</th>
+                        <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Bank</th>
+                        <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase">Insentif</th>
+                        <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {statusItems.map(item => (
+                        <tr key={item.id} className={`hover:bg-[var(--bg-secondary)] ${item.flip_status==='DONE'?'opacity-50':''}`}>
+                          <td className="px-3 py-2 font-semibold">{item.employee_name}</td>
+                          <td className="px-3 py-2 font-mono text-[var(--text-secondary)]">
+                            {item.bank_code ? `${item.bank_code.toUpperCase()} ···${item.bank_account_number?.slice(-4)}` : <span className="text-red-400">⚠ Belum diisi</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold">{toRupiah(item.net_salary)}</td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${STYLE[item.flip_status]||STYLE.NONE}`}>
+                              {item.flip_status||'PENDING'}
+                            </span>
+                            {item.flip_error && <p className="text-[9px] text-red-500 mt-0.5">{item.flip_error}</p>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)]">
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            Tutup
+          </button>
+          <button
+            onClick={handleTransfer}
+            disabled={transferring || loading || pendingItems.length === 0}
+            className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            {transferring ? <Loader2 size={15} className="animate-spin"/> : <Banknote size={15}/>}
+            {transferring ? 'Mentransfer...' : pendingItems.length > 0 ? `Transfer ${pendingItems.length} Karyawan · ${toRpShort(bi?.total_needed||0)}` : '✅ Semua Sudah Ditransfer'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
