@@ -2118,24 +2118,34 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Karyawan</th>
-                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Bank</th>
-                      <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase">Insentif</th>
-                      <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase">Status</th>
+                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">Karyawan</th>
+                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">Bank</th>
+                      <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">Insentif</th>
+                      <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">Status</th>
+                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">ID Flip</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
                     {statusItems.map(item => (
-                      <tr key={item.id} className={`hover:bg-[var(--bg-secondary)] ${item.flip_status==='DONE'?'opacity-50':''}`}>
-                        <td className="px-3 py-2 font-semibold">{item.employee_name}</td>
-                        <td className="px-3 py-2 font-mono text-[var(--text-secondary)] text-[10px]">
+                      <tr key={item.id} className={`hover:bg-[var(--bg-secondary)] ${item.flip_status==='DONE'?'opacity-60':''}`}>
+                        <td className="px-3 py-2.5 font-semibold text-xs">{item.employee_name}</td>
+                        <td className="px-3 py-2.5 font-mono text-[var(--text-secondary)] text-[10px]">
                           {item.bank_code ? `${item.bank_code.toUpperCase()} ···${item.bank_account_number?.slice(-4)}` : <span className="text-red-400">⚠ Belum diisi</span>}
                         </td>
-                        <td className="px-3 py-2 text-right font-semibold">{toRupiah(item.net_salary)}</td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-3 py-2.5 text-right font-semibold text-xs">{toRupiah(item.net_salary)}</td>
+                        <td className="px-3 py-2.5 text-center">
                           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_STYLE[item.flip_status]||STATUS_STYLE.NONE}`}>
-                            {item.flip_status||'PENDING'}
+                            {item.flip_status==='DONE' ? '✅ DONE' : item.flip_status==='PENDING' ? '⏳ PENDING' : item.flip_status==='FAILED' ? '❌ FAILED' : item.flip_status||'NONE'}
                           </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {item.flip_disbursement_id ? (
+                            <span className="font-mono text-[10px] text-[var(--brand-600)] bg-[var(--brand-600)]/10 px-2 py-0.5 rounded-lg">
+                              #{item.flip_disbursement_id}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-[var(--text-muted)]">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2693,30 +2703,38 @@ const DisburseModal = ({ run, onClose, onSuccess }) => {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-[var(--border)] bg-[var(--bg)]">
-                            <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Karyawan</th>
-                            <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Bank</th>
-                            <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase">Nominal</th>
-                            <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase">Status</th>
+                            <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wide">Karyawan</th>
+                            <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wide">Bank</th>
+                            <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wide">Nominal</th>
+                            <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wide">Status</th>
+                            <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wide">ID Flip</th>
                             <th className="px-3 py-2"/>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                           {(status?.items||[]).map(item => (
-                            <tr key={item.id} className={`hover:bg-[var(--bg-secondary)] ${item.flip_status==='DONE'?'opacity-50':''}`}>
-                              <td className="px-3 py-2 font-semibold">{item.employee_name}</td>
-                              <td className="px-3 py-2">
+                            <tr key={item.id} className={`hover:bg-[var(--bg-secondary)] ${item.flip_status==='DONE'?'opacity-60':''}`}>
+                              <td className="px-3 py-2.5 font-semibold text-xs">{item.employee_name}</td>
+                              <td className="px-3 py-2.5">
                                 {item.bank_code
-                                  ? <span className="font-mono text-[var(--text-secondary)]">{item.bank_code.toUpperCase()} ···{item.bank_account_number?.slice(-4)}</span>
-                                  : <span className="text-red-400 font-semibold">⚠ Rekening kosong</span>}
+                                  ? <span className="font-mono text-[var(--text-secondary)] text-[10px]">{item.bank_code.toUpperCase()} ···{item.bank_account_number?.slice(-4)}</span>
+                                  : <span className="text-red-400 font-semibold text-[10px]">⚠ Rekening kosong</span>}
                               </td>
-                              <td className="px-3 py-2 text-right font-semibold">{toRupiah(item.net_salary)}</td>
-                              <td className="px-3 py-2 text-center">
+                              <td className="px-3 py-2.5 text-right font-semibold text-xs">{toRupiah(item.net_salary)}</td>
+                              <td className="px-3 py-2.5 text-center">
                                 <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${FLIP_STATUS_STYLE[item.flip_status]||'bg-gray-100 text-gray-500'}`}>
-                                  {item.flip_status||'PENDING'}
+                                  {item.flip_status==='DONE'?'✅ DONE':item.flip_status==='PENDING'?'⏳ PENDING':item.flip_status==='FAILED'?'❌ FAILED':item.flip_status||'NONE'}
                                 </span>
                                 {item.flip_error && <p className="text-[9px] text-red-500 mt-0.5 truncate max-w-[100px]">{item.flip_error}</p>}
                               </td>
-                              <td className="px-3 py-2 text-center">
+                              <td className="px-3 py-2.5">
+                                {item.flip_disbursement_id ? (
+                                  <span className="font-mono text-[10px] text-[var(--brand-600)] bg-[var(--brand-600)]/10 px-2 py-0.5 rounded-lg">
+                                    #{item.flip_disbursement_id}
+                                  </span>
+                                ) : <span className="text-[10px] text-[var(--text-muted)]">—</span>}
+                              </td>
+                              <td className="px-3 py-2.5 text-center">
                                 {item.flip_status==='FAILED' && (
                                   <button onClick={()=>handleRetry(item.id)} className="text-[10px] text-blue-600 hover:underline font-bold">Retry</button>
                                 )}
