@@ -1998,9 +1998,20 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
   const [balanceInfo,  setBalanceInfo]  = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [transferring, setTransferring] = useState(false);
+  const [error,        setError]        = useState(null);
 
   const API  = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
   const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
+
+  // Guard: period must have id
+  if (!period?.id) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-[var(--bg-card)] p-6 rounded-2xl text-center space-y-3">
+        <p className="text-red-500 font-bold">⚠️ Data periode tidak valid</p>
+        <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Tutup</button>
+      </div>
+    </div>
+  );
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -2015,7 +2026,11 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
         .reduce((s,i)=>s+parseFloat(i.net_salary||0),0);
       const bal = balRes?.data?.balance || 0;
       setBalanceInfo({ current_balance: bal, total_needed: totalNeeded, sufficient: bal >= totalNeeded });
-    } catch { toast.error('Gagal memuat status'); }
+    } catch(e) {
+      console.error('[IncentiveDisburse] loadStatus error:', e);
+      setError(e.message);
+      toast.error('Gagal memuat status: ' + e.message);
+    }
     finally { setLoading(false); }
   }, [period.id]);
 
@@ -2175,7 +2190,8 @@ const PaymentPortalTab = () => {
   const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
 
   const [incentivePeriods,    setIncentivePeriods]    = useState([]);
-  const [disburseIncentive,  setDisburseIncentive]  = useState(null); // period to disburse
+  const [disburseIncentive,  setDisburseIncentive]  = useState(null);
+  const [incentiveStatuses,  setIncentiveStatuses]  = useState({}); // periodId -> {allDone, anyPending, doneCount, pendingCount}
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -2191,6 +2207,29 @@ const PaymentPortalTab = () => {
       // Incentive periods that are approved or locked
       const incPeriods = (incRes?.data?.periods || []).filter(p => ['approved','locked'].includes(p.status));
       setIncentivePeriods(incPeriods);
+      // Load flip status per incentive period
+      if (incPeriods.length) {
+        const statusMap = {};
+        await Promise.all(incPeriods.map(async (p) => {
+          try {
+            const sr = await window.fetch(`${API}/incentive/periods/${p.id}/disburse-status`, { headers: authH });
+            const sd = await sr.json();
+            const items = sd.data?.items || [];
+            const doneCount    = items.filter(i => i.flip_status === 'DONE').length;
+            const pendingCount = items.filter(i => i.flip_status === 'PENDING').length;
+            const failedCount  = items.filter(i => i.flip_status === 'FAILED').length;
+            const noneCount    = items.filter(i => !i.flip_status || i.flip_status === 'NONE').length;
+            statusMap[p.id] = {
+              allDone:      items.length > 0 && doneCount === items.length,
+              anyPending:   pendingCount > 0,
+              anyStarted:   doneCount > 0 || pendingCount > 0,
+              doneCount, pendingCount, failedCount, noneCount,
+              totalCount:   items.length,
+            };
+          } catch { statusMap[p.id] = { allDone:false, anyPending:false, anyStarted:false }; }
+        }));
+        setIncentiveStatuses(statusMap);
+      }
     } catch { toast.error('Gagal memuat data'); }
     finally { setLoading(false); }
   }, [filterYear]);
@@ -2420,11 +2459,35 @@ const PaymentPortalTab = () => {
                         <p className="text-[10px] text-[var(--text-muted)]">Total insentif</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setDisburseIncentive(period)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
-                      <Banknote size={14}/> Transfer Insentif via Flip
-                    </button>
+                    {(() => {
+                      const ist = incentiveStatuses[period.id] || {};
+                      if (ist.allDone) return (
+                        <div className="space-y-2">
+                          <div className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200">
+                            ✅ Semua Sudah Ditransfer ({ist.doneCount} karyawan)
+                          </div>
+                          <button
+                            onClick={() => setDisburseIncentive(period)}
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors">
+                            <Eye size={13}/> Lihat Detail Transfer
+                          </button>
+                        </div>
+                      );
+                      if (ist.anyPending) return (
+                        <button
+                          onClick={() => setDisburseIncentive(period)}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white transition-colors">
+                          <RefreshCw size={13}/> Refresh Status ({ist.pendingCount} Pending)
+                        </button>
+                      );
+                      return (
+                        <button
+                          onClick={() => setDisburseIncentive(period)}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
+                          <Banknote size={14}/> Transfer Insentif via Flip
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -2445,7 +2508,7 @@ const PaymentPortalTab = () => {
         <IncentiveDisburseModal
           period={disburseIncentive}
           results={[]}
-          onClose={() => setDisburseIncentive(null)}
+          onClose={() => { setDisburseIncentive(null); loadData(); }}
           onSuccess={() => { setDisburseIncentive(null); loadData(); }}
         />
       )}
