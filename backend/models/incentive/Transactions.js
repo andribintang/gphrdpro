@@ -123,6 +123,12 @@ const IncentiveResult = sequelize.define('IncentiveResult', {
   details_json:       { type: DataTypes.JSON, defaultValue: {}, comment: 'Full breakdown for slip' },
 
   status: { type: DataTypes.ENUM('draft','approved','locked'), defaultValue: 'draft' },
+
+  // Flip disbursement fields
+  flip_disbursement_id: { type: DataTypes.STRING(100), allowNull: true },
+  flip_status:          { type: DataTypes.ENUM('NONE','PENDING','DONE','FAILED','CANCELLED'), defaultValue: 'NONE' },
+  flip_error:           { type: DataTypes.TEXT, allowNull: true },
+  transfer_at:          { type: DataTypes.DATE, allowNull: true },
 }, {
   tableName: 'inc_results',
   timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at',
