@@ -2418,9 +2418,16 @@ const PaymentPortalTab = () => {
                             {run.payment_date || run.paid_at?.split('T')[0] || '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">
-                              ✅ Dibayar
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">
+                                ✅ Dibayar
+                              </span>
+                              <button
+                                onClick={() => setDisburse(run)}
+                                className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-colors flex items-center gap-1">
+                                <Eye size={10}/> Detail Flip
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
