@@ -38,15 +38,7 @@ export default function OrgChartPage() {
   const filtered = filterDept ? { [filterDept]: depts[filterDept] } : depts;
 
   const handleExport = () => {
-    if (!chartRef.current) return;
-    import('html2canvas').then(({ default: h2c }) => {
-      h2c(chartRef.current, { scale:2, backgroundColor: '#ffffff' }).then(canvas => {
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
-        a.download = 'org-chart.png';
-        a.click();
-      });
-    }).catch(() => alert('Export tidak tersedia'));
+    window.print();
   };
 
   const getInitials = name => (name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
