@@ -172,6 +172,25 @@ const getRunDisbursementStatus = async (req, res, next) => {
       }],
     });
 
+    // Sync PENDING items from Flip API
+    const pendingItems = items.filter(i => i.flip_status === 'PENDING' && i.flip_disbursement_id);
+    if (pendingItems.length > 0) {
+      await Promise.all(pendingItems.map(async item => {
+        try {
+          const disbursement = await flip.getDisbursementStatus(item.flip_disbursement_id);
+          const newStatus = flip.mapStatus(disbursement.status);
+          if (newStatus !== item.flip_status) {
+            await PayrollItem.update({
+              flip_status:  newStatus,
+              transfer_at:  newStatus === 'DONE' ? new Date() : item.transfer_at,
+              flip_error:   disbursement.failure_reason || null,
+            }, { where: { id: item.id } });
+            item.flip_status = newStatus;
+          }
+        } catch(e) { console.warn('Flip sync error for item', item.id, e.message); }
+      }));
+    }
+
     // Merge: use item bank if already transferred, else use employee bank
     const mapped = items.map(item => {
       const empBank = item.user?.employee;

@@ -714,20 +714,40 @@ const getDisbursePeriodStatus = async (req, res, next) => {
       include: [{ model: IncEmployee, as: 'employee', required: false }],
     });
 
+    // Sync PENDING items from Flip API to get latest status
+    const pendingResults = results.filter(r => r.flip_status === 'PENDING' && r.flip_disbursement_id);
+    if (pendingResults.length > 0) {
+      await Promise.all(pendingResults.map(async r => {
+        try {
+          const disbursement = await flip.getDisbursementStatus(r.flip_disbursement_id);
+          const newStatus = flip.mapStatus(disbursement.status);
+          if (newStatus !== r.flip_status) {
+            await r.update({
+              flip_status:  newStatus,
+              transfer_at:  newStatus === 'DONE' ? new Date() : r.transfer_at,
+              flip_error:   disbursement.failure_reason || null,
+            });
+          }
+        } catch(e) { console.warn('Flip sync error for result', r.id, e.message); }
+      }));
+      // Reload after sync
+      await Promise.all(results.map(r => r.reload()));
+    }
+
     const items = await Promise.all(results.map(async r => {
       const empUser = r.employee?.user_id
         ? await User.findByPk(r.employee.user_id, { include: [{ model: Employee, as: 'employee' }] })
         : null;
       return {
-        id:                r.id,
-        employee_name:     r.employee_name,
-        net_salary:        r.total_incentive,
-        flip_status:       r.flip_status || 'NONE',
-        flip_error:        r.flip_error,
+        id:                   r.id,
+        employee_name:        r.employee_name,
+        net_salary:           r.total_incentive,
+        flip_status:          r.flip_status || 'NONE',
+        flip_error:           r.flip_error,
         flip_disbursement_id: r.flip_disbursement_id,
-        transfer_at:       r.transfer_at,
-        bank_code:         empUser?.employee?.bank_code,
-        bank_account_number: empUser?.employee?.bank_account_number,
+        transfer_at:          r.transfer_at,
+        bank_code:            empUser?.employee?.bank_code,
+        bank_account_number:  empUser?.employee?.bank_account_number,
       };
     }));
 
