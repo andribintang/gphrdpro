@@ -11,6 +11,8 @@ import AttendancePage      from './pages/AttendancePage';
 import AttendanceAdminPage from './pages/AttendanceAdminPage';
 import UserAccessPage      from './pages/UserAccessPage';
 import DepartmentsPage     from './pages/DepartmentsPage';
+import OrgChartPage        from './pages/OrgChartPage';
+import HRAssistantPage     from './pages/HRAssistantPage';
 import LeavesPage from './pages/LeavesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
@@ -91,6 +93,8 @@ export default function App() {
 
                 {/* Pengaturan */}
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="org-chart" element={<ProtectedRoute roles={['admin','hr','supervisor']}><OrgChartPage /></ProtectedRoute>}/>
+                <Route path="hr-assistant" element={<ProtectedRoute roles={['admin','hr']}><HRAssistantPage /></ProtectedRoute>}/>
                 <Route path="departments" element={
                   <ProtectedRoute roles={['admin','hr']}><DepartmentsPage /></ProtectedRoute>
                 } />

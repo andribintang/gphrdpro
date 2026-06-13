@@ -6,7 +6,7 @@ import {
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
-  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store,
+  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store, Sparkles,
   PanelLeftClose, PanelLeftOpen, Shield
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
@@ -68,6 +68,8 @@ const NAV = [
       { to:'/attendance-admin', icon:ClipboardList, label:'Data Absensi',    roles:['admin','hr'] },
       { to:'/leaves',           icon:CalendarOff,   label:'Cuti',            roles:['admin','hr','supervisor','employee'] },
       { to:'/departments',      icon:Building2,     label:'Departemen',      roles:['admin','hr'] },
+      { to:'/org-chart',         icon:LayoutList,    label:'Org Chart',       roles:['admin','hr','supervisor'] },
+      { to:'/hr-assistant',      icon:Sparkles,      label:'AI HR Assistant', roles:['admin','hr'] },
       { to:'/payroll-pro',      icon:DollarSign,    label:'Gaji & Slip',     roles:['admin','hr','supervisor','employee'] },
       { to:'/reports',          icon:BarChart3,     label:'Laporan HRD',     roles:['admin','hr'] },
     ],
