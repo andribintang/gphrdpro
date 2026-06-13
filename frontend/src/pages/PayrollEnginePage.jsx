@@ -1991,6 +1991,190 @@ const PayrollSettingsTab = () => {
 
 
 
+
+// ── IncentiveDisburseModal (inline untuk PaymentPortalTab) ────
+const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
+  const [statusItems,  setStatusItems]  = useState([]);
+  const [balanceInfo,  setBalanceInfo]  = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [transferring, setTransferring] = useState(false);
+  const [error,        setError]        = useState(null);
+
+  const API  = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+  const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
+
+  // Guard: period must have id
+  if (!period?.id) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-[var(--bg-card)] p-6 rounded-2xl text-center space-y-3">
+        <p className="text-red-500 font-bold">⚠️ Data periode tidak valid</p>
+        <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Tutup</button>
+      </div>
+    </div>
+  );
+
+  const loadStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statusRes, balRes] = await Promise.all([
+        window.fetch(`${API}/incentive/periods/${period.id}/disburse-status`, { headers: authH }).then(r=>r.json()),
+        window.fetch(`${API}/flip/balance`, { headers: authH }).then(r=>r.json()).catch(()=>null),
+      ]);
+      setStatusItems(statusRes.data?.items || []);
+      const totalNeeded = (statusRes.data?.items||[])
+        .filter(i=>i.flip_status!=='DONE')
+        .reduce((s,i)=>s+parseFloat(i.net_salary||0),0);
+      const bal = balRes?.data?.balance || 0;
+      setBalanceInfo({ current_balance: bal, total_needed: totalNeeded, sufficient: bal >= totalNeeded });
+    } catch(e) {
+      console.error('[IncentiveDisburse] loadStatus error:', e);
+      setError(e.message);
+      toast.error('Gagal memuat status: ' + e.message);
+    }
+    finally { setLoading(false); }
+  }, [period.id]);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const handleTransfer = async () => {
+    setTransferring(true);
+    try {
+      const r = await window.fetch(`${API}/incentive/periods/${period.id}/disburse`, {
+        method: 'POST', headers: authH,
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success(d.message || 'Transfer dikirim ke Flip');
+        if (d.data?.failed > 0) toast.error(`${d.data.failed} transfer gagal`);
+      } else toast.error(d.message);
+    } catch { toast.error('Gagal transfer'); }
+    finally {
+      setTransferring(false);
+      await loadStatus(); // Reload status setelah transfer
+    }
+  };
+
+  // Items belum pernah ditransfer (NONE)
+  const pendingItems    = statusItems.filter(i => !i.flip_status || i.flip_status === 'NONE');
+  // Items sedang dalam proses (PENDING) atau sudah selesai (DONE)
+  const hasStarted      = statusItems.some(i => i.flip_status && i.flip_status !== 'NONE');
+  const inProgressItems = statusItems.filter(i => i.flip_status === 'PENDING');
+  const doneItems       = statusItems.filter(i => i.flip_status === 'DONE');
+  const bi = balanceInfo;
+  const STATUS_STYLE = { NONE:'bg-gray-100 text-gray-500', PENDING:'bg-yellow-100 text-yellow-700', DONE:'bg-green-100 text-green-700', FAILED:'bg-red-100 text-red-600' };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-card)] w-full max-w-2xl my-6 rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-xl">🚀</div>
+            <div>
+              <h2 className="font-bold text-base">Transfer Insentif via Flip</h2>
+              <p className="text-xs text-[var(--text-muted)]">{period.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg)]">
+            <X className="w-4 h-4"/>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-blue-500"/></div>
+          ) : (
+            <>
+              {/* Balance */}
+              <div className={`rounded-2xl border-2 p-4 ${bi?.sufficient ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-bold text-[var(--text-muted)] uppercase mb-1">
+                      {bi?.sufficient ? '✅ Saldo Mencukupi' : '⚠️ Saldo Tidak Mencukupi'}
+                    </p>
+                    <p className={`text-2xl font-black ${bi?.sufficient ? 'text-emerald-700' : 'text-red-700'}`}>
+                      {toRupiah(bi?.current_balance||0)}
+                    </p>
+                  </div>
+                  <button onClick={loadStatus} className="w-8 h-8 rounded-lg border border-[var(--border)] flex items-center justify-center">
+                    <RefreshCw className="w-3.5 h-3.5"/>
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                    <p className="text-[10px] text-[var(--text-muted)]">Dibutuhkan</p>
+                    <p className="font-bold text-sm">{toRupiah(bi?.total_needed||0)}</p>
+                  </div>
+                  <div className={`rounded-xl p-2.5 text-center ${bi?.sufficient ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                    <p className="text-[10px] text-[var(--text-muted)]">{bi?.sufficient ? 'Sisa' : 'Kurang'}</p>
+                    <p className={`font-bold text-sm ${bi?.sufficient ? 'text-emerald-700' : 'text-red-600'}`}>
+                      {toRupiah(Math.abs((bi?.current_balance||0)-(bi?.total_needed||0)))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Employee list */}
+              <div className="border border-[var(--border)] rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Karyawan</th>
+                      <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase">Bank</th>
+                      <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase">Insentif</th>
+                      <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {statusItems.map(item => (
+                      <tr key={item.id} className={`hover:bg-[var(--bg-secondary)] ${item.flip_status==='DONE'?'opacity-50':''}`}>
+                        <td className="px-3 py-2 font-semibold">{item.employee_name}</td>
+                        <td className="px-3 py-2 font-mono text-[var(--text-secondary)] text-[10px]">
+                          {item.bank_code ? `${item.bank_code.toUpperCase()} ···${item.bank_account_number?.slice(-4)}` : <span className="text-red-400">⚠ Belum diisi</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold">{toRupiah(item.net_salary)}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_STYLE[item.flip_status]||STATUS_STYLE.NONE}`}>
+                            {item.flip_status||'PENDING'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)]">
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)]">Tutup</button>
+          {hasStarted && !pendingItems.length ? (
+            /* Transfer sudah dikirim — tampilkan Refresh Status */
+            <button onClick={async () => { setLoading(true); await loadStatus(); setLoading(false); toast.success('Status diperbarui'); }}
+              disabled={loading}
+              className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCw className="w-4 h-4"/>}
+              {inProgressItems.length > 0
+                ? `🔄 Refresh Status (${inProgressItems.length} Pending)`
+                : `✅ ${doneItems.length} Selesai · Refresh`}
+            </button>
+          ) : (
+            /* Belum ditransfer — tampilkan tombol Transfer */
+            <button onClick={handleTransfer}
+              disabled={transferring || loading || pendingItems.length === 0}
+              className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              {transferring ? <Loader2 className="w-4 h-4 animate-spin"/> : <Banknote className="w-4 h-4"/>}
+              {transferring ? 'Mentransfer...' : pendingItems.length > 0
+                ? `Transfer ${pendingItems.length} Karyawan · ${toRupiahShort(bi?.total_needed||0)}`
+                : '✅ Semua Sudah Ditransfer'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ════════════════════════════════════════════════════════════════
 // PAYMENT PORTAL TAB — 1 Portal untuk semua tipe pembayaran
 // ════════════════════════════════════════════════════════════════
