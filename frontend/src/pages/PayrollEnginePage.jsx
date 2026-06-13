@@ -1998,20 +1998,9 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
   const [balanceInfo,  setBalanceInfo]  = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [transferring, setTransferring] = useState(false);
-  const [error,        setError]        = useState(null);
 
   const API  = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
   const authH = { Authorization: 'Bearer ' + localStorage.getItem('accessToken') };
-
-  // Guard: period must have id
-  if (!period?.id) return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-[var(--bg-card)] p-6 rounded-2xl text-center space-y-3">
-        <p className="text-red-500 font-bold">⚠️ Data periode tidak valid</p>
-        <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Tutup</button>
-      </div>
-    </div>
-  );
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -2026,11 +2015,7 @@ const IncentiveDisburseModal = ({ period, onClose, onSuccess }) => {
         .reduce((s,i)=>s+parseFloat(i.net_salary||0),0);
       const bal = balRes?.data?.balance || 0;
       setBalanceInfo({ current_balance: bal, total_needed: totalNeeded, sufficient: bal >= totalNeeded });
-    } catch(e) {
-      console.error('[IncentiveDisburse] loadStatus error:', e);
-      setError(e.message);
-      toast.error('Gagal memuat status: ' + e.message);
-    }
+    } catch { toast.error('Gagal memuat status'); }
     finally { setLoading(false); }
   }, [period.id]);
 

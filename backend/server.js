@@ -376,11 +376,6 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
-      // Add flip columns to inc_results
-      `ALTER TABLE inc_results ADD COLUMN IF NOT EXISTS flip_disbursement_id VARCHAR(100) NULL`,
-      `ALTER TABLE inc_results ADD COLUMN IF NOT EXISTS flip_status ENUM('NONE','PENDING','DONE','FAILED','CANCELLED') DEFAULT 'NONE'`,
-      `ALTER TABLE inc_results ADD COLUMN IF NOT EXISTS flip_error TEXT NULL`,
-      `ALTER TABLE inc_results ADD COLUMN IF NOT EXISTS transfer_at DATETIME NULL`,
       `CREATE TABLE IF NOT EXISTS erp_channel_targets (
         id INT AUTO_INCREMENT PRIMARY KEY,
         sub_channel_id INT NOT NULL,
