@@ -344,7 +344,7 @@ const BottomNav = () => {
 
       {/* ── EMPLOYEE: HRD-focused nav ── */}
       {role === 'employee' && (<>
-        <NAV_ITEM to="/dashboard"    icon={Home}       label="Home"    exact/>
+        <NAV_ITEM to="/dashboard"    icon={Home}       label="Home"   exact/>
         <NAV_ITEM to="/attendance"   icon={Clock}      label="Absensi"/>
         <NAV_ITEM to="/leaves"       icon={CalendarOff} label="Cuti"   fab/>
         <NAV_ITEM to="/payroll-pro"  icon={DollarSign} label="Slip"/>
@@ -355,8 +355,8 @@ const BottomNav = () => {
       {isSupervisor && (<>
         <NAV_ITEM to="/dashboard"       icon={Home}       label="Home"   exact/>
         <NAV_ITEM to="/attendance"      icon={Clock}      label="Absensi"/>
-        <NAV_ITEM to="/attendance-admin" icon={Users}     label="Tim"    fab/>
-        <NAV_ITEM to="/leaves"          icon={CalendarOff} label="Cuti"/>
+        <NAV_ITEM to="/leaves"          icon={CalendarOff} label="Cuti"  fab/>
+        <NAV_ITEM to="/employees"       icon={Users}      label="Tim"/>
         <NAV_ITEM to="/self-service"    icon={User}       label="Profil"/>
       </>)}
 

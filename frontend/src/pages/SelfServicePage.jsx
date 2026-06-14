@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  User, Phone, MapPin, AlertCircle, Camera, Save, Lock,
+  User, Phone, MapPin, AlertCircle, Camera, Save, Lock, LogOut,
   Calendar, CheckCircle2, FileText, Loader2, RefreshCw,
   Eye, EyeOff, Edit3, X, Building2, CreditCard,
   ChevronLeft, ChevronRight, Bell, Shield,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
 const MONTHS_ID = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -52,9 +53,14 @@ export default function SelfServicePage() {
 const MobileProfileHeader = ({ user, onTabChange }) => {
   const [empData, setEmpData] = useState(null);
   useEffect(() => {
-    api.get(`/employees/${user?.id}`).then(r => setEmpData(r.data.data)).catch(()=>{});
+    api.get(`/employees/${user?.id}`).then(r => {
+      const d = r.data.data;
+      // API returns { user: { ...fields, employee: {...} } }
+      setEmpData(d.user || d);
+    }).catch(()=>{});
   }, [user?.id]);
 
+  // empData is already the user object (with employee nested)
   const emp = empData?.employee || {};
   const needsBank = !emp.bank_code;
 
@@ -109,7 +115,23 @@ const MobileProfileHeader = ({ user, onTabChange }) => {
           </button>
         )}
       </div>
+
+      {/* Logout button */}
+      <LogoutButton/>
     </div>
+  );
+};
+
+// ── LOGOUT BUTTON ─────────────────────────────────────────────
+const LogoutButton = () => {
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
+  return (
+    <button
+      onClick={() => { logout(); navigate('/login'); }}
+      className="w-full mobile-card flex items-center justify-center gap-2 py-4 text-red-500 font-bold text-sm active:opacity-70 transition-opacity mt-2">
+      <LogOut size={18}/> Keluar / Logout
+    </button>
   );
 };
 
@@ -126,18 +148,20 @@ const ProfileTab = ({ userId }) => {
     setLoading(true);
     try {
       const r = await api.get(`/employees/${userId}`);
-      const d = r.data.data;
-      setData(d);
-      const emp = d.employee || {};
+      const raw = r.data.data;
+      // API returns { user: { name, role, employee: { phone, ... } } }
+      const userData = raw.user || raw;
+      const empData  = userData.employee || {};
+      setData({ user: userData, employee: empData });
       setForm({
-        name:                d.user?.name || d.name || '',
-        phone:               emp.phone || '',
-        address:             emp.address || '',
-        emergency_contact:   emp.emergency_contact || '',
-        emergency_phone:     emp.emergency_phone || '',
-        bank_code:           emp.bank_code || '',
-        bank_account_number: emp.bank_account_number || '',
-        bank_account_name:   emp.bank_account_name || '',
+        name:                userData.name || '',
+        phone:               empData.phone || '',
+        address:             empData.address || '',
+        emergency_contact:   empData.emergency_contact || '',
+        emergency_phone:     empData.emergency_phone || '',
+        bank_code:           empData.bank_code || '',
+        bank_account_number: empData.bank_account_number || '',
+        bank_account_name:   empData.bank_account_name || '',
       });
     } catch { toast.error('Gagal memuat profil'); }
     finally { setLoading(false); }
@@ -198,6 +222,8 @@ const ProfileTab = ({ userId }) => {
     img.src = URL.createObjectURL(file);
     e.target.value = '';
   };
+
+  const emp  = data?.employee || {};
 
   if (loading) return (
     <div className="space-y-3">
@@ -315,7 +341,23 @@ const ProfileTab = ({ userId }) => {
           </button>
         )}
       </div>
+
+      {/* Logout button */}
+      <LogoutButton/>
     </div>
+  );
+};
+
+// ── LOGOUT BUTTON ─────────────────────────────────────────────
+const LogoutButton = () => {
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
+  return (
+    <button
+      onClick={() => { logout(); navigate('/login'); }}
+      className="w-full mobile-card flex items-center justify-center gap-2 py-4 text-red-500 font-bold text-sm active:opacity-70 transition-opacity mt-2">
+      <LogOut size={18}/> Keluar / Logout
+    </button>
   );
 };
 
@@ -602,8 +644,52 @@ const LeaveTab = ({ userId }) => {
 
 // ── PAYSLIP TAB ───────────────────────────────────────────────
 const PayslipTab = () => {
-  const [slips,   setSlips]   = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [slips,    setSlips]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [unlocked, setUnlocked] = useState(false);
+  const [pin,      setPin]      = useState('');
+  const [pinErr,   setPinErr]   = useState('');
+  const { user } = useAuth();
+
+  // Lock after 5 minutes
+  useEffect(() => {
+    if (!unlocked) return;
+    const t = setTimeout(() => setUnlocked(false), 5 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [unlocked]);
+
+  const handleUnlock = async () => {
+    if (!pin) { setPinErr('Masukkan password'); return; }
+    try {
+      await api.post('/auth/verify-password', { password: pin });
+      setUnlocked(true); setPin(''); setPinErr('');
+    } catch { setPinErr('Password salah'); }
+  };
+
+  if (!unlocked) return (
+    <div className="mobile-card p-6 text-center space-y-4">
+      <div className="w-16 h-16 rounded-full bg-[var(--brand-600)]/10 flex items-center justify-center mx-auto">
+        <Lock size={28} className="text-[var(--brand-600)]"/>
+      </div>
+      <div>
+        <p className="font-bold text-base">Slip Gaji Terkunci</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">Masukkan password untuk melihat slip gaji</p>
+      </div>
+      <div className="relative">
+        <input type="password" value={pin} onChange={e=>{setPin(e.target.value);setPinErr('');}}
+          onKeyDown={e=>e.key==='Enter'&&handleUnlock()}
+          placeholder="Masukkan password akun" autoFocus
+          className={`input-base w-full text-center text-lg tracking-widest ${pinErr?'border-red-400':''}`}
+          style={{fontSize:'16px'}}/>
+        {pinErr && <p className="text-xs text-red-500 mt-1">{pinErr}</p>}
+      </div>
+      <button onClick={handleUnlock}
+        className="w-full py-3.5 rounded-2xl text-sm font-bold text-white"
+        style={{background:'linear-gradient(135deg,var(--brand-500),var(--brand-700))'}}>
+        Buka Slip Gaji
+      </button>
+    </div>
+  );
 
   useEffect(() => {
     api.get('/payroll-engine/my', { params:{limit:24} })
@@ -735,6 +821,22 @@ const PasswordTab = () => {
           </button>
         </div>
       </div>
+
+      {/* Logout button */}
+      <LogoutButton/>
     </div>
+  );
+};
+
+// ── LOGOUT BUTTON ─────────────────────────────────────────────
+const LogoutButton = () => {
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
+  return (
+    <button
+      onClick={() => { logout(); navigate('/login'); }}
+      className="w-full mobile-card flex items-center justify-center gap-2 py-4 text-red-500 font-bold text-sm active:opacity-70 transition-opacity mt-2">
+      <LogOut size={18}/> Keluar / Logout
+    </button>
   );
 };
