@@ -322,7 +322,9 @@ function EmployeeDashboard({ user, navigate }) {
           { label:'Slip Gaji', icon:'💰', path:'/payroll-pro', color:'text-emerald-600' },
           { label:'Pengajuan Cuti', icon:'📋', path:'/leaves', color:'text-purple-600' },
           { label:'Riwayat Absensi', icon:'🕐', path:'/attendance', color:'text-blue-600' },
-          { label:'Profil Saya', icon:'👤', path:'/employees', color:'text-amber-600' },
+          user?.role === 'supervisor'
+            ? { label:'Tim Saya', icon:'👥', path:'/employees', color:'text-amber-600' }
+            : { label:'Profil Saya', icon:'👤', path:'/self-service', color:'text-amber-600' },
         ].map(q => (
           <button key={q.label} onClick={()=>navigate(q.path)}
             className="table-wrapper p-5 text-center hover:scale-[1.02] transition-transform">

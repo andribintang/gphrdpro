@@ -353,10 +353,10 @@ const BottomNav = () => {
 
       {/* ── SUPERVISOR: HRD + approval ── */}
       {isSupervisor && (<>
-        <NAV_ITEM to="/employees"       icon={Users}       label="My Team"/>
+        <NAV_ITEM to="/dashboard"       icon={Home}        label="Home"   exact/>
         <NAV_ITEM to="/leaves"          icon={CalendarOff} label="Cuti"/>
         <NAV_ITEM to="/attendance"      icon={Clock}       label="Absensi" fab/>
-        <NAV_ITEM to="/dashboard"       icon={Home}        label="Home"/>
+        <NAV_ITEM to="/employees"       icon={Users}       label="My Team"/>
         <NAV_ITEM to="/self-service"    icon={User}        label="Profil"/>
       </>)}
 
