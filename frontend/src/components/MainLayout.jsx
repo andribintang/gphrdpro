@@ -6,7 +6,7 @@ import {
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
-  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store, Sparkles,
+  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store, Sparkles, User,
   PanelLeftClose, PanelLeftOpen, Shield
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
