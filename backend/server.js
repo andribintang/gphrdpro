@@ -984,7 +984,9 @@ app.use('/api/company',        companyRoutes);
 app.use('/api/erp',            erpRoutes);
 app.use('/api/flip',           flipRoutes);
 app.use('/api/notifications',  notificationRoutes);
-app.use('/api/notifications',  notificationRoutes);
+app.use('/api/news',           newsRoutes);
+app.use('/api/quotes',         quotesRoutes);
+app.use('/api/ai',             aiProxyRoutes);
 
 // ── 404 + Error ───────────────────────────────────────────────
 app.use(notFound);
