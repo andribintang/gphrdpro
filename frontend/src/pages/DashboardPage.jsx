@@ -15,6 +15,113 @@ import { attendanceService } from '../utils/attendanceService';
 import { leaveService } from '../utils/leaveService';
 import api from '../utils/api';
 
+// ── Quote Card (daily motivasi) ───────────────────────────────
+const QuoteCard = ({ quote }) => {
+  if (!quote) return null;
+  return (
+    <div className="rounded-2xl p-4 mb-1 relative overflow-hidden"
+      style={{background:'linear-gradient(135deg,var(--brand-600)15,var(--brand-700)05)',border:'1px solid var(--brand-600)20'}}>
+      <div className="absolute top-2 right-3 text-4xl opacity-10 font-serif select-none">"</div>
+      <p className="text-sm font-semibold text-[var(--text-primary)] leading-relaxed mb-1.5 pr-6">
+        {quote.content_id}
+      </p>
+      <p className="text-xs text-[var(--text-muted)] italic">{quote.content_en}</p>
+      <p className="text-[10px] text-[var(--brand-600)] font-semibold mt-2">✨ Motivasi Hari Ini</p>
+    </div>
+  );
+};
+
+// ── News Feed ─────────────────────────────────────────────────
+const NewsFeed = ({ limit=4 }) => {
+  const [news,    setNews]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detail,  setDetail]  = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get('/news', { params:{ limit, published_only:'true' } })
+      .then(r => setNews(r.data.data?.news || []))
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  }, []);
+
+  const handleLike = async (id) => {
+    try {
+      const r = await api.post(\`/news/\${id}/like\`);
+      setNews(prev => prev.map(n => n.id===id ? {
+        ...n, like_count: r.data.liked ? parseInt(n.like_count)+1 : parseInt(n.like_count)-1,
+        user_liked: r.data.liked ? 1 : 0,
+      } : n));
+    } catch {}
+  };
+
+  const CAT_COLORS = { pengumuman:'bg-red-100 text-red-700', event:'bg-purple-100 text-purple-700', kebijakan:'bg-blue-100 text-blue-700', info:'bg-emerald-100 text-emerald-700' };
+
+  if (loading) return <div className="space-y-3">{[...Array(2)].map((_,i)=><div key={i} className="skeleton h-24 rounded-2xl"/>)}</div>;
+  if (!news.length) return null;
+
+  return (
+    <>
+      {detail && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={()=>setDetail(null)}>
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-2xl w-full max-w-2xl my-6 overflow-hidden" onClick={e=>e.stopPropagation()}>
+            {detail.cover_url && <img src={detail.cover_url} alt={detail.title} className="w-full h-52 object-cover"/>}
+            <div className="p-6">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <span className={\`text-[11px] px-2 py-0.5 rounded-full font-semibold \${CAT_COLORS[detail.category]||'bg-gray-100 text-gray-600'}\`}>
+                    {detail.category}
+                  </span>
+                  <h2 className="font-black text-xl mt-2">{detail.title}</h2>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    {detail.author_name} · {new Date(detail.published_at||detail.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}
+                  </p>
+                </div>
+                <button onClick={()=>setDetail(null)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg-secondary)] flex-shrink-0">✕</button>
+              </div>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{detail.content}</p>
+              <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[var(--border)]">
+                <button onClick={()=>handleLike(detail.id)}
+                  className={\`flex items-center gap-1.5 text-sm font-semibold \${parseInt(detail.user_liked)?'text-red-500':'text-[var(--text-muted)]'}\`}>
+                  ❤️ {detail.like_count} Suka
+                </button>
+                <span className="text-sm text-[var(--text-muted)]">👁 {detail.read_count} Dibaca</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold">📰 News & Pengumuman</p>
+          <button onClick={()=>navigate('/news')} className="text-xs text-[var(--brand-600)] font-semibold hover:underline">Lihat Semua →</button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {news.map(n => (
+            <button key={n.id} onClick={async()=>{ const r=await api.get(\`/news/\${n.id}\`); setDetail(r.data.data.news); }}
+              className="table-wrapper overflow-hidden text-left hover:shadow-md transition-shadow group">
+              {n.cover_url && <img src={n.cover_url} alt={n.title} className="w-full h-28 object-cover group-hover:scale-105 transition-transform"/>}
+              <div className="p-3">
+                <span className={\`text-[10px] px-2 py-0.5 rounded-full font-semibold \${CAT_COLORS[n.category]||'bg-gray-100 text-gray-500'}\`}>
+                  {n.category}
+                </span>
+                <p className="font-bold text-sm mt-1.5 line-clamp-2 leading-snug">{n.title}</p>
+                <p className="text-xs text-[var(--text-muted)] line-clamp-1 mt-0.5">{n.content.replace(/<[^>]*>/g,'').slice(0,80)}</p>
+                <div className="flex items-center gap-3 mt-2 text-xs text-[var(--text-muted)]">
+                  <span>❤️ {n.like_count}</span>
+                  <span>👁 {n.read_count}</span>
+                  <span className="ml-auto">{new Date(n.published_at||n.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short'})}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+};
+
 const toRpShort = v => {
   const n = parseFloat(v)||0;
   if (n>=1e9) return 'Rp '+(n/1e9).toFixed(1)+'M';
@@ -39,6 +146,7 @@ export default function DashboardPage() {
   const [birthdays,   setBirthdays]   = useState([]);
   const [payrollSum,  setPayrollSum]  = useState(null);
   const [loading,     setLoading]     = useState(true);
+  const [todayQuote,  setTodayQuote]  = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,6 +217,9 @@ export default function DashboardPage() {
           .catch(()=>{});
       }
     } catch(e) { console.error(e); }
+
+    // Load daily quote
+    api.get('/quotes/today').then(r => setTodayQuote(r.data.data?.quote)).catch(()=>{});
     finally { setLoading(false); }
   }, [isHRAdmin]);
 
@@ -140,6 +251,9 @@ export default function DashboardPage() {
           <RefreshCw size={15} className={loading?'animate-spin':''}/>
         </button>
       </div>
+
+      {/* Daily Quote */}
+      <QuoteCard quote={todayQuote}/>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -286,6 +400,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* News Feed */}
+      <NewsFeed limit={4}/>
+
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -301,6 +418,7 @@ export default function DashboardPage() {
           </button>
         ))}
       </div>
+      <NewsFeed limit={4}/>
     </div>
   );
 }
@@ -311,12 +429,18 @@ function EmployeeDashboard({ user, navigate }) {
   useEffect(() => {
     api.get('/attendance/my/stats').then(r => setMyAtt(r.data.data)).catch(()=>{});
   }, []);
+  const [empQuote, setEmpQuote] = useState(null);
+  useEffect(() => {
+    api.get('/quotes/today').then(r=>setEmpQuote(r.data.data?.quote)).catch(()=>{});
+  }, []);
+
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <div>
         <h1 className="page-title">Halo, {user?.name?.split(' ')[0]}! 👋</h1>
         <p className="page-subtitle">{new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'})}</p>
       </div>
+      <QuoteCard quote={empQuote}/>
       <div className="grid grid-cols-2 gap-3">
         {[
           { label:'Slip Gaji', icon:'💰', path:'/payroll-pro', color:'text-emerald-600' },

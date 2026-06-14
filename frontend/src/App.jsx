@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
@@ -19,6 +20,8 @@ import ReportsPage from './pages/ReportsPage';
 import PayrollEnginePage from './pages/PayrollEnginePage';
 import SettingsPage     from './pages/SettingsPage';
 import SelfServicePage  from './pages/SelfServicePage';
+import NewsPage          from './pages/NewsPage';
+import SplashScreen      from './components/SplashScreen';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import PayrollComponentManager from './pages/PayrollComponentManager';
 import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
@@ -58,6 +61,13 @@ function DeviceRedirect() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = React.useState(() => {
+    // Show splash only once per session
+    const shown = sessionStorage.getItem('splash_shown');
+    if (shown) return false;
+    sessionStorage.setItem('splash_shown', '1');
+    return true;
+  });
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -95,6 +105,7 @@ export default function App() {
                 {/* Pengaturan */}
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="self-service" element={<SelfServicePage />} />
+                <Route path="news" element={<NewsPage />} />
                 <Route path="org-chart" element={<ProtectedRoute roles={['admin','hr','supervisor']}><OrgChartPage /></ProtectedRoute>}/>
                 <Route path="hr-assistant" element={<ProtectedRoute roles={['admin','hr']}><HRAssistantPage /></ProtectedRoute>}/>
                 <Route path="departments" element={
@@ -230,5 +241,6 @@ export default function App() {
         />
       </AuthProvider>
     </ThemeProvider>
+    </>
   );
 }

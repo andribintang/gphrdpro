@@ -21,6 +21,8 @@ const companyRoutes        = require('./routes/company');
 const erpRoutes            = require('./routes/erp');
 const flipRoutes           = require('./routes/flip');
 const notificationRoutes   = require('./routes/notifications');
+const newsRoutes           = require('./routes/news');
+const quotesRoutes         = require('./routes/quotes');
 
 const app  = express();
 app.set('trust proxy', 1); // Railway/Railway proxy
@@ -376,6 +378,46 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      // News & Quotes tables
+      `CREATE TABLE IF NOT EXISTS company_news (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        cover_url TEXT NULL,
+        category ENUM('pengumuman','event','kebijakan','info') DEFAULT 'pengumuman',
+        is_published TINYINT(1) DEFAULT 0,
+        published_at DATETIME NULL,
+        created_by INT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_published (is_published, published_at),
+        INDEX idx_category (category)
+      )`,
+      `CREATE TABLE IF NOT EXISTS news_reads (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        news_id INT NOT NULL,
+        read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_read (user_id, news_id),
+        INDEX idx_news (news_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS news_likes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        news_id INT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_like (user_id, news_id),
+        INDEX idx_news (news_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS daily_quotes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        content_id TEXT NOT NULL,
+        content_en TEXT NOT NULL,
+        date DATE NOT NULL UNIQUE,
+        generated_at DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_date (date)
+      )`,
       `CREATE TABLE IF NOT EXISTS erp_channel_targets (
         id INT AUTO_INCREMENT PRIMARY KEY,
         sub_channel_id INT NOT NULL,
