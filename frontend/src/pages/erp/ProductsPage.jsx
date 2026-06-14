@@ -780,7 +780,7 @@ function BulkPublishModal({ products, onClose, onDone }) {
           store_active_gpr:    brand === 'gpracing' ? 1 : (r.store_active_gpr ? 1 : 0),
           store_slug:          r.store_slug || (toSlug(r.name) + '-' + r.id),
           store_meta_title:    r.name,
-          category_id:         r.category_id || null,
+          store_category_id:         r.category_id || null,
         });
         ok.push(r.id);
       } catch (e) {

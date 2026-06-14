@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, ChevronDown, ChevronRight, RefreshCw, Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
-import employeeService from '../utils/employeeService';
+import { employeeService } from '../utils/employeeService';
 
 const DEPT_COLORS = [
   '#f43f5e','#3b82f6','#10b981','#f59e0b','#8b5cf6',
