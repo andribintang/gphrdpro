@@ -217,10 +217,10 @@ export default function DashboardPage() {
           .catch(()=>{});
       }
     } catch(e) { console.error(e); }
-
-    // Load daily quote
-    api.get('/quotes/today').then(r => setTodayQuote(r.data.data?.quote)).catch(()=>{});
     finally { setLoading(false); }
+
+    // Load daily quote (separate, non-blocking)
+    api.get('/quotes/today').then(r => setTodayQuote(r.data.data?.quote)).catch(()=>{});
   }, [isHRAdmin]);
 
   useEffect(() => { load(); }, [load]);
