@@ -10,9 +10,9 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid,
 } from 'recharts';
-import employeeService from '../utils/employeeService';
-import attendanceService from '../utils/attendanceService';
-import leaveService from '../utils/leaveService';
+import { employeeService } from '../utils/employeeService';
+import { attendanceService } from '../utils/attendanceService';
+import { leaveService } from '../utils/leaveService';
 import api from '../utils/api';
 
 const toRpShort = v => {

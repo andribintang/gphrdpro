@@ -285,7 +285,7 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
       ...p,
       // Basic
       branch_id:    p.branch_id   || 1,
-      category_id:  p.category_id || '',
+      store_category_id:  p.category_id || '',
       name:         p.name        || '',
       sku:          p.sku         || '',
       barcode:      p.barcode     || '',
