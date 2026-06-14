@@ -47,7 +47,7 @@ const NewsFeed = ({ limit=4 }) => {
 
   const handleLike = async (id) => {
     try {
-      const r = await api.post(\`/news/\${id}/like\`);
+      const r = await api.post(`/news/${id}/like`);
       setNews(prev => prev.map(n => n.id===id ? {
         ...n, like_count: r.data.liked ? parseInt(n.like_count)+1 : parseInt(n.like_count)-1,
         user_liked: r.data.liked ? 1 : 0,
@@ -69,7 +69,7 @@ const NewsFeed = ({ limit=4 }) => {
             <div className="p-6">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                  <span className={\`text-[11px] px-2 py-0.5 rounded-full font-semibold \${CAT_COLORS[detail.category]||'bg-gray-100 text-gray-600'}\`}>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${CAT_COLORS[detail.category]||'bg-gray-100 text-gray-600'}`}>
                     {detail.category}
                   </span>
                   <h2 className="font-black text-xl mt-2">{detail.title}</h2>
@@ -82,7 +82,7 @@ const NewsFeed = ({ limit=4 }) => {
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{detail.content}</p>
               <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[var(--border)]">
                 <button onClick={()=>handleLike(detail.id)}
-                  className={\`flex items-center gap-1.5 text-sm font-semibold \${parseInt(detail.user_liked)?'text-red-500':'text-[var(--text-muted)]'}\`}>
+                  className={`flex items-center gap-1.5 text-sm font-semibold ${parseInt(detail.user_liked)?'text-red-500':'text-[var(--text-muted)]'}`}>
                   ❤️ {detail.like_count} Suka
                 </button>
                 <span className="text-sm text-[var(--text-muted)]">👁 {detail.read_count} Dibaca</span>
@@ -99,11 +99,11 @@ const NewsFeed = ({ limit=4 }) => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {news.map(n => (
-            <button key={n.id} onClick={async()=>{ const r=await api.get(\`/news/\${n.id}\`); setDetail(r.data.data.news); }}
+            <button key={n.id} onClick={async()=>{ const r=await api.get(`/news/${n.id}`); setDetail(r.data.data.news); }}
               className="table-wrapper overflow-hidden text-left hover:shadow-md transition-shadow group">
               {n.cover_url && <img src={n.cover_url} alt={n.title} className="w-full h-28 object-cover group-hover:scale-105 transition-transform"/>}
               <div className="p-3">
-                <span className={\`text-[10px] px-2 py-0.5 rounded-full font-semibold \${CAT_COLORS[n.category]||'bg-gray-100 text-gray-500'}\`}>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${CAT_COLORS[n.category]||'bg-gray-100 text-gray-500'}`}>
                   {n.category}
                 </span>
                 <p className="font-bold text-sm mt-1.5 line-clamp-2 leading-snug">{n.title}</p>
