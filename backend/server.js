@@ -22,6 +22,7 @@ const erpRoutes            = require('./routes/erp');
 const flipRoutes           = require('./routes/flip');
 const notificationRoutes   = require('./routes/notifications');
 const newsRoutes           = require('./routes/news');
+const aiProxyRoutes        = require('./routes/aiProxy');
 const quotesRoutes         = require('./routes/quotes');
 
 const app  = express();

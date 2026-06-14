@@ -93,9 +93,13 @@ Instruksi:
 
       const history = messages.slice(-8).map(m => ({ role:m.role, content:m.content }));
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
+      const res = await fetch(`${API_URL}/ai/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + localStorage.getItem('accessToken'),
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1000,
