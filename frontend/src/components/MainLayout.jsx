@@ -298,64 +298,76 @@ const Sidebar = ({ collapsed, onToggle, onClose, isOnErp }) => {
   );
 };
 
-// ── Bottom Navigation Bar (mobile only) ───────────────────────
+// ── Bottom Navigation Bar (mobile only) — Role-based ──────────
 const BottomNav = () => {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const role = user?.role;
+  const isHR = ['admin','hr'].includes(role);
+  const isSupervisor = role === 'supervisor';
 
   const isActive = (path, exact = false) =>
     exact ? location.pathname === path : location.pathname === path || location.pathname.startsWith(path + '/');
+
+  const NAV_ITEM = ({ to, icon: Icon, label, exact, fab }) => {
+    const active = isActive(to, exact);
+    if (fab) return (
+      <button onClick={() => navigate(to)}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 -mt-5 relative">
+        <div className="w-13 h-13 rounded-full w-12 h-12 flex items-center justify-center shadow-xl transition-transform active:scale-90"
+          style={{ background: 'linear-gradient(135deg, var(--brand-500), var(--brand-700))' }}>
+          <Icon size={22} strokeWidth={2.5} className="text-white"/>
+        </div>
+        <span className="text-[10px] font-semibold leading-none mt-0.5" style={{color:'var(--brand-600)'}}>{label}</span>
+      </button>
+    );
+    return (
+      <button onClick={() => navigate(to)}
+        className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all active:scale-95 relative ${active ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
+        {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-[var(--brand-600)]"/>}
+        <Icon size={20} strokeWidth={active ? 2.5 : 1.8}/>
+        <span className="text-[10px] font-medium leading-none">{label}</span>
+      </button>
+    );
+  };
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
       style={{
         background: 'var(--topbar-bg)',
         borderTop: '1px solid var(--topbar-border)',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.1)',
         paddingBottom: 'env(safe-area-inset-bottom)',
-        height: 'calc(60px + env(safe-area-inset-bottom))',
+        height: 'calc(62px + env(safe-area-inset-bottom))',
       }}>
 
-      {/* Home — Dashboard ERP */}
-      <button onClick={() => navigate('/erp')}
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/erp', true) ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
-        <Home size={20} strokeWidth={isActive('/erp', true) ? 2.5 : 1.8} />
-        <span className="text-[10px] font-medium leading-none">Home</span>
-        {isActive('/erp', true) && <span className="absolute bottom-[calc(env(safe-area-inset-bottom)+56px)] w-5 h-0.5 rounded-full bg-[var(--brand-600)]" />}
-      </button>
+      {/* ── EMPLOYEE: HRD-focused nav ── */}
+      {role === 'employee' && (<>
+        <NAV_ITEM to="/dashboard"    icon={Home}       label="Home"    exact/>
+        <NAV_ITEM to="/attendance"   icon={Clock}      label="Absensi"/>
+        <NAV_ITEM to="/leaves"       icon={CalendarOff} label="Cuti"   fab/>
+        <NAV_ITEM to="/payroll-pro"  icon={DollarSign} label="Slip"/>
+        <NAV_ITEM to="/self-service" icon={User}       label="Profil"/>
+      </>)}
 
-      {/* Check IN/Out — Absensi */}
-      <button onClick={() => navigate('/attendance')}
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/attendance') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
-        <Clock size={20} strokeWidth={isActive('/attendance') ? 2.5 : 1.8} />
-        <span className="text-[10px] font-medium leading-none">Check In</span>
-      </button>
+      {/* ── SUPERVISOR: HRD + approval ── */}
+      {isSupervisor && (<>
+        <NAV_ITEM to="/dashboard"       icon={Home}       label="Home"   exact/>
+        <NAV_ITEM to="/attendance"      icon={Clock}      label="Absensi"/>
+        <NAV_ITEM to="/attendance-admin" icon={Users}     label="Tim"    fab/>
+        <NAV_ITEM to="/leaves"          icon={CalendarOff} label="Cuti"/>
+        <NAV_ITEM to="/self-service"    icon={User}       label="Profil"/>
+      </>)}
 
-      {/* +Sales — Input New Order (center FAB style) */}
-      <button onClick={() => navigate('/erp/orders/new')}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 -mt-4 relative">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90"
-          style={{ background: `linear-gradient(135deg, var(--brand-500), var(--brand-700))` }}>
-          <Plus size={22} strokeWidth={2.5} className="text-white" />
-        </div>
-        <span className="text-[10px] font-medium leading-none mt-0.5 text-[var(--brand-600)]">+Sales</span>
-      </button>
-
-      {/* Sales — Data Penjualan */}
-      <button onClick={() => navigate('/erp/reports')}
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/erp/reports') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
-        <TrendingUp size={20} strokeWidth={isActive('/erp/reports') ? 2.5 : 1.8} />
-        <span className="text-[10px] font-medium leading-none">Sales</span>
-      </button>
-
-      {/* Akun */}
-      <button onClick={() => navigate('/settings')}
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive('/settings') ? 'text-[var(--brand-600)]' : 'text-[var(--text-muted)]'}`}>
-        <Settings size={20} strokeWidth={isActive('/settings') ? 2.5 : 1.8} />
-        <span className="text-[10px] font-medium leading-none">Akun</span>
-      </button>
+      {/* ── ADMIN/HR: Mixed HRD + ERP ── */}
+      {isHR && (<>
+        <NAV_ITEM to="/dashboard"  icon={Home}       label="Home"   exact/>
+        <NAV_ITEM to="/employees"  icon={Users}      label="HRD"/>
+        <NAV_ITEM to="/erp/orders/new" icon={Plus}   label="+Order" fab/>
+        <NAV_ITEM to="/erp"        icon={ShoppingCart} label="ERP"/>
+        <NAV_ITEM to="/settings"   icon={Settings}   label="Akun"/>
+      </>)}
 
     </nav>
   );

@@ -567,10 +567,15 @@ function ClockTab({ todayData, onRefresh }) {
           </>
         )}
         <button onClick={btn.action} disabled={actionLoading || isComplete}
-          className={`relative w-40 h-40 rounded-full bg-gradient-to-br ${btn.gradient} flex flex-col items-center justify-center gap-2 shadow-2xl transition-all duration-200 ${!isComplete ? 'active:scale-90 hover:scale-105' : 'opacity-80'} disabled:cursor-not-allowed`}>
+          className={`checkin-btn bg-gradient-to-br ${btn.gradient} ${!isComplete ? '' : 'opacity-80'} disabled:cursor-not-allowed`}>
+          {!isComplete && <div className="checkin-btn-ring" style={{borderColor:'white'}}/>}
           {actionLoading
             ? <Loader2 className="w-10 h-10 text-white animate-spin" />
-            : <><btn.icon className="w-10 h-10 text-white" strokeWidth={2} /><span className="text-white font-black text-sm tracking-widest">{btn.label}</span></>
+            : <>
+                <btn.icon className="w-10 h-10 text-white" strokeWidth={2} />
+                <span className="text-white font-black text-sm tracking-widest">{btn.label}</span>
+                <span className="text-white/80 text-[11px] font-medium">{btn.sublabel}</span>
+              </>
           }
         </button>
       </div>
