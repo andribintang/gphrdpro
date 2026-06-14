@@ -17,7 +17,8 @@ import LeavesPage from './pages/LeavesPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
 import PayrollEnginePage from './pages/PayrollEnginePage';
-import SettingsPage from './pages/SettingsPage';
+import SettingsPage     from './pages/SettingsPage';
+import SelfServicePage  from './pages/SelfServicePage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import PayrollComponentManager from './pages/PayrollComponentManager';
 import IncentiveDashboard from './pages/incentive/IncentiveDashboard';
@@ -93,6 +94,7 @@ export default function App() {
 
                 {/* Pengaturan */}
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="self-service" element={<SelfServicePage />} />
                 <Route path="org-chart" element={<ProtectedRoute roles={['admin','hr','supervisor']}><OrgChartPage /></ProtectedRoute>}/>
                 <Route path="hr-assistant" element={<ProtectedRoute roles={['admin','hr']}><HRAssistantPage /></ProtectedRoute>}/>
                 <Route path="departments" element={
