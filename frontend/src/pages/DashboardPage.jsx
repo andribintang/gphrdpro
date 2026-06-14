@@ -460,3 +460,4 @@ function EmployeeDashboard({ user, navigate }) {
     </div>
   );
 }
+
