@@ -122,18 +122,7 @@ const MobileProfileHeader = ({ user, onTabChange }) => {
   );
 };
 
-// ── LOGOUT BUTTON ─────────────────────────────────────────────
-const LogoutButton = () => {
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
-  return (
-    <button
-      onClick={() => { logout(); navigate('/login'); }}
-      className="w-full mobile-card flex items-center justify-center gap-2 py-4 text-red-500 font-bold text-sm active:opacity-70 transition-opacity mt-2">
-      <LogOut size={18}/> Keluar / Logout
-    </button>
-  );
-};
+
 
 // ── PROFILE TAB ───────────────────────────────────────────────
 const ProfileTab = ({ userId }) => {
@@ -348,18 +337,7 @@ const ProfileTab = ({ userId }) => {
   );
 };
 
-// ── LOGOUT BUTTON ─────────────────────────────────────────────
-const LogoutButton = () => {
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
-  return (
-    <button
-      onClick={() => { logout(); navigate('/login'); }}
-      className="w-full mobile-card flex items-center justify-center gap-2 py-4 text-red-500 font-bold text-sm active:opacity-70 transition-opacity mt-2">
-      <LogOut size={18}/> Keluar / Logout
-    </button>
-  );
-};
+
 
 // ── ATTENDANCE TAB ────────────────────────────────────────────
 const AttendanceTab = ({ userId }) => {
