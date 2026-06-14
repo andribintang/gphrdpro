@@ -114,8 +114,6 @@ export default function DashboardPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (!isHRAdmin) return <EmployeeDashboard user={user} navigate={navigate}/>;
-
   const s = empStats?.summary || {};
   const today = todayAtt || {};
 
@@ -127,6 +125,8 @@ export default function DashboardPage() {
     { label:'Cuti Pending',    value:pendingLeaves.length, icon:'📋', color:'text-purple-600', bg:'bg-purple-50', sub:'butuh approval', path:'/leaves' },
     { label:'Gaji Bulan Ini',  value:payrollSum?toRpShort(payrollSum.total_net):'—', icon:'💰', color:'text-[var(--brand-600)]', bg:'bg-[var(--brand-600)]/5', sub:payrollSum?.status||'belum generate', path:'/payroll-pro' },
   ];
+
+  if (!isHRAdmin) return <EmployeeDashboard user={user} navigate={navigate}/>;
 
   return (
     <div className="space-y-6 animate-fade-in">
