@@ -69,9 +69,11 @@ export default function App() {
     return true;
   });
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
+    <>
+      {showSplash && <SplashScreen onDone={()=>setShowSplash(false)}/>}
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
           <CompanyProvider>
             <Routes>
 
