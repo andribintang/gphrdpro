@@ -8,6 +8,58 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+
+// ── Cloudinary upload (same as EmployeesPage) ────────────────
+const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'hrd_attendance';
+
+const compressPhoto = (file, maxKB = 100) => new Promise((resolve) => {
+  if (file.size <= maxKB * 1024) { resolve(file); return; }
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const canvas = document.createElement('canvas');
+    let { width, height } = img;
+    const MAX = 800;
+    if (width > MAX || height > MAX) {
+      if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+      else { width = Math.round(width * MAX / height); height = MAX; }
+    }
+    canvas.width = width; canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    const tryQ = (q) => new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+    const search = async () => {
+      let lo = 0.1, hi = 0.9, best = null;
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        const blob = await tryQ(mid);
+        if (blob.size <= maxKB * 1024) { best = blob; lo = mid; }
+        else hi = mid;
+        if (hi - lo < 0.02) break;
+      }
+      if (!best) best = await tryQ(0.1);
+      resolve(new File([best], 'photo.jpg', { type: 'image/jpeg' }));
+    };
+    search();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+  img.src = url;
+});
+
+const uploadToCloudinary = async (file) => {
+  const compressed = await compressPhoto(file, 100);
+  if (!CLOUD_NAME) throw new Error('Cloudinary belum dikonfigurasi (VITE_CLOUDINARY_CLOUD_NAME)');
+  const fd = new FormData();
+  fd.append('file', compressed);
+  fd.append('upload_preset', UPLOAD_PRESET);
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: 'POST', body: fd,
+  });
+  const d = await r.json();
+  if (!d.secure_url) throw new Error(d.error?.message || 'Upload gagal');
+  return d.secure_url;
+};
 import api from '../utils/api';
 
 const MONTHS_ID = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -26,6 +78,34 @@ export default function SelfServicePage() {
   ];
 
   return (
+    <>
+    {/* ── DESKTOP version ── */}
+    <div className="hidden lg:block space-y-5 animate-fade-in">
+      <div className="page-header">
+        <h1 className="page-title">Self Service — {user?.name}</h1>
+        <p className="page-subtitle">Kelola profil, absensi, dan cuti Anda</p>
+      </div>
+      <div className="flex border-b border-[var(--border)] overflow-x-auto scrollbar-none">
+        {[{id:'profile',icon:'👤',label:'Profil'},{id:'attendance',icon:'📅',label:'Absensi'},
+          {id:'leave',icon:'🌴',label:'Cuti'},{id:'payslip',icon:'💰',label:'Slip Gaji'},{id:'password',icon:'🔐',label:'Password'}
+        ].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={`px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-all flex-shrink-0
+              ${tab===t.id?'border-[var(--brand-600)] text-[var(--brand-600)]':'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="max-w-3xl">
+        {tab==='profile'    && <ProfileTab    userId={user?.id}/>}
+        {tab==='attendance' && <AttendanceTab userId={user?.id}/>}
+        {tab==='leave'      && <LeaveTab      userId={user?.id}/>}
+        {tab==='payslip'    && <PayslipTab/>}
+        {tab==='password'   && <PasswordTab/>}
+      </div>
+    </div>
+
+    {/* ── MOBILE version ── */}
     <div className="lg:hidden hrd-mobile-page">
       {/* Profile header card */}
       <MobileProfileHeader user={user} onTabChange={setTab}/>
@@ -46,6 +126,7 @@ export default function SelfServicePage() {
       {tab === 'payslip'    && <PayslipTab/>}
       {tab === 'password'   && <PasswordTab/>}
     </div>
+    </>
   );
 }
 
@@ -188,27 +269,14 @@ const ProfileTab = ({ userId }) => {
     const file = e.target.files[0];
     if (!file) return;
     const toastId = toast.loading('Mengupload foto...');
-    const img = new Image();
-    img.onload = async () => {
-      const canvas = document.createElement('canvas');
-      const MAX = 400;
-      const ratio = Math.min(MAX/img.width, MAX/img.height);
-      canvas.width = img.width * ratio;
-      canvas.height = img.height * ratio;
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      let q = 0.8, dataUrl = canvas.toDataURL('image/jpeg', q);
-      while (dataUrl.length > 100_000 && q > 0.3) { q -= 0.1; dataUrl = canvas.toDataURL('image/jpeg', q); }
-      try {
-        const blob = await fetch(dataUrl).then(r=>r.blob());
-        const fd = new FormData(); fd.append('file', blob, 'photo.jpg');
-        const up = await api.post('/employees/upload-photo', fd, { headers:{'Content-Type':'multipart/form-data'} });
-        const url = up.data.data?.url || up.data.url;
-        await api.put(`/employees/${userId}`, { photo_url: url });
-        toast.success('Foto diperbarui!', { id: toastId });
-        load();
-      } catch { toast.error('Gagal upload', { id: toastId }); }
-    };
-    img.src = URL.createObjectURL(file);
+    try {
+      const url = await uploadToCloudinary(file);
+      await api.put(`/employees/${userId}`, { photo_url: url });
+      toast.success('Foto berhasil diperbarui! 📸', { id: toastId });
+      load();
+    } catch(err) {
+      toast.error('Gagal upload: ' + err.message, { id: toastId });
+    }
     e.target.value = '';
   };
 

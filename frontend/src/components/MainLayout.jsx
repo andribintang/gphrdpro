@@ -344,20 +344,20 @@ const BottomNav = () => {
 
       {/* ── EMPLOYEE: HRD-focused nav ── */}
       {role === 'employee' && (<>
-        <NAV_ITEM to="/dashboard"    icon={Home}       label="Home"   exact/>
-        <NAV_ITEM to="/attendance"   icon={Clock}      label="Absensi"/>
-        <NAV_ITEM to="/leaves"       icon={CalendarOff} label="Cuti"   fab/>
-        <NAV_ITEM to="/payroll-pro"  icon={DollarSign} label="Slip"/>
-        <NAV_ITEM to="/self-service" icon={User}       label="Profil"/>
+        <NAV_ITEM to="/dashboard"    icon={Home}        label="Home"   exact/>
+        <NAV_ITEM to="/leaves"       icon={CalendarOff} label="Cuti"/>
+        <NAV_ITEM to="/attendance"   icon={Clock}       label="Absensi" fab/>
+        <NAV_ITEM to="/payroll-pro"  icon={DollarSign}  label="Slip"/>
+        <NAV_ITEM to="/self-service" icon={User}        label="Profil"/>
       </>)}
 
       {/* ── SUPERVISOR: HRD + approval ── */}
       {isSupervisor && (<>
-        <NAV_ITEM to="/dashboard"       icon={Home}       label="Home"   exact/>
-        <NAV_ITEM to="/attendance"      icon={Clock}      label="Absensi"/>
-        <NAV_ITEM to="/leaves"          icon={CalendarOff} label="Cuti"  fab/>
-        <NAV_ITEM to="/employees"       icon={Users}      label="Tim"/>
-        <NAV_ITEM to="/self-service"    icon={User}       label="Profil"/>
+        <NAV_ITEM to="/employees"       icon={Users}       label="Tim Saya"/>
+        <NAV_ITEM to="/leaves"          icon={CalendarOff} label="Cuti"/>
+        <NAV_ITEM to="/attendance"      icon={Clock}       label="Absensi" fab/>
+        <NAV_ITEM to="/dashboard"       icon={Home}        label="Home"/>
+        <NAV_ITEM to="/self-service"    icon={User}        label="Profil"/>
       </>)}
 
       {/* ── ADMIN/HR: Mixed HRD + ERP ── */}
