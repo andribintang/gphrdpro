@@ -462,4 +462,5 @@ module.exports = {
   getSalesChannels, updateSalesChannel,
   getActivityTypes, createActivityType, updateActivityType, deleteActivityType,
   getBonusTargets, createBonusTarget, updateBonusTarget, deleteBonusTarget,
+  getShareTemplates, upsertShareTemplates, deleteShareTemplate,
 };
