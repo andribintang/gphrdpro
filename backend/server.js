@@ -23,6 +23,7 @@ const flipRoutes           = require('./routes/flip');
 const notificationRoutes   = require('./routes/notifications');
 const newsRoutes           = require('./routes/news');
 const cleanupRoutes        = require('./routes/cleanup');
+const backupRoutes         = require('./routes/backup');
 const aiProxyRoutes        = require('./routes/aiProxy');
 const quotesRoutes         = require('./routes/quotes');
 
@@ -64,7 +65,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-cleanup-secret', 'x-migrate-secret', 'x-backup-secret'],
 }));
 
 // ── Rate limiting ─────────────────────────────────────────────
@@ -380,6 +381,28 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      // Backup tables
+      `CREATE TABLE IF NOT EXISTS backup_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        url TEXT NOT NULL,
+        size_kb INT DEFAULT 0,
+        total_rows INT DEFAULT 0,
+        triggered_by VARCHAR(50) DEFAULT 'manual',
+        status ENUM('success','failed') DEFAULT 'success',
+        error TEXT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_created (created_at)
+      )`,
+      `CREATE TABLE IF NOT EXISTS backup_schedule (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        frequency ENUM('daily','weekly','monthly') DEFAULT 'daily',
+        hour INT DEFAULT 2,
+        enabled TINYINT(1) DEFAULT 1,
+        last_run DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
       // News & Quotes tables
       `CREATE TABLE IF NOT EXISTS company_news (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -987,6 +1010,7 @@ app.use('/api/flip',           flipRoutes);
 app.use('/api/notifications',  notificationRoutes);
 app.use('/api/news',           newsRoutes);
 app.use('/api/cleanup',        cleanupRoutes);
+app.use('/api/backup',         backupRoutes);
 app.use('/api/quotes',         quotesRoutes);
 app.use('/api/ai',             aiProxyRoutes);
 
