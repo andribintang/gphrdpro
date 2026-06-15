@@ -381,6 +381,21 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE company_settings ADD COLUMN topbar_color VARCHAR(20) NOT NULL DEFAULT 'default'`,
       // Fix erp_products timestamps
       `ALTER TABLE payroll_settings ADD COLUMN late_tolerance_minutes INT DEFAULT 0 COMMENT 'Toleransi terlambat menit'`,
+      // Incentive share templates (master porsi per karyawan)
+      `CREATE TABLE IF NOT EXISTS inc_share_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id INT NOT NULL,
+        channel_code ENUM('WA','MARKETPLACE','WEB') NOT NULL,
+        share_percentage DECIMAL(5,2) NOT NULL DEFAULT 0,
+        notes VARCHAR(255) NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        created_by INT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_emp_channel (employee_id, channel_code),
+        INDEX idx_channel (channel_code),
+        INDEX idx_active (is_active)
+      )`,
       // Backup tables
       `CREATE TABLE IF NOT EXISTS backup_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,

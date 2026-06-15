@@ -2,7 +2,8 @@
  * INCENTIVE CALCULATION ENGINE
  * Handles: WA, Marketplace, Web, Activities, Bonus Target
  */
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
+const { sequelize } = require('../config/database');
 const {
   IncEmployee, SalesChannel, BonusTarget, ChannelRate,
   WaSale, MarketplaceSale, MarketplaceShare,
@@ -70,65 +71,121 @@ const calculatePeriod = async (periodId) => {
   const channelsMap = {};
   channels.forEach(ch => { channelsMap[ch.code] = ch; });
 
-  // ── 1. WA Sales per employee — recalculate with branch-specific rate ────
+  // ── Load master share templates (porsi per karyawan semua cabang) ──────
+  const [shareTemplates] = await sequelize.query(
+    `SELECT * FROM inc_share_templates WHERE is_active = 1`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
+  const templatesByChannel = { WA: {}, MARKETPLACE: {}, WEB: {} };
+  shareTemplates.forEach(t => {
+    if (templatesByChannel[t.channel_code]) {
+      templatesByChannel[t.channel_code][t.employee_id] = parseFloat(t.share_percentage);
+    }
+  });
+  const useTemplate = { WA: Object.keys(templatesByChannel.WA).length > 0,
+                        MARKETPLACE: Object.keys(templatesByChannel.MARKETPLACE).length > 0,
+                        WEB: Object.keys(templatesByChannel.WEB).length > 0 };
+
+  // ── 1. WA Sales — ALL cabang digabung, dibagi pakai master template ──────
   const waSales = await WaSale.findAll({ where: { period_id: periodId } });
   const waByEmp = {};
   let totalWaSales = 0;
   const waEligibleStatuses = channelsMap['WA']?.eligible_statuses || ['kontrak','tetap'];
-  for (const s of waSales) {
-    const emp = employees.find(e => e.id === s.employee_id);
-    const effectiveWaPct = await getEffectiveRate('WA', emp?.branch_id, channelsMap);
-    // Only calculate incentive if employee status is eligible
-    const eligible = emp ? isEligible(emp, waEligibleStatuses) : true;
-    const recalcIncentive = eligible ? round2(parseFloat(s.sale_amount) * effectiveWaPct / 100) : 0;
 
-    if (!waByEmp[s.employee_id]) waByEmp[s.employee_id] = { amount: 0, incentive: 0, pct: effectiveWaPct, eligible };
-    waByEmp[s.employee_id].amount   += parseFloat(s.sale_amount);
-    waByEmp[s.employee_id].incentive += recalcIncentive;
-    totalWaSales += parseFloat(s.sale_amount);
+  if (useTemplate.WA) {
+    // Gabung semua WA dari semua cabang
+    for (const s of waSales) totalWaSales += parseFloat(s.sale_amount);
+    // Hitung insentif global pakai rate global WA
+    const globalWaPct = parseFloat(channelsMap['WA']?.percentage || 0);
+    const totalWaIncentive = round2(totalWaSales * globalWaPct / 100);
+    // Bagi ke karyawan sesuai % master template
+    for (const [empId, pct] of Object.entries(templatesByChannel.WA)) {
+      const emp = employees.find(e => e.id === parseInt(empId));
+      const eligible = emp ? isEligible(emp, waEligibleStatuses) : true;
+      const portion = round2(totalWaIncentive * pct / 100);
+      waByEmp[empId] = { amount: round2(totalWaSales * pct / 100), incentive: eligible ? portion : 0, pct: globalWaPct, eligible, template_pct: pct };
+    }
+  } else {
+    // Fallback: per employee per cabang (cara lama)
+    for (const s of waSales) {
+      const emp = employees.find(e => e.id === s.employee_id);
+      const effectiveWaPct = await getEffectiveRate('WA', emp?.branch_id, channelsMap);
+      const eligible = emp ? isEligible(emp, waEligibleStatuses) : true;
+      const recalcIncentive = eligible ? round2(parseFloat(s.sale_amount) * effectiveWaPct / 100) : 0;
+      if (!waByEmp[s.employee_id]) waByEmp[s.employee_id] = { amount: 0, incentive: 0, pct: effectiveWaPct, eligible };
+      waByEmp[s.employee_id].amount    += parseFloat(s.sale_amount);
+      waByEmp[s.employee_id].incentive += recalcIncentive;
+      totalWaSales += parseFloat(s.sale_amount);
+    }
   }
 
-  // ── 2. Marketplace per employee — recalculate with branch-specific rate ─
+  // ── 2. Marketplace — ALL cabang digabung, dibagi pakai master template ───
   const mpSales = await MarketplaceSale.findAll({
     where: { period_id: periodId },
     include: [{ model: MarketplaceShare, as: 'shares' }],
   });
   const mpByEmp = {};
   let totalMpSales = 0;
-  for (const sale of mpSales) {
-    totalMpSales += parseFloat(sale.total_amount);
-    const effectiveMpPct = await getEffectiveRate('MARKETPLACE', sale.branch_id, channelsMap);
-    const mpEligibleStatuses = channelsMap['MARKETPLACE']?.eligible_statuses || ['kontrak','tetap'];
-    for (const sh of (sale.shares || [])) {
-      const emp2 = employees.find(e => e.id === sh.employee_id);
-      const performance = parseFloat(sh.performance_amount);
-      const eligible    = emp2 ? isEligible(emp2, mpEligibleStatuses) : true;
-      const incentive   = eligible ? round2(performance * effectiveMpPct / 100) : 0;
-      if (!mpByEmp[sh.employee_id]) mpByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveMpPct };
-      mpByEmp[sh.employee_id].performance += performance;
-      mpByEmp[sh.employee_id].incentive   += incentive;
+  const mpEligibleStatuses = channelsMap['MARKETPLACE']?.eligible_statuses || ['kontrak','tetap'];
+
+  if (useTemplate.MARKETPLACE) {
+    for (const sale of mpSales) totalMpSales += parseFloat(sale.total_amount);
+    const globalMpPct = parseFloat(channelsMap['MARKETPLACE']?.percentage || 0);
+    const totalMpIncentive = round2(totalMpSales * globalMpPct / 100);
+    for (const [empId, pct] of Object.entries(templatesByChannel.MARKETPLACE)) {
+      const emp2 = employees.find(e => e.id === parseInt(empId));
+      const eligible = emp2 ? isEligible(emp2, mpEligibleStatuses) : true;
+      const portion = round2(totalMpIncentive * pct / 100);
+      mpByEmp[empId] = { performance: round2(totalMpSales * pct / 100), incentive: eligible ? portion : 0, pct: globalMpPct, template_pct: pct };
+    }
+  } else {
+    for (const sale of mpSales) {
+      totalMpSales += parseFloat(sale.total_amount);
+      const effectiveMpPct = await getEffectiveRate('MARKETPLACE', sale.branch_id, channelsMap);
+      for (const sh of (sale.shares || [])) {
+        const emp2 = employees.find(e => e.id === sh.employee_id);
+        const performance = parseFloat(sh.performance_amount);
+        const eligible    = emp2 ? isEligible(emp2, mpEligibleStatuses) : true;
+        const incentive   = eligible ? round2(performance * effectiveMpPct / 100) : 0;
+        if (!mpByEmp[sh.employee_id]) mpByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveMpPct };
+        mpByEmp[sh.employee_id].performance += performance;
+        mpByEmp[sh.employee_id].incentive   += incentive;
+      }
     }
   }
 
-  // ── 3. Web per employee — recalculate with branch-specific rate ─────────
+  // ── 3. Web — ALL cabang digabung, dibagi pakai master template ───────────
   const webSales = await WebSale.findAll({
     where: { period_id: periodId },
     include: [{ model: WebShare, as: 'shares' }],
   });
   const webByEmp = {};
   let totalWebSales = 0;
-  for (const sale of webSales) {
-    totalWebSales += parseFloat(sale.total_amount);
-    const effectiveWebPct = await getEffectiveRate('WEB', sale.branch_id, channelsMap);
-    const webEligibleStatuses = channelsMap['WEB']?.eligible_statuses || ['kontrak','tetap'];
-    for (const sh of (sale.shares || [])) {
-      const emp3 = employees.find(e => e.id === sh.employee_id);
-      const performance = parseFloat(sh.performance_amount);
-      const eligible    = emp3 ? isEligible(emp3, webEligibleStatuses) : true;
-      const incentive   = eligible ? round2(performance * effectiveWebPct / 100) : 0;
-      if (!webByEmp[sh.employee_id]) webByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveWebPct };
-      webByEmp[sh.employee_id].performance += performance;
-      webByEmp[sh.employee_id].incentive   += incentive;
+  const webEligibleStatuses = channelsMap['WEB']?.eligible_statuses || ['kontrak','tetap'];
+
+  if (useTemplate.WEB) {
+    for (const sale of webSales) totalWebSales += parseFloat(sale.total_amount);
+    const globalWebPct = parseFloat(channelsMap['WEB']?.percentage || 0);
+    const totalWebIncentive = round2(totalWebSales * globalWebPct / 100);
+    for (const [empId, pct] of Object.entries(templatesByChannel.WEB)) {
+      const emp3 = employees.find(e => e.id === parseInt(empId));
+      const eligible = emp3 ? isEligible(emp3, webEligibleStatuses) : true;
+      const portion = round2(totalWebIncentive * pct / 100);
+      webByEmp[empId] = { performance: round2(totalWebSales * pct / 100), incentive: eligible ? portion : 0, pct: globalWebPct, template_pct: pct };
+    }
+  } else {
+    for (const sale of webSales) {
+      totalWebSales += parseFloat(sale.total_amount);
+      const effectiveWebPct = await getEffectiveRate('WEB', sale.branch_id, channelsMap);
+      for (const sh of (sale.shares || [])) {
+        const emp3 = employees.find(e => e.id === sh.employee_id);
+        const performance = parseFloat(sh.performance_amount);
+        const eligible    = emp3 ? isEligible(emp3, webEligibleStatuses) : true;
+        const incentive   = eligible ? round2(performance * effectiveWebPct / 100) : 0;
+        if (!webByEmp[sh.employee_id]) webByEmp[sh.employee_id] = { performance: 0, incentive: 0, pct: effectiveWebPct };
+        webByEmp[sh.employee_id].performance += performance;
+        webByEmp[sh.employee_id].incentive   += incentive;
+      }
     }
   }
 

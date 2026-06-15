@@ -377,6 +377,83 @@ const deleteChannelRate = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── GET /api/incentive/share-templates ───────────────────────
+const getShareTemplates = async (req, res, next) => {
+  try {
+    const { sequelize } = require('../../config/database');
+    const [rows] = await sequelize.query(`
+      SELECT st.*, ie.name AS employee_name, ie.nip, b.name AS branch_name
+      FROM inc_share_templates st
+      JOIN inc_employees ie ON ie.id = st.employee_id
+      LEFT JOIN inc_branches b ON b.id = ie.branch_id
+      WHERE st.is_active = 1
+      ORDER BY st.channel_code, ie.name
+    `);
+
+    // Group by channel
+    const byChannel = { WA: [], MARKETPLACE: [], WEB: [] };
+    rows.forEach(r => { if (byChannel[r.channel_code]) byChannel[r.channel_code].push(r); });
+
+    // Total % per channel
+    const totals = {};
+    Object.keys(byChannel).forEach(ch => {
+      totals[ch] = byChannel[ch].reduce((s, r) => s + parseFloat(r.share_percentage), 0);
+    });
+
+    return res.json({ success: true, data: { templates: rows, byChannel, totals } });
+  } catch(err) { next(err); }
+};
+
+// ── POST /api/incentive/share-templates/bulk ──────────────────
+// Upsert all templates for a channel at once
+const upsertShareTemplates = async (req, res, next) => {
+  try {
+    const { channel_code, templates } = req.body;
+    if (!channel_code || !['WA','MARKETPLACE','WEB'].includes(channel_code))
+      return res.status(400).json({ success: false, message: 'channel_code tidak valid' });
+    if (!templates?.length)
+      return res.status(400).json({ success: false, message: 'templates wajib diisi' });
+
+    const total = templates.reduce((s, t) => s + parseFloat(t.share_percentage || 0), 0);
+    if (Math.abs(total - 100) > 0.01)
+      return res.status(400).json({ success: false, message: `Total porsi harus 100% (saat ini ${total.toFixed(2)}%)` });
+
+    const { sequelize } = require('../../config/database');
+    const t = await sequelize.transaction();
+    try {
+      // Deactivate all existing for this channel
+      await sequelize.query(
+        `UPDATE inc_share_templates SET is_active = 0 WHERE channel_code = ?`,
+        { replacements: [channel_code], transaction: t }
+      );
+
+      for (const tmpl of templates) {
+        await sequelize.query(`
+          INSERT INTO inc_share_templates (employee_id, channel_code, share_percentage, notes, is_active, created_by, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 1, ?, NOW(), NOW())
+          ON DUPLICATE KEY UPDATE
+            share_percentage = VALUES(share_percentage),
+            notes = VALUES(notes),
+            is_active = 1,
+            updated_at = NOW()
+        `, { replacements: [tmpl.employee_id, channel_code, parseFloat(tmpl.share_percentage), tmpl.notes || '', req.user.id], transaction: t });
+      }
+
+      await t.commit();
+      return res.json({ success: true, message: `Template porsi ${channel_code} berhasil disimpan` });
+    } catch(e) { await t.rollback(); throw e; }
+  } catch(err) { next(err); }
+};
+
+// ── DELETE /api/incentive/share-templates/:id ─────────────────
+const deleteShareTemplate = async (req, res, next) => {
+  try {
+    const { sequelize } = require('../../config/database');
+    await sequelize.query(`UPDATE inc_share_templates SET is_active = 0 WHERE id = ?`, { replacements: [req.params.id] });
+    return res.json({ success: true, message: 'Template dihapus' });
+  } catch(err) { next(err); }
+};
+
 module.exports = {
   getBranches, createBranch, updateBranch, deleteBranch,
   getChannelRates, upsertChannelRate, deleteChannelRate,

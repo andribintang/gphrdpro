@@ -75,6 +75,10 @@ export const incentiveService = {
   deleteActivity:  (id)     => api.delete(`${BASE}/activities/${id}`),
 
   // Results
+  getShareTemplates:    ()     => api.get(`${BASE}/share-templates`),
+  upsertShareTemplates: (data) => api.post(`${BASE}/share-templates/bulk`, data),
+  deleteShareTemplate:  (id)   => api.delete(`${BASE}/share-templates/${id}`),
+
   getResults:      (params) => api.get(`${BASE}/results`, { params }),
   getResultDetail: (id)     => api.get(`${BASE}/results/${id}`),
 };

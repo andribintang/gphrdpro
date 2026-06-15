@@ -36,6 +36,11 @@ router.put('/employees/:id', master.updateIncEmployee);
 router.delete('/employees/:id', master.deleteIncEmployee);
 
 // ── Master: Sales Channels ───────────────────────────────────
+// Share Templates (master porsi karyawan)
+router.get ('/share-templates',       master.getShareTemplates);
+router.post('/share-templates/bulk',  master.upsertShareTemplates);
+router.delete('/share-templates/:id', master.deleteShareTemplate);
+
 router.get('/channels',     master.getSalesChannels);
 router.put('/channels/:id', master.updateSalesChannel);
 
