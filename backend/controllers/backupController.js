@@ -13,18 +13,19 @@ const uploadToCloudinary = async (jsonStr, filename) => {
     throw new Error('Cloudinary env belum dikonfigurasi');
 
   const crypto = require('crypto');
+  const FormData = require('form-data');
   const timestamp = Math.floor(Date.now() / 1000);
   const publicId  = `backups/${filename}`;
-  const sigStr    = `public_id=${publicId}&resource_type=raw&timestamp=${timestamp}${CLOUD_SECRET}`;
+
+  // Cloudinary signature: params sorted alphabetically + secret (NO resource_type in sig)
+  const sigStr = `public_id=${publicId}&timestamp=${timestamp}${CLOUD_SECRET}`;
   const signature = crypto.createHash('sha1').update(sigStr).digest('hex');
 
-  const FormData  = require('form-data');
   const form = new FormData();
   form.append('file',         Buffer.from(jsonStr, 'utf-8'), { filename: filename + '.json', contentType: 'application/json' });
   form.append('api_key',      CLOUD_API_KEY);
   form.append('timestamp',    String(timestamp));
   form.append('public_id',    publicId);
-  form.append('resource_type','raw');
   form.append('signature',    signature);
 
   return new Promise((resolve, reject) => {
