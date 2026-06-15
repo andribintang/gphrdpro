@@ -396,14 +396,21 @@ const getShareTemplates = async (req, res, next) => {
       UNIQUE KEY uniq_emp_channel (employee_id, channel_code)
     )`).catch(()=>{});
 
-    const [rows] = await sequelize.query(`
-      SELECT st.*, ie.name AS employee_name, ie.nip, b.name AS branch_name
-      FROM inc_share_templates st
-      JOIN inc_employees ie ON ie.id = st.employee_id
-      LEFT JOIN inc_branches b ON b.id = ie.branch_id
-      WHERE st.is_active = 1
-      ORDER BY st.channel_code, ie.name
-    `);
+    // Try full query first, fallback to simple if join fails
+    let rows = [];
+    try {
+      [rows] = await sequelize.query(`
+        SELECT st.*, ie.name AS employee_name, ie.nip, b.name AS branch_name
+        FROM inc_share_templates st
+        LEFT JOIN inc_employees ie ON ie.id = st.employee_id
+        LEFT JOIN inc_branches b ON b.id = ie.branch_id
+        WHERE st.is_active = 1
+        ORDER BY st.channel_code
+      `);
+    } catch(qErr) {
+      console.warn('[ShareTemplates] Query fallback:', qErr.message);
+      [rows] = await sequelize.query(`SELECT * FROM inc_share_templates WHERE is_active = 1`);
+    }
 
     // Group by channel
     const byChannel = { WA: [], MARKETPLACE: [], WEB: [] };
