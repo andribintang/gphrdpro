@@ -381,6 +381,21 @@ const deleteChannelRate = async (req, res, next) => {
 const getShareTemplates = async (req, res, next) => {
   try {
     const { sequelize } = require('../../config/database');
+
+    // Auto-create table if not exists (safe fallback)
+    await sequelize.query(`CREATE TABLE IF NOT EXISTS inc_share_templates (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      employee_id INT NOT NULL,
+      channel_code ENUM('WA','MARKETPLACE','WEB') NOT NULL,
+      share_percentage DECIMAL(5,2) NOT NULL DEFAULT 0,
+      notes VARCHAR(255) NULL,
+      is_active TINYINT(1) DEFAULT 1,
+      created_by INT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_emp_channel (employee_id, channel_code)
+    )`).catch(()=>{});
+
     const [rows] = await sequelize.query(`
       SELECT st.*, ie.name AS employee_name, ie.nip, b.name AS branch_name
       FROM inc_share_templates st
