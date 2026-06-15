@@ -400,9 +400,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* News Feed */}
-      <NewsFeed limit={4}/>
-
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
