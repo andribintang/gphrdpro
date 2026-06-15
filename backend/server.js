@@ -22,6 +22,7 @@ const erpRoutes            = require('./routes/erp');
 const flipRoutes           = require('./routes/flip');
 const notificationRoutes   = require('./routes/notifications');
 const newsRoutes           = require('./routes/news');
+const cleanupRoutes        = require('./routes/cleanup');
 const aiProxyRoutes        = require('./routes/aiProxy');
 const quotesRoutes         = require('./routes/quotes');
 
@@ -985,6 +986,7 @@ app.use('/api/erp',            erpRoutes);
 app.use('/api/flip',           flipRoutes);
 app.use('/api/notifications',  notificationRoutes);
 app.use('/api/news',           newsRoutes);
+app.use('/api/cleanup',        cleanupRoutes);
 app.use('/api/quotes',         quotesRoutes);
 app.use('/api/ai',             aiProxyRoutes);
 

@@ -6,7 +6,7 @@ import {
   ShoppingCart, Package, Upload, ShoppingBag, Wallet,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
-  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store, Sparkles, User,
+  RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store, Sparkles, User, Trash2,
   PanelLeftClose, PanelLeftOpen, Shield
 } from 'lucide-react';
 import { useAuth }  from '../context/AuthContext';
@@ -111,6 +111,7 @@ const NAV = [
     group: 'Pengaturan',
     items: [
       { to:'/company-settings',   icon:Building2,         label:'Perusahaan',    roles:['admin'] },
+      { to:'/cleanup',             icon:Trash2,            label:'Data Cleanup',  roles:['admin'] },
       { to:'/payroll-components', icon:SlidersHorizontal, label:'Komponen Gaji', roles:['admin','hr'] },
       { to:'/user-access',        icon:Shield,            label:'Hak Akses',     roles:['admin','hr'] },
       { to:'/self-service',        icon:User,              label:'Self Service',  roles:['admin','hr','supervisor','employee'] },

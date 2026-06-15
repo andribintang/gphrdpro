@@ -59,9 +59,10 @@ export const RUN_STATUS = {
 };
 
 export const RUN_TYPES = {
-  monthly:   { label:'Gaji Bulanan', icon:'💰', color:'text-brand-600 dark:text-brand-400',   bg:'bg-brand-100 dark:bg-brand-950' },
-  thr:       { label:'THR',          icon:'🌙', color:'text-emerald-600 dark:text-emerald-400',bg:'bg-emerald-100 dark:bg-emerald-950' },
-  bonus:     { label:'Bonus',        icon:'⭐', color:'text-amber-600 dark:text-amber-400',   bg:'bg-amber-100 dark:bg-amber-950' },
+  monthly:   { label:'Gaji Bulanan', icon:'💰', color:'text-brand-600 dark:text-brand-400',    bg:'bg-brand-100 dark:bg-brand-950' },
+  thr:       { label:'THR',          icon:'🌙', color:'text-emerald-600 dark:text-emerald-400', bg:'bg-emerald-100 dark:bg-emerald-950' },
+  bonus:     { label:'Bonus',        icon:'⭐', color:'text-amber-600 dark:text-amber-400',    bg:'bg-amber-100 dark:bg-amber-950' },
+  incentive: { label:'Insentif',     icon:'🚀', color:'text-purple-600 dark:text-purple-400',  bg:'bg-purple-100 dark:bg-purple-950' },
 };
 
 export const MONTHS_ID = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
