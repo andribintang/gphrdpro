@@ -176,9 +176,10 @@ export default function ResultsPage() {
   const [filterBranch, setFB]   = useState('');
   const [selectedSlip, setSelectedSlip] = useState(null);
   const [branches, setBranches] = useState([]);
-  const [exportingPDF, setExportingPDF] = useState(false);
-  const [exportingXLS, setExportingXLS] = useState(false);
-  const [progress, setProgress] = useState(null);
+  const [exportingPDF,  setExportingPDF]  = useState(false);
+  const [exportingXLS,  setExportingXLS]  = useState(false);
+  const [progress,      setProgress]      = useState(null);
+  const [showDisburse,  setShowDisburse]  = useState(false);
 
   const fetch = useCallback(async () => {
     setLoading(true);
