@@ -229,7 +229,9 @@ const calculatePeriod = async (periodId) => {
 
   // Eligible statuses for bonus from BonusTarget setting
   const bonusEligibleStatuses = achievedTarget?.eligible_statuses || ['kontrak','tetap'];
-  const eligibleForBonus      = employees.filter(e => isEligible(e, bonusEligibleStatuses));
+  // Combined eligibility: status kepegawaian DAN toggle per-karyawan eligible_for_bonus
+  const isEligibleForBonus = (emp) => isEligible(emp, bonusEligibleStatuses) && emp.eligible_for_bonus !== false;
+  const eligibleForBonus      = employees.filter(isEligibleForBonus);
   const eligibleCount         = eligibleForBonus.length;
   const bonusPerEmp           = eligibleCount > 0 ? round2(totalBonus / eligibleCount) : 0;
 
@@ -241,7 +243,7 @@ const calculatePeriod = async (periodId) => {
     const web = webByEmp[emp.id] || { performance: 0, incentive: 0 };
     const act = actByEmp[emp.id] || { incentive: 0, details: [] };
 
-    const empBonusAmount = isEligible(emp, bonusEligibleStatuses) ? bonusPerEmp : 0;
+    const empBonusAmount = isEligibleForBonus(emp) ? bonusPerEmp : 0;
     const totalIncentive = round2(
       wa.incentive + mp.incentive + web.incentive + act.incentive + empBonusAmount
     );
@@ -251,7 +253,12 @@ const calculatePeriod = async (periodId) => {
       marketplace: { performance: mp.performance, incentive: mp.incentive, channel_pct: mp.pct  || mpChannel?.percentage },
       web:         { performance: web.performance, incentive: web.incentive, channel_pct: web.pct || webChannel?.percentage },
       activities:  { incentive: act.incentive, details: act.details },
-      bonus_target:{ amount: isEligible(emp, bonusEligibleStatuses) ? bonusPerEmp : 0, excluded: !isEligible(emp, bonusEligibleStatuses), tier: achievedTarget ? { name: achievedTarget.name, min: achievedTarget.min_amount, total_bonus: achievedTarget.bonus_amount } : null },
+      bonus_target:{
+        amount: empBonusAmount,
+        excluded: !isEligibleForBonus(emp),
+        excluded_reason: !isEligible(emp, bonusEligibleStatuses) ? 'status_kepegawaian' : (emp.eligible_for_bonus === false ? 'dikecualikan_manual' : null),
+        tier: achievedTarget ? { name: achievedTarget.name, min: achievedTarget.min_amount, total_bonus: achievedTarget.bonus_amount } : null,
+      },
     };
 
     results.push({

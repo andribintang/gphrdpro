@@ -197,6 +197,19 @@ const deleteIncEmployee = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── PATCH /api/incentive/employees/:id/bonus-eligibility ─────
+const toggleBonusEligibility = async (req, res, next) => {
+  try {
+    const emp = await IncEmployee.findByPk(req.params.id);
+    if (!emp) return res.status(404).json({ success: false, message: 'Karyawan tidak ditemukan' });
+    const { eligible_for_bonus } = req.body;
+    const newValue = eligible_for_bonus !== undefined ? !!eligible_for_bonus : !emp.eligible_for_bonus;
+    await emp.update({ eligible_for_bonus: newValue });
+    await audit(req, 'UPDATE', 'employees', emp.id, `Bonus eligibility ${emp.name}: ${newValue ? 'YES' : 'NO'}`);
+    return res.json({ success: true, message: `${emp.name} ${newValue ? 'berhak' : 'tidak berhak'} menerima bonus target`, data: { employee: emp } });
+  } catch (err) { next(err); }
+};
+
 // ─────────────────────────────────────────────────────────────
 // SALES CHANNELS
 // ─────────────────────────────────────────────────────────────
@@ -515,6 +528,7 @@ module.exports = {
   getChannelRates, upsertChannelRate, deleteChannelRate,
   getPositions, createPosition, updatePosition, deletePosition,
   getIncEmployees, getIncEmployee, createIncEmployee, updateIncEmployee, deleteIncEmployee,
+  toggleBonusEligibility,
   getSalesChannels, updateSalesChannel,
   getActivityTypes, createActivityType, updateActivityType, deleteActivityType,
   getBonusTargets, createBonusTarget, updateBonusTarget, deleteBonusTarget,

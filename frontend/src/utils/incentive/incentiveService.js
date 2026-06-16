@@ -23,6 +23,7 @@ export const incentiveService = {
   getEmployee:    (id)     => api.get(`${BASE}/employees/${id}`),
   createEmployee: (data)   => api.post(`${BASE}/employees`, data),
   updateEmployee: (id, d)  => api.put(`${BASE}/employees/${id}`, d),
+  toggleBonusEligibility: (id, eligible_for_bonus) => api.patch(`${BASE}/employees/${id}/bonus-eligibility`, { eligible_for_bonus }),
   deleteEmployee: (id)     => api.delete(`${BASE}/employees/${id}`),
 
   // Master — Channels

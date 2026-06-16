@@ -34,6 +34,7 @@ router.get('/employees/:id', master.getIncEmployee);
 router.post('/employees',    master.createIncEmployee);
 router.put('/employees/:id', master.updateIncEmployee);
 router.delete('/employees/:id', master.deleteIncEmployee);
+router.patch('/employees/:id/bonus-eligibility', master.toggleBonusEligibility);
 
 // ── Master: Sales Channels ───────────────────────────────────
 // Share Templates (master porsi karyawan)

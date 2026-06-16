@@ -23,6 +23,10 @@ const IncEmployee = sequelize.define('IncEmployee', {
     comment: 'Status kepegawaian: magang, training, kontrak, tetap',
   },
   is_active:     { type: DataTypes.BOOLEAN, defaultValue: true },
+  eligible_for_bonus: {
+    type: DataTypes.BOOLEAN, defaultValue: true,
+    comment: 'Apakah karyawan ini berhak mendapat bonus target (terlepas dari status kepegawaian)',
+  },
   notes:         { type: DataTypes.TEXT, allowNull: true },
 }, {
   tableName: 'inc_employees',

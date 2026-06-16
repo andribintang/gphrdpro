@@ -369,6 +369,7 @@ app.post('/run-alter', async (req, res) => {
   ('gpracing', 'GP RACING STORE', 'Spare Part Motor Racing', '#dc2626', 'gpracingstore.com', 1)`,
   
       // Add employment_status to inc_employees
+      `ALTER TABLE inc_employees ADD COLUMN eligible_for_bonus TINYINT(1) NOT NULL DEFAULT 1`,
       `ALTER TABLE inc_employees ADD COLUMN employment_status ENUM('magang','training','kontrak','tetap') NOT NULL DEFAULT 'kontrak'`,
       // Add eligible_statuses to inc_bonus_targets
       `ALTER TABLE inc_bonus_targets ADD COLUMN eligible_statuses JSON`,

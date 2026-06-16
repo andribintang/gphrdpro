@@ -301,7 +301,7 @@ const EmployeesTab = () => {
   const [loading, setLoading]  = useState(true);
   const [modal, setModal]      = useState(null);
   const [filterBranch, setFB]  = useState('');
-  const [form, setForm]        = useState({ name:'', email:'', phone:'', branch_id:'', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'', employment_status:'kontrak', is_active: true });
+  const [form, setForm]        = useState({ name:'', email:'', phone:'', branch_id:'', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'', employment_status:'kontrak', is_active: true, eligible_for_bonus: true });
   const [saving, setSaving]    = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -321,8 +321,8 @@ const EmployeesTab = () => {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const openAdd  = () => { setForm({ name:'', email:'', phone:'', branch_id: branches[0]?.id || '', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'', employment_status:'kontrak', is_active: true }); setModal('add'); };
-  const openEdit = (e) => { setForm({ ...e, branch_id: e.branch_id, position_id: e.position_id || '', employment_status: e.employment_status || 'kontrak', is_active: e.is_active !== false }); setModal(e); };
+  const openAdd  = () => { setForm({ name:'', email:'', phone:'', branch_id: branches[0]?.id || '', position_id:'', join_date: new Date().toISOString().split('T')[0], employee_code:'', employment_status:'kontrak', is_active: true, eligible_for_bonus: true }); setModal('add'); };
+  const openEdit = (e) => { setForm({ ...e, branch_id: e.branch_id, position_id: e.position_id || '', employment_status: e.employment_status || 'kontrak', is_active: e.is_active !== false, eligible_for_bonus: e.eligible_for_bonus !== false }); setModal(e); };
 
   const handleSave = async () => {
     if (!form.name || !form.branch_id) { toast.error('Nama dan cabang wajib diisi'); return; }
@@ -341,6 +341,15 @@ const EmployeesTab = () => {
       toast.success(`${e.name} ${e.is_active ? 'dinonaktifkan' : 'diaktifkan'}`);
       fetchAll();
     } catch { toast.error('Gagal'); }
+  };
+
+  const handleToggleBonus = async (e) => {
+    try {
+      const newVal = !(e.eligible_for_bonus !== false);
+      await incentiveService.toggleBonusEligibility(e.id, newVal);
+      toast.success(`${e.name} ${newVal ? 'berhak ✓' : 'tidak berhak ✗'} bonus target`);
+      fetchAll();
+    } catch { toast.error('Gagal mengubah status bonus'); }
   };
 
   const filteredPositions = positions.filter(p => !form.branch_id || p.branch_id == form.branch_id);
@@ -399,6 +408,15 @@ const EmployeesTab = () => {
                     'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                     {e.employment_status || 'kontrak'}
                   </span>
+                  <button onClick={() => handleToggleBonus(e)}
+                    title="Klik untuk ubah status bonus target"
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 transition-colors ${
+                      e.eligible_for_bonus !== false
+                        ? 'bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 hover:bg-purple-200'
+                        : 'bg-red-100 dark:bg-red-950 text-red-500 dark:text-red-400 hover:bg-red-200'
+                    }`}>
+                    🎯 Bonus: {e.eligible_for_bonus !== false ? 'Yes' : 'No'}
+                  </button>
                 </div>
               </div>
               <div className="flex gap-1.5">
@@ -450,6 +468,27 @@ const EmployeesTab = () => {
                 </button>
               ))}
             </div>
+          </div>
+          {/* Bonus Target Eligibility */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Berhak Bonus Target?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => sf('eligible_for_bonus', true)}
+                className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                  form.eligible_for_bonus !== false ? 'bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 border-current' : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'
+                }`}>
+                <p className="text-xs font-bold text-[var(--text-primary)]">✓ Yes</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Dapat bagian bonus target</p>
+              </button>
+              <button type="button" onClick={() => sf('eligible_for_bonus', false)}
+                className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                  form.eligible_for_bonus === false ? 'bg-red-100 dark:bg-red-950 text-red-500 dark:text-red-400 border-current' : 'border-[var(--border)] hover:bg-[var(--bg-secondary)]'
+                }`}>
+                <p className="text-xs font-bold text-[var(--text-primary)]">✗ No</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Dikecualikan dari bonus target</p>
+              </button>
+            </div>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1.5">Pengaturan ini independen dari status kepegawaian — bonus target hanya dibagi ke karyawan dengan status "Yes".</p>
           </div>
           <Field label="Kode Karyawan"><input value={form.employee_code} onChange={e => sf('employee_code', e.target.value)} placeholder="EMP-001" className="input-base text-sm" /></Field>
           <Field label="Email"><input type="email" value={form.email} onChange={e => sf('email', e.target.value)} placeholder="email@company.com" className="input-base text-sm" /></Field>
