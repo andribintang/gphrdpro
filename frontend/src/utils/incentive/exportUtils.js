@@ -58,88 +58,147 @@ export const exportSlipPDF = async (result, period, companyName = 'GPDISTRO HR P
 
   let y = 0;
 
-  // ════════════════════════════
-  // HEADER — kompak 28mm
-  // ════════════════════════════
-  doc.setFillColor(...C.red);
-  doc.rect(0, 0, W, 28, 'F');
-  // Accent circle kecil
+  // ════════════════════════════════════════════════════════════
+  // HEADER — diagonal gradient merah + dot pattern (sesuai referensi)
+  // ════════════════════════════════════════════════════════════
+  const HEADER_H = 34;
   doc.setFillColor(...C.redDk);
-  doc.circle(W - 2, 0, 14, 'F');
+  doc.rect(0, 0, W, HEADER_H, 'F');
+  // Diagonal lighter overlay dari kiri-atas ke kanan-bawah
+  doc.setFillColor(...C.red);
+  doc.triangle(0, 0, W * 0.65, 0, 0, HEADER_H, 'F');
+  doc.triangle(0, 0, W, 0, W * 0.65, 0, 'F');
+  doc.triangle(0, HEADER_H, W * 0.65, 0, W, HEADER_H, 'F');
 
-  doc.setTextColor(...C.white);
-  // Company + title dalam satu area kompak
+  // Dot pattern dekoratif kanan atas
+  doc.setFillColor(255, 255, 255);
+  for (let dx = 0; dx < 7; dx++) {
+    for (let dy = 0; dy < 4; dy++) {
+      const ox = W - 30 + dx * 4;
+      const oy = 3 + dy * 4;
+      if (ox < W - 1) {
+        doc.setGState && doc.setGState(new doc.GState({ opacity: 0.18 }));
+        doc.circle(ox, oy, 0.5, 'F');
+      }
+    }
+  }
+  doc.setGState && doc.setGState(new doc.GState({ opacity: 1 }));
+
+  // Logo hexagon "G" kiri atas
+  const hexCx = P + 5, hexCy = 7, hexR = 4.5;
+  doc.setFillColor(255, 255, 255);
+  const hexPts = [];
+  for (let i = 0; i < 6; i++) {
+    const ang = (Math.PI / 3) * i - Math.PI / 2;
+    hexPts.push([hexCx + hexR * Math.cos(ang), hexCy + hexR * Math.sin(ang)]);
+  }
+  doc.setGState && doc.setGState(new doc.GState({ opacity: 0.95 }));
+  for (let i = 1; i < 5; i++) doc.triangle(hexPts[0][0], hexPts[0][1], hexPts[i][0], hexPts[i][1], hexPts[i+1][0], hexPts[i+1][1], 'F');
+  doc.setGState && doc.setGState(new doc.GState({ opacity: 1 }));
+  doc.setTextColor(...C.red);
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'bold');
-  doc.text(companyName.toUpperCase(), W / 2, 7, { align: 'center' });
+  doc.text('G', hexCx, hexCy + 1.6, { align: 'center' });
 
-  doc.setFontSize(14);
-  doc.text('SLIP INSENTIF', W / 2, 15, { align: 'center' });
-
-  doc.setFontSize(7);
+  doc.setTextColor(...C.white);
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  doc.text((companyName || 'GPDISTRO').toUpperCase(), hexCx + 8, hexCy - 1);
+  doc.setFontSize(4);
   doc.setFont('helvetica', 'normal');
-  doc.text(period?.name || '', W / 2, 22, { align: 'center' });
+  doc.text('Distribution Redefined', hexCx + 8, hexCy + 2.3);
 
-  // Status pill kecil di kiri
-  const statusLabel = { draft:'Draft', calculated:'Dihitung', approved:'Disetujui', locked:'Final' }[result.status] || '';
-  doc.setFillColor(0, 0, 0, 0.25);
-  doc.roundedRect(P, 23.5, 18, 5, 1, 1, 'F');
+  // Title tengah
+  doc.setTextColor(...C.white);
   doc.setFontSize(5.5);
   doc.setFont('helvetica', 'bold');
-  doc.text(statusLabel, P + 9, 27, { align: 'center' });
+  doc.text('GPDISTRO HR PRO', W / 2, 14, { align: 'center' });
+  doc.setFontSize(15);
+  doc.text('SLIP INSENTIF', W / 2, 22, { align: 'center' });
+  // underline kecil
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.4);
+  doc.line(W/2 - 10, 24, W/2 + 10, 24);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(period?.name || '', W / 2, 29, { align: 'center' });
 
-  y = 32;
+  y = HEADER_H + 4;
 
-  // ════════════════════════════
-  // EMPLOYEE INFO — 1 baris kompak
-  // ════════════════════════════
-  doc.setFillColor(...C.grayL);
-  doc.roundedRect(P, y, W - P*2, 18, 2, 2, 'F');
+  // ════════════════════════════════════════════════════════════
+  // STATUS BADGE (DRAFT/dll) — pill merah outline
+  // ════════════════════════════════════════════════════════════
+  const statusLabel = { draft:'DRAFT', calculated:'DIHITUNG', approved:'DISETUJUI', locked:'FINAL' }[result.status] || '';
+  if (statusLabel) {
+    const badgeW = doc.getTextWidth(statusLabel) * 0.35 + 8;
+    doc.setFillColor(...C.red);
+    doc.roundedRect(P, y, badgeW, 6, 1.2, 1.2, 'F');
+    doc.setTextColor(...C.white);
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(statusLabel, P + badgeW/2, y + 4, { align: 'center' });
+    y += 9;
+  } else {
+    y += 2;
+  }
 
-  // Avatar mini
+  // ════════════════════════════════════════════════════════════
+  // EMPLOYEE CARD — avatar bulat besar + total kanan
+  // ════════════════════════════════════════════════════════════
+  const cardH = 20;
+  doc.setFillColor(250, 250, 250);
+  doc.setDrawColor(...C.line);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(P, y, W - P*2, cardH, 2.5, 2.5, 'FD');
+
+  // Avatar bulat
+  const avR = 7;
   doc.setFillColor(...C.red);
-  doc.circle(P + 9, y + 9, 7, 'F');
+  doc.circle(P + 11, y + cardH/2, avR, 'F');
   doc.setTextColor(...C.white);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text((result.employee_name||'?')[0].toUpperCase(), P + 9, y + 12.5, { align:'center' });
+  doc.text((result.employee_name||'?')[0].toUpperCase(), P + 11, y + cardH/2 + 1.8, { align:'center' });
 
-  // Info
-  const ex = P + 19;
+  // Nama + jabatan
+  const ex = P + 21;
   doc.setTextColor(...C.dark);
-  doc.setFontSize(9);
+  doc.setFontSize(9.5);
   doc.setFont('helvetica', 'bold');
-  doc.text(result.employee_name || '', ex, y + 7);
+  doc.text(result.employee_name || '', ex, y + 8.5);
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.gray);
-  doc.text(`${result.position_name || '-'}  |  ${result.branch_name || '-'}`, ex, y + 12.5);
+  doc.text(`${result.position_name || '-'}  |  ${result.branch_name || '-'}`, ex, y + 13.5);
 
-  // Total di kanan dalam employee card
+  // Total di kanan
   doc.setTextColor(...C.green);
-  doc.setFontSize(9.5);
+  doc.setFontSize(10.5);
   doc.setFont('helvetica', 'bold');
-  doc.text(fmt(result.total_incentive), W - P, y + 8, { align: 'right' });
+  doc.text(fmt(result.total_incentive), W - P - 3, y + 9, { align: 'right' });
   doc.setFontSize(5.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.gray);
-  doc.text('Total Insentif', W - P, y + 13, { align: 'right' });
+  doc.text('Total Insentif', W - P - 3, y + 14, { align: 'right' });
 
-  y += 22;
+  y += cardH + 6;
 
   // ════════════════════════════
-  // HELPER: section head
+  // HELPER: section head — solid block style (sesuai referensi)
   // ════════════════════════════
-  const sh = (title, color = C.navy) => {
+  const sh = (title, color = C.navy, icon = '▦') => {
     doc.setFillColor(...color);
-    doc.rect(P, y, 2, 6, 'F');
-    doc.setFillColor(color[0], color[1], color[2], 0.08);
-    doc.rect(P + 2, y, W - P*2 - 2, 6, 'F');
-    doc.setTextColor(...color);
+    doc.roundedRect(P, y, W - P*2, 7, 1.5, 1.5, 'F');
+    // icon box putih kecil
+    doc.setFillColor(255, 255, 255);
+    doc.setGState && doc.setGState(new doc.GState({ opacity: 0.2 }));
+    doc.roundedRect(P + 2, y + 1.2, 4.6, 4.6, 1, 1, 'F');
+    doc.setGState && doc.setGState(new doc.GState({ opacity: 1 }));
+    doc.setTextColor(...C.white);
     doc.setFontSize(6);
     doc.setFont('helvetica', 'bold');
-    doc.text(title.toUpperCase(), P + 4, y + 4.2);
-    y += 7.5;
+    doc.text(title.toUpperCase(), P + 9, y + 4.7);
+    y += 9;
   };
 
   // ════════════════════════════
@@ -163,31 +222,32 @@ export const exportSlipPDF = async (result, period, companyName = 'GPDISTRO HR P
   };
 
   // ════════════════════════════
-  // PERFORMANCE (jika ada)
+  // PERFORMANCE (jika ada) — navy section sesuai referensi
   // ════════════════════════════
   if (perfRows.length > 0) {
-    sh('Performance Penjualan', C.gray);
+    sh('Performance Penjualan', C.navy);
     perfRows.forEach((r, i) => rw(r.l, r.v, C.dark, i === perfRows.length - 1));
-    y += 2;
+    y += 3;
   }
 
   // ════════════════════════════
-  // RINCIAN INSENTIF
+  // RINCIAN INSENTIF — green section
   // ════════════════════════════
   sh('Rincian Insentif', C.green);
   rows.forEach((r, i) => rw(r.l, r.v, r.c, i === rows.length - 1));
 
-  y += 2;
+  y += 3;
 
-  // Total bar
+  // Total bar — solid green card, rounded (sesuai referensi)
   doc.setFillColor(...C.green);
-  doc.roundedRect(P, y, W - P*2, 9, 1.5, 1.5, 'F');
+  doc.roundedRect(P, y, W - P*2, 11, 2, 2, 'F');
   doc.setTextColor(...C.white);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('TOTAL INSENTIF', P + 3, y + 6);
-  doc.text(fmt(result.total_incentive), W - P, y + 6, { align: 'right' });
-  y += 13;
+  doc.text('TOTAL INSENTIF', P + 4, y + 7);
+  doc.setFontSize(9);
+  doc.text(fmt(result.total_incentive), W - P - 3, y + 7, { align: 'right' });
+  y += 15;
 
   // ════════════════════════════
   // DETAIL AKTIVITAS (kompak)

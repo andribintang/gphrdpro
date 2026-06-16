@@ -52,58 +52,88 @@ const SlipModal = ({ resultId, period, onClose }) => {
         onClick={e => e.stopPropagation()}>
         <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full bg-[var(--border2)]" /></div>
 
-        {/* Slip Header */}
+        {/* Slip Header — red diagonal gradient sesuai referensi */}
         <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-indigo-800" />
+          <div className="absolute inset-0" style={{background:'linear-gradient(135deg, #dc2626 0%, #991b1b 55%, #7f1d1d 100%)'}} />
+          {/* Dot pattern dekoratif */}
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-10"
+            style={{backgroundImage:'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize:'10px 10px'}} />
           <div className="relative px-5 pt-5 pb-6">
-            <div className="flex justify-between mb-4">
-              <div>
-                <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Slip Insentif</p>
-                <p className="text-white font-black text-lg">{period?.name}</p>
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-white/95 flex items-center justify-center flex-shrink-0">
+                  <span className="text-red-600 font-black text-xs">G</span>
+                </div>
+                <div>
+                  <p className="text-white font-bold text-[10px] leading-none">GPDISTRO</p>
+                  <p className="text-white/60 text-[7px] leading-none mt-0.5">Distribution Redefined</p>
+                </div>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center">
-                <span className="text-white font-black text-xl">{result.employee_name?.[0]}</span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-base">{result.employee_name}</p>
-                <p className="text-white/60 text-xs">{result.position_name}</p>
-                <p className="text-white/60 text-xs">{result.branch_name}</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Total Insentif</p>
-              <p className="text-white font-black text-3xl">{toRp(result.total_incentive)}</p>
+            <div className="text-center mb-1">
+              <p className="text-white/70 text-[10px] font-semibold uppercase tracking-wider">GPDISTRO HR PRO</p>
+              <p className="text-white font-black text-2xl tracking-tight">SLIP INSENTIF</p>
+              <div className="w-10 h-0.5 bg-white/50 mx-auto my-1.5 rounded-full"/>
+              <p className="text-white/80 text-xs">{period?.name}</p>
             </div>
           </div>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="px-5 pt-4">
+          {/* Status badge */}
+          {result.status && (
+            <span className="inline-block px-3 py-1 rounded-lg text-[10px] font-bold uppercase text-white"
+              style={{background:'#dc2626'}}>
+              {{draft:'Draft',calculated:'Dihitung',approved:'Disetujui',locked:'Final'}[result.status] || result.status}
+            </span>
+          )}
+        </div>
+
+        {/* Employee card */}
+        <div className="px-5 pt-3">
+          <div className="flex items-center gap-3 p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#dc2626'}}>
+              <span className="text-white font-black text-lg">{result.employee_name?.[0]}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-base text-[var(--text-primary)] truncate">{result.employee_name}</p>
+              <p className="text-xs text-[var(--text-muted)] truncate">{result.position_name} | {result.branch_name}</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="font-black text-lg text-emerald-600 whitespace-nowrap">{toRp(result.total_incentive)}</p>
+              <p className="text-[10px] text-[var(--text-muted)]">Total Insentif</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 pt-4 space-y-4">
           {/* Performance */}
           {(parseFloat(result.wa_sales_amount) > 0 || parseFloat(result.marketplace_performance) > 0 || parseFloat(result.web_performance) > 0) && (
             <div className="rounded-2xl border border-[var(--border)] overflow-hidden">
-              <div className="bg-[var(--bg-secondary)] px-4 py-2.5 border-b border-[var(--border)]">
-                <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Performance Penjualan</p>
+              <div className="px-4 py-2.5 flex items-center gap-2" style={{background:'#1e293b'}}>
+                <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                  <span className="text-white text-[10px]">📊</span>
+                </div>
+                <p className="text-xs font-bold text-white uppercase tracking-wider">Performance Penjualan</p>
               </div>
               {parseFloat(result.wa_sales_amount) > 0 && (
                 <div className="flex justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
-                  <p className="text-xs font-medium text-[var(--text-primary)]">💬 Penjualan WA</p>
+                  <p className="text-xs font-medium text-[var(--text-primary)]">WhatsApp</p>
                   <p className="text-xs font-semibold">{toRp(result.wa_sales_amount)}</p>
                 </div>
               )}
               {parseFloat(result.marketplace_performance) > 0 && (
                 <div className="flex justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
-                  <p className="text-xs font-medium text-[var(--text-primary)]">🛒 Performance Marketplace</p>
+                  <p className="text-xs font-medium text-[var(--text-primary)]">Marketplace</p>
                   <p className="text-xs font-semibold">{toRp(result.marketplace_performance)}</p>
                 </div>
               )}
               {parseFloat(result.web_performance) > 0 && (
                 <div className="flex justify-between px-4 py-2.5">
-                  <p className="text-xs font-medium text-[var(--text-primary)]">🌐 Performance Web</p>
+                  <p className="text-xs font-medium text-[var(--text-primary)]">Website</p>
                   <p className="text-xs font-semibold">{toRp(result.web_performance)}</p>
                 </div>
               )}
@@ -111,33 +141,46 @@ const SlipModal = ({ resultId, period, onClose }) => {
           )}
 
           {/* Incentive breakdown */}
-          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 overflow-hidden">
-            <div className="bg-emerald-50 dark:bg-emerald-950 px-4 py-2.5 border-b border-emerald-200 dark:border-emerald-800">
-              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Rincian Insentif</p>
+          <div className="rounded-2xl border border-[var(--border)] overflow-hidden">
+            <div className="px-4 py-2.5 flex items-center gap-2" style={{background:'#16a34a'}}>
+              <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                <span className="text-white text-[10px]">📋</span>
+              </div>
+              <p className="text-xs font-bold text-white uppercase tracking-wider">Rincian Insentif</p>
             </div>
             {[
-              { label:`💬 Insentif WA (${parseFloat(d.wa?.channel_pct||0)}%)`,                    value: result.wa_incentive },
-              { label:`🛒 Insentif Marketplace (${parseFloat(d.marketplace?.channel_pct||0)}%)`, value: result.marketplace_incentive },
-              { label:`🌐 Insentif Web (${parseFloat(d.web?.channel_pct||0)}%)`,                 value: result.web_incentive },
-              { label:'⭐ Insentif Aktivitas',                                                    value: result.activity_incentive },
-              { label:`🎯 Bonus Target${d.bonus_target?.tier ? ` — ${d.bonus_target.tier.name}` : ''}`, value: result.bonus_target },
+              { label:`Marketplace (${parseFloat(d.marketplace?.channel_pct||0)}%)`, value: result.marketplace_incentive },
+              { label:`Website (${parseFloat(d.web?.channel_pct||0)}%)`,             value: result.web_incentive },
+              { label:`WhatsApp (${parseFloat(d.wa?.channel_pct||0)}%)`,             value: result.wa_incentive },
+              { label:'Aktivitas',                                                    value: result.activity_incentive },
+              { label:`Bonus Target${d.bonus_target?.tier ? ` — ${d.bonus_target.tier.name}` : ''}`, value: result.bonus_target },
             ].filter(r => parseFloat(r.value) > 0).map((r, i, arr) => (
               <div key={i} className={`flex justify-between px-4 py-2.5 ${i < arr.length-1 ? 'border-b border-[var(--border-subtle)]' : ''}`}>
                 <p className="text-xs font-medium text-[var(--text-primary)]">{r.label}</p>
-                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">+{toRp(r.value)}</p>
+                <p className="text-xs font-bold text-emerald-600">{toRp(r.value)}</p>
               </div>
             ))}
-            <div className="flex justify-between px-4 py-3 bg-emerald-50 dark:bg-emerald-950 border-t border-emerald-200 dark:border-emerald-800">
-              <span className="text-sm font-black text-[var(--text-primary)]">Total Insentif</span>
-              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{toRp(result.total_incentive)}</span>
+          </div>
+
+          {/* Total Insentif — solid green card */}
+          <div className="flex justify-between items-center px-4 py-4 rounded-2xl" style={{background:'#16a34a'}}>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center">
+                <span className="text-white text-xs">🏅</span>
+              </div>
+              <span className="text-sm font-black text-white uppercase tracking-wider">Total Insentif</span>
             </div>
+            <span className="text-base font-black text-white">{toRp(result.total_incentive)}</span>
           </div>
 
           {/* Activity details */}
           {d.activities?.details?.length > 0 && (
-            <div className="rounded-2xl border border-purple-200 dark:border-purple-800 overflow-hidden">
-              <div className="bg-purple-50 dark:bg-purple-950 px-4 py-2.5 border-b border-purple-200 dark:border-purple-800">
-                <p className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">Detail Aktivitas</p>
+            <div className="rounded-2xl border border-[var(--border)] overflow-hidden">
+              <div className="px-4 py-2.5 flex items-center gap-2" style={{background:'#1e293b'}}>
+                <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                  <span className="text-white text-[10px]">⭐</span>
+                </div>
+                <p className="text-xs font-bold text-white uppercase tracking-wider">Detail Aktivitas</p>
               </div>
               {d.activities.details.map((a, i) => (
                 <div key={i} className="flex justify-between px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-0">
@@ -145,7 +188,7 @@ const SlipModal = ({ resultId, period, onClose }) => {
                     <p className="text-xs font-semibold text-[var(--text-primary)]">{a.activity}</p>
                     <p className="text-[10px] text-[var(--text-muted)]">{a.date} · {a.qty} × {toRp(a.nominal)}</p>
                   </div>
-                  <p className="text-xs font-bold text-purple-600 dark:text-purple-400">+{toRp(a.amount)}</p>
+                  <p className="text-xs font-bold text-emerald-600">{toRp(a.amount)}</p>
                 </div>
               ))}
             </div>
@@ -153,7 +196,8 @@ const SlipModal = ({ resultId, period, onClose }) => {
 
           {/* Export button */}
           <button onClick={handleExportPDF} disabled={exporting}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-all active:scale-95 disabled:opacity-60">
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-60"
+            style={{background:'linear-gradient(135deg, #dc2626, #991b1b)'}}>
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
             {exporting ? 'Membuat PDF...' : 'Download Slip PDF'}
           </button>
