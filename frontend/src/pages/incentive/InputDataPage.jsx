@@ -281,11 +281,15 @@ const PerChannelTab = ({ periodId, branches, employees, channel, channelType, pe
     const branchTemplate = shareTemplates[String(selectedBranch)]?.[channelType];
     if (branchTemplate?.length > 0) {
       setForm({ total_amount: '', notes: '' });
-      setShares(branchTemplate.map(t => ({
-        employee_id:      t.employee_id,
-        name:             t.employee_name,
-        share_percentage: parseFloat(t.share_percentage),
-      })));
+      setShares(branchTemplate.map(t => {
+        // Fallback chain: API employee_name -> lookup from employees list -> ID
+        const empLookup = employees.find(e => e.id === t.employee_id);
+        return {
+          employee_id:      t.employee_id,
+          name:             t.employee_name || empLookup?.name || `Karyawan #${t.employee_id}`,
+          share_percentage: parseFloat(t.share_percentage),
+        };
+      }));
       setUsingTemplate(true);
       return;
     }

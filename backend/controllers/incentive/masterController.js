@@ -408,9 +408,30 @@ const getShareTemplates = async (req, res, next) => {
         WHERE st.is_active = 1
         ORDER BY st.branch_id, st.channel_code
       `);
+      console.log(`[ShareTemplates] JOIN query OK — ${rows.length} rows, sample employee_name: ${rows[0]?.employee_name}`);
     } catch(qErr) {
-      console.warn('[ShareTemplates] Query fallback:', qErr.message);
+      console.warn('[ShareTemplates] JOIN query failed, using manual lookup fallback:', qErr.message);
       [rows] = await sequelize.query(`SELECT * FROM inc_share_templates WHERE is_active = 1`);
+
+      // Manually attach employee_name + branch info since JOIN failed
+      try {
+        const empIds = [...new Set(rows.map(r => r.employee_id))];
+        if (empIds.length) {
+          const [emps] = await sequelize.query(
+            `SELECT id, name, nip, branch_id FROM inc_employees WHERE id IN (${empIds.join(',')})`
+          );
+          const empMap = {};
+          emps.forEach(e => { empMap[e.id] = e; });
+          rows = rows.map(r => ({
+            ...r,
+            employee_name: empMap[r.employee_id]?.name || null,
+            nip: empMap[r.employee_id]?.nip || null,
+            emp_branch_id: empMap[r.employee_id]?.branch_id || null,
+          }));
+        }
+      } catch(lookupErr) {
+        console.warn('[ShareTemplates] Manual employee lookup also failed:', lookupErr.message);
+      }
     }
 
     // Group by branch_id -> channel
