@@ -241,23 +241,30 @@ const PerChannelTab = ({ periodId, branches, employees, channel, channelType, pe
   const [shares, setShares] = useState([]);
   const [saving, setSaving] = useState(false);
 
+  const [shareTemplates, setShareTemplates] = useState({});  // { branchId: { byChannel: { MARKETPLACE: [...], WEB: [...] } } }
+  const [usingTemplate, setUsingTemplate]    = useState(false);
+
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
       const fn  = channelType === 'MARKETPLACE' ? incentiveService.getMarketplaceSales : incentiveService.getWebSales;
-      const res = await fn({ period_id: periodId });
+      const [res, tplRes] = await Promise.all([
+        fn({ period_id: periodId }),
+        incentiveService.getShareTemplates().catch(() => null),
+      ]);
       setSalesList(res.data.data.sales);
+      if (tplRes) setShareTemplates(tplRes.data.data.byBranchChannel || {});
     } catch { toast.error('Gagal memuat data'); }
     finally { setLoading(false); }
   }, [periodId, channelType]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  // When branch selected, init shares from employees of that branch
+  // When branch selected: prioritize Master Porsi Template, fallback to equal split
   useEffect(() => {
-    if (!selectedBranch) { setShares([]); return; }
+    if (!selectedBranch) { setShares([]); setUsingTemplate(false); return; }
 
-    // Check existing sale for this branch+period
+    // Check existing sale for this branch+period (already saved this period)
     const existing = salesList.find(s => s.branch_id == selectedBranch);
     if (existing) {
       setForm({ total_amount: existing.total_amount, notes: existing.notes || '' });
@@ -266,16 +273,33 @@ const PerChannelTab = ({ periodId, branches, employees, channel, channelType, pe
         name:             sh.employee?.name,
         share_percentage: parseFloat(sh.share_percentage),
       })) || []);
-    } else {
-      setForm({ total_amount: '', notes: '' });
-      const branchEmps = employees.filter(e => e.branch_id == selectedBranch && e.is_active);
-      const equalShare = branchEmps.length > 0 ? parseFloat((100 / branchEmps.length).toFixed(3)) : 0;
-      setShares(branchEmps.map(e => ({
-        employee_id: e.id, name: e.name,
-        share_percentage: equalShare,
-      })));
+      setUsingTemplate(false); // already saved manually before, allow edit
+      return;
     }
-  }, [selectedBranch, salesList, employees]);
+
+    // Check master share template for this branch + channel
+    const branchTemplate = shareTemplates[String(selectedBranch)]?.[channelType];
+    if (branchTemplate?.length > 0) {
+      setForm({ total_amount: '', notes: '' });
+      setShares(branchTemplate.map(t => ({
+        employee_id:      t.employee_id,
+        name:             t.employee_name,
+        share_percentage: parseFloat(t.share_percentage),
+      })));
+      setUsingTemplate(true);
+      return;
+    }
+
+    // Fallback: equal split among branch employees (no template set yet)
+    setForm({ total_amount: '', notes: '' });
+    const branchEmps = employees.filter(e => e.branch_id == selectedBranch && e.is_active);
+    const equalShare = branchEmps.length > 0 ? parseFloat((100 / branchEmps.length).toFixed(3)) : 0;
+    setShares(branchEmps.map(e => ({
+      employee_id: e.id, name: e.name,
+      share_percentage: equalShare,
+    })));
+    setUsingTemplate(false);
+  }, [selectedBranch, salesList, employees, shareTemplates, channelType]);
 
   const totalPct    = shares.reduce((s, r) => s + (parseFloat(r.share_percentage) || 0), 0);
   const pctValid    = Math.abs(totalPct - 100) < 0.01;
@@ -378,6 +402,16 @@ const PerChannelTab = ({ periodId, branches, employees, channel, channelType, pe
             </select>
           </div>
 
+          {selectedBranch && !usingTemplate && !salesList.find(s => s.branch_id == selectedBranch) && (
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"/>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Cabang ini belum punya Master Porsi untuk {channelType === 'MARKETPLACE' ? 'Marketplace' : 'Web'} — sistem membagi rata sementara.
+                Atur porsi tetap di <strong>Master Data → Porsi Insentif</strong> agar tidak perlu diatur ulang setiap periode.
+              </p>
+            </div>
+          )}
+
           {selectedBranch && (
             <>
               <div>
@@ -394,11 +428,23 @@ const PerChannelTab = ({ periodId, branches, employees, channel, channelType, pe
               {/* Share table */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Pembagian %</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Pembagian %</label>
+                    {usingTemplate && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">
+                        📊 Master Porsi
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-xs font-bold ${pctValid ? 'text-emerald-600' : 'text-red-500'}`}>
                     Total: {totalPct.toFixed(2)}% {pctValid ? '✓' : '⚠ harus 100%'}
                   </span>
                 </div>
+                {usingTemplate && (
+                  <p className="text-[11px] text-emerald-600 mb-2">
+                    Porsi otomatis diambil dari Master Data → Porsi Insentif. Edit di sana jika ingin mengubah pembagian untuk cabang ini.
+                  </p>
+                )}
                 <div className="card overflow-hidden">
                   <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-[var(--bg-secondary)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                     <span className="col-span-5">Karyawan</span>
@@ -418,7 +464,9 @@ const PerChannelTab = ({ periodId, branches, employees, channel, channelType, pe
                             <input type="number" step="0.001" min="0" max="100"
                               value={sh.share_percentage || ''}
                               onChange={e => setSharePct(i, e.target.value)}
-                              className="input-base text-xs text-center pr-5 h-8"
+                              disabled={usingTemplate}
+                              title={usingTemplate ? 'Porsi dari Master Data — edit di Master Data > Porsi Insentif' : ''}
+                              className={`input-base text-xs text-center pr-5 h-8 ${usingTemplate ? 'opacity-60 cursor-not-allowed bg-[var(--bg-secondary)]' : ''}`}
                             />
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)] font-bold">%</span>
                           </div>
