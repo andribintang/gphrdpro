@@ -384,18 +384,25 @@ app.post('/run-alter', async (req, res) => {
       // Incentive share templates (master porsi per karyawan)
       `CREATE TABLE IF NOT EXISTS inc_share_templates (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        branch_id INT NOT NULL DEFAULT 0,
         employee_id INT NOT NULL,
-        channel_code ENUM('WA','MARKETPLACE','WEB') NOT NULL,
+        channel_code ENUM('MARKETPLACE','WEB') NOT NULL,
         share_percentage DECIMAL(5,2) NOT NULL DEFAULT 0,
         notes VARCHAR(255) NULL,
         is_active TINYINT(1) DEFAULT 1,
         created_by INT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uniq_emp_channel (employee_id, channel_code),
+        UNIQUE KEY uniq_branch_emp_channel (branch_id, employee_id, channel_code),
         INDEX idx_channel (channel_code),
+        INDEX idx_branch (branch_id),
         INDEX idx_active (is_active)
       )`,
+      `ALTER TABLE inc_share_templates ADD COLUMN branch_id INT NOT NULL DEFAULT 0`,
+      `ALTER TABLE inc_share_templates DROP INDEX uniq_emp_channel`,
+      `ALTER TABLE inc_share_templates ADD UNIQUE KEY uniq_branch_emp_channel (branch_id, employee_id, channel_code)`,
+      `ALTER TABLE inc_share_templates MODIFY COLUMN channel_code ENUM('MARKETPLACE','WEB') NOT NULL`,
+      `DELETE FROM inc_share_templates WHERE channel_code = 'WA'`,
       // Backup tables
       `CREATE TABLE IF NOT EXISTS backup_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,

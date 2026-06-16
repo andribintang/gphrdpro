@@ -900,17 +900,18 @@ const BonusTargetsTab = () => {
 // SHARE TEMPLATE TAB — Porsi Insentif per Karyawan
 // ══════════════════════════════════════════════════════════════
 const ShareTemplateTab = () => {
-  const [data,      setData]      = useState({ byChannel:{WA:{},MARKETPLACE:{},WEB:{}}, totals:{WA:0,MARKETPLACE:0,WEB:0} });
+  const [data,      setData]      = useState({ byBranchChannel:{}, totals:{}, branches:[] });
   const [employees, setEmployees] = useState([]);
+  const [branches,  setBranches]  = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
-  const [channel,   setChannel]   = useState('WA');
-  const [edits,     setEdits]     = useState({});
+  const [branchId,  setBranchId]  = useState(null);
+  const [channel,   setChannel]   = useState('MARKETPLACE');
+  const [edits,     setEdits]     = useState({}); // edits[branchId][channel][empId] = pct
 
   const CHANNELS = [
-    { code:'WA',          label:'WA Sales',    desc:'Penjualan via WhatsApp — semua cabang digabung' },
-    { code:'MARKETPLACE', label:'Marketplace', desc:'Penjualan via marketplace — semua cabang digabung' },
-    { code:'WEB',         label:'Web/Online',  desc:'Penjualan via website — semua cabang digabung' },
+    { code:'MARKETPLACE', label:'Marketplace', desc:'Penjualan via marketplace — dihitung PER CABANG' },
+    { code:'WEB',         label:'Web/Online',  desc:'Penjualan via website — dihitung PER CABANG' },
   ];
 
   const load = useCallback(async () => {
@@ -923,37 +924,48 @@ const ShareTemplateTab = () => {
       const d = tRes.data.data;
       setData(d);
       setEmployees(eRes.data.data.employees || []);
+      setBranches(d.branches || []);
+      if (!branchId && d.branches?.length) setBranchId(d.branches[0].id);
 
       // Init edits from existing templates
       const initEdits = {};
-      Object.entries(d.byChannel || {}).forEach(([ch, rows]) => {
-        if (!initEdits[ch]) initEdits[ch] = {};
-        rows.forEach(r => { initEdits[ch][r.employee_id] = String(r.share_percentage); });
+      Object.entries(d.byBranchChannel || {}).forEach(([bId, channels]) => {
+        if (!initEdits[bId]) initEdits[bId] = { MARKETPLACE:{}, WEB:{} };
+        Object.entries(channels).forEach(([ch, rows]) => {
+          rows.forEach(r => { initEdits[bId][ch][r.employee_id] = String(r.share_percentage); });
+        });
       });
       setEdits(initEdits);
     } catch { toast.error('Gagal memuat data'); }
     finally { setLoading(false); }
-  }, []);
+  }, [branchId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, []);
 
-  const currentEdits = edits[channel] || {};
+  const bKey = String(branchId);
+  const currentEdits = edits[bKey]?.[channel] || {};
   const currentTotal = Object.values(currentEdits).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const isValid = Math.abs(currentTotal - 100) < 0.01;
 
   const setEmpPct = (empId, val) => {
-    setEdits(prev => ({ ...prev, [channel]: { ...prev[channel], [empId]: val } }));
+    setEdits(prev => ({
+      ...prev,
+      [bKey]: { ...(prev[bKey]||{MARKETPLACE:{},WEB:{}}), [channel]: { ...(prev[bKey]?.[channel]||{}), [empId]: val } },
+    }));
   };
 
   const addEmployee = (empId) => {
     if (currentEdits[empId] !== undefined) return;
-    setEdits(prev => ({ ...prev, [channel]: { ...prev[channel], [empId]: '0' } }));
+    setEdits(prev => ({
+      ...prev,
+      [bKey]: { ...(prev[bKey]||{MARKETPLACE:{},WEB:{}}), [channel]: { ...(prev[bKey]?.[channel]||{}), [empId]: '0' } },
+    }));
   };
 
   const removeEmployee = (empId) => {
     const next = { ...currentEdits };
     delete next[empId];
-    setEdits(prev => ({ ...prev, [channel]: next }));
+    setEdits(prev => ({ ...prev, [bKey]: { ...(prev[bKey]||{MARKETPLACE:{},WEB:{}}), [channel]: next } }));
   };
 
   const distributeEqual = () => {
@@ -962,10 +974,11 @@ const ShareTemplateTab = () => {
     const each = (100 / ids.length).toFixed(2);
     const newEdits = {};
     ids.forEach((id, i) => { newEdits[id] = i === ids.length-1 ? String((100 - (parseFloat(each) * (ids.length-1))).toFixed(2)) : each; });
-    setEdits(prev => ({ ...prev, [channel]: newEdits }));
+    setEdits(prev => ({ ...prev, [bKey]: { ...(prev[bKey]||{MARKETPLACE:{},WEB:{}}), [channel]: newEdits } }));
   };
 
   const handleSave = async () => {
+    if (!branchId) { toast.error('Pilih cabang dulu'); return; }
     if (!isValid) { toast.error(`Total harus 100% (saat ini ${currentTotal.toFixed(2)}%)`); return; }
     const templates = Object.entries(currentEdits)
       .filter(([,v]) => parseFloat(v) > 0)
@@ -973,8 +986,8 @@ const ShareTemplateTab = () => {
     if (!templates.length) { toast.error('Tambahkan minimal 1 karyawan'); return; }
     setSaving(true);
     try {
-      await incentiveService.upsertShareTemplates({ channel_code: channel, templates });
-      toast.success(`Template porsi ${channel} berhasil disimpan!`);
+      await incentiveService.upsertShareTemplates({ branch_id: branchId, channel_code: channel, templates });
+      toast.success(`Template porsi ${channel} untuk cabang ini berhasil disimpan!`);
       load();
     } catch(e) { toast.error(e.response?.data?.message || 'Gagal menyimpan'); }
     finally { setSaving(false); }
@@ -982,146 +995,169 @@ const ShareTemplateTab = () => {
 
   const assignedIds = new Set(Object.keys(currentEdits).map(Number));
   const unassigned  = employees.filter(e => !assignedIds.has(e.id));
+  const currentBranch = branches.find(b => b.id === branchId);
 
   return (
     <div className="space-y-5">
       <div className="table-wrapper p-4 border-l-4 border-[var(--brand-600)] bg-[var(--brand-600)]/5">
-        <p className="text-sm font-bold text-[var(--brand-600)] mb-1">📊 Master Porsi Insentif</p>
+        <p className="text-sm font-bold text-[var(--brand-600)] mb-1">📊 Master Porsi Insentif — Marketplace & Web</p>
         <p className="text-xs text-[var(--text-muted)]">
-          Tentukan % porsi setiap karyawan untuk setiap channel penjualan. Template ini otomatis digunakan saat kalkulasi periode — tidak perlu diinput ulang setiap bulan.
-          Total porsi harus <strong>100%</strong> per channel.
+          Porsi dihitung <strong>per cabang</strong> — setiap cabang punya pool penjualan sendiri yang dibagi ke karyawan pilihan (boleh lintas cabang).
+          WA Sales tidak menggunakan template ini — tetap dihitung per penjualan masing-masing dari ERP.
+          Total porsi harus <strong>100%</strong> per cabang per channel.
         </p>
       </div>
 
-      {/* Channel selector */}
-      <div className="flex gap-2 flex-wrap">
-        {CHANNELS.map(ch => (
-          <button key={ch.code} onClick={() => setChannel(ch.code)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
-              channel===ch.code ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--brand-600)]'
-            }`}>
-            {ch.label}
-            {data.totals?.[ch.code] > 0 && (
-              <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${Math.abs(data.totals[ch.code]-100)<0.01?'bg-emerald-500':'bg-amber-500'} text-white`}>
-                {data.totals[ch.code].toFixed(0)}%
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Branch selector */}
+      <div>
+        <label className="block text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-2">Pilih Cabang</label>
+        <div className="flex gap-2 flex-wrap">
+          {branches.map(b => (
+            <button key={b.id} onClick={() => setBranchId(b.id)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                branchId===b.id ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--brand-600)]'
+              }`}>
+              🏢 {b.name}
+            </button>
+          ))}
+          {branches.length === 0 && !loading && (
+            <p className="text-xs text-[var(--text-muted)] italic">Belum ada data cabang — tambahkan dulu di tab Cabang</p>
+          )}
+        </div>
       </div>
 
-      <p className="text-xs text-[var(--text-muted)]">
-        {CHANNELS.find(c=>c.code===channel)?.desc}
-      </p>
+      {branchId && (<>
+        {/* Channel selector */}
+        <div className="flex gap-2 flex-wrap">
+          {CHANNELS.map(ch => {
+            const total = data.totals?.[bKey]?.[ch.code] || 0;
+            return (
+              <button key={ch.code} onClick={() => setChannel(ch.code)}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                  channel===ch.code ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--brand-600)]'
+                }`}>
+                {ch.label}
+                {total > 0 && (
+                  <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${Math.abs(total-100)<0.01?'bg-emerald-500':'bg-amber-500'} text-white`}>
+                    {total.toFixed(0)}%
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-      {loading ? (
-        <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-[var(--brand-600)] border-t-transparent rounded-full animate-spin"/></div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Assigned employees */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide">
-                Karyawan Ter-assign ({Object.keys(currentEdits).length})
-              </p>
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-black ${isValid?'text-emerald-600':currentTotal>100?'text-red-500':'text-amber-600'}`}>
-                  {currentTotal.toFixed(2)}% / 100%
-                </span>
-                <button onClick={distributeEqual} className="text-xs text-[var(--brand-600)] hover:underline font-semibold">
-                  Bagi Rata
-                </button>
+        <p className="text-xs text-[var(--text-muted)]">
+          {CHANNELS.find(c=>c.code===channel)?.desc} — Cabang: <strong>{currentBranch?.name}</strong>
+        </p>
+
+        {loading ? (
+          <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-[var(--brand-600)] border-t-transparent rounded-full animate-spin"/></div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Assigned employees */}
+            <div className="lg:col-span-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide">
+                  Karyawan Ter-assign ({Object.keys(currentEdits).length})
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-black ${isValid?'text-emerald-600':currentTotal>100?'text-red-500':'text-amber-600'}`}>
+                    {currentTotal.toFixed(2)}% / 100%
+                  </span>
+                  <button onClick={distributeEqual} className="text-xs text-[var(--brand-600)] hover:underline font-semibold">
+                    Bagi Rata
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Progress bar */}
-            <div className="h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${currentTotal>100?'bg-red-500':isValid?'bg-emerald-500':'bg-[var(--brand-600)]'}`}
-                style={{width:`${Math.min(100,currentTotal)}%`}}/>
-            </div>
-
-            {Object.keys(currentEdits).length === 0 ? (
-              <div className="table-wrapper p-8 text-center text-[var(--text-muted)]">
-                <p className="text-2xl mb-2">👥</p>
-                <p className="text-sm">Belum ada karyawan — pilih dari daftar kanan</p>
+              <div className="h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${currentTotal>100?'bg-red-500':isValid?'bg-emerald-500':'bg-[var(--brand-600)]'}`}
+                  style={{width:`${Math.min(100,currentTotal)}%`}}/>
               </div>
-            ) : (
-              <div className="table-wrapper overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-                      <th className="px-4 py-2.5 text-left text-xs font-bold text-[var(--text-muted)] uppercase">Karyawan</th>
-                      <th className="px-4 py-2.5 text-center text-xs font-bold text-[var(--text-muted)] uppercase">Porsi %</th>
-                      <th className="px-4 py-2.5 w-10"/>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(currentEdits).map(([empId, pct]) => {
-                      const emp = employees.find(e => e.id === parseInt(empId));
-                      return (
-                        <tr key={empId} className="border-b border-[var(--border)] hover:bg-[var(--bg-secondary)]">
-                          <td className="px-4 py-2.5">
-                            <p className="font-semibold">{emp?.name || `ID ${empId}`}</p>
-                            <p className="text-[11px] text-[var(--text-muted)]">{emp?.branch?.name || '—'} · {emp?.position?.name || '—'}</p>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2 justify-center">
-                              <input type="number" value={pct} min="0" max="100" step="0.01"
-                                onChange={e => setEmpPct(parseInt(empId), e.target.value)}
-                                className="input-base text-sm text-center w-24 h-8"/>
-                              <span className="text-[var(--text-muted)] text-sm">%</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <button onClick={() => removeEmployee(parseInt(empId))}
-                              className="w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center text-[var(--text-muted)] hover:text-red-500">
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
 
-            {/* Save button */}
-            <button onClick={handleSave} disabled={saving || !isValid}
-              className="btn-primary w-full gap-2 disabled:opacity-50">
-              {saving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> Menyimpan...</> : <>💾 Simpan Template {channel}</>}
-            </button>
-          </div>
-
-          {/* Unassigned employees */}
-          <div>
-            <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-3">
-              + Tambah Karyawan ({unassigned.length})
-            </p>
-            <div className="table-wrapper overflow-hidden max-h-96 overflow-y-auto">
-              {unassigned.length === 0 ? (
-                <div className="p-6 text-center text-xs text-[var(--text-muted)]">Semua karyawan sudah di-assign</div>
+              {Object.keys(currentEdits).length === 0 ? (
+                <div className="table-wrapper p-8 text-center text-[var(--text-muted)]">
+                  <p className="text-2xl mb-2">👥</p>
+                  <p className="text-sm">Belum ada karyawan untuk cabang ini — pilih dari daftar kanan</p>
+                </div>
               ) : (
-                <div className="divide-y divide-[var(--border)]">
-                  {unassigned.map(e => (
-                    <button key={e.id} onClick={() => addEmployee(e.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-secondary)] text-left transition-colors">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--brand-600)]/10 flex items-center justify-center text-xs font-bold text-[var(--brand-600)] flex-shrink-0">
-                        {e.name[0].toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold truncate">{e.name}</p>
-                        <p className="text-[10px] text-[var(--text-muted)] truncate">{e.branch?.name || '—'}</p>
-                      </div>
-                      <span className="ml-auto text-[var(--brand-600)] text-lg flex-shrink-0">+</span>
-                    </button>
-                  ))}
+                <div className="table-wrapper overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+                        <th className="px-4 py-2.5 text-left text-xs font-bold text-[var(--text-muted)] uppercase">Karyawan</th>
+                        <th className="px-4 py-2.5 text-center text-xs font-bold text-[var(--text-muted)] uppercase">Porsi %</th>
+                        <th className="px-4 py-2.5 w-10"/>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(currentEdits).map(([empId, pct]) => {
+                        const emp = employees.find(e => e.id === parseInt(empId));
+                        return (
+                          <tr key={empId} className="border-b border-[var(--border)] hover:bg-[var(--bg-secondary)]">
+                            <td className="px-4 py-2.5">
+                              <p className="font-semibold">{emp?.name || `ID ${empId}`}</p>
+                              <p className="text-[11px] text-[var(--text-muted)]">{emp?.branch?.name || '—'} · {emp?.position?.name || '—'}</p>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2 justify-center">
+                                <input type="number" value={pct} min="0" max="100" step="0.01"
+                                  onChange={e => setEmpPct(parseInt(empId), e.target.value)}
+                                  className="input-base text-sm text-center w-24 h-8"/>
+                                <span className="text-[var(--text-muted)] text-sm">%</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <button onClick={() => removeEmployee(parseInt(empId))}
+                                className="w-6 h-6 rounded-lg hover:bg-red-100 flex items-center justify-center text-[var(--text-muted)] hover:text-red-500">
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
+
+              <button onClick={handleSave} disabled={saving || !isValid}
+                className="btn-primary w-full gap-2 disabled:opacity-50">
+                {saving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> Menyimpan...</> : <>💾 Simpan Template {channel} — {currentBranch?.name}</>}
+              </button>
+            </div>
+
+            {/* Unassigned employees — semua karyawan, lintas cabang boleh dipilih */}
+            <div>
+              <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-3">
+                + Tambah Karyawan ({unassigned.length}) — boleh lintas cabang
+              </p>
+              <div className="table-wrapper overflow-hidden max-h-96 overflow-y-auto">
+                {unassigned.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-[var(--text-muted)]">Semua karyawan sudah di-assign</div>
+                ) : (
+                  <div className="divide-y divide-[var(--border)]">
+                    {unassigned.map(e => (
+                      <button key={e.id} onClick={() => addEmployee(e.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-secondary)] text-left transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-[var(--brand-600)]/10 flex items-center justify-center text-xs font-bold text-[var(--brand-600)] flex-shrink-0">
+                          {e.name[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate">{e.name}</p>
+                          <p className="text-[10px] text-[var(--text-muted)] truncate">{e.branch?.name || '—'}</p>
+                        </div>
+                        <span className="ml-auto text-[var(--brand-600)] text-lg flex-shrink-0">+</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </>)}
     </div>
   );
 };

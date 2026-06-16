@@ -385,54 +385,68 @@ const getShareTemplates = async (req, res, next) => {
     // Auto-create table if not exists (safe fallback)
     await sequelize.query(`CREATE TABLE IF NOT EXISTS inc_share_templates (
       id INT AUTO_INCREMENT PRIMARY KEY,
+      branch_id INT NOT NULL DEFAULT 0,
       employee_id INT NOT NULL,
-      channel_code ENUM('WA','MARKETPLACE','WEB') NOT NULL,
+      channel_code ENUM('MARKETPLACE','WEB') NOT NULL,
       share_percentage DECIMAL(5,2) NOT NULL DEFAULT 0,
       notes VARCHAR(255) NULL,
       is_active TINYINT(1) DEFAULT 1,
       created_by INT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_emp_channel (employee_id, channel_code)
+      UNIQUE KEY uniq_branch_emp_channel (branch_id, employee_id, channel_code)
     )`).catch(()=>{});
 
-    // Try full query first, fallback to simple if join fails
     let rows = [];
     try {
       [rows] = await sequelize.query(`
-        SELECT st.*, ie.name AS employee_name, ie.nip, b.name AS branch_name
+        SELECT st.*, ie.name AS employee_name, ie.nip, ie.branch_id AS emp_branch_id,
+          b.name AS branch_name
         FROM inc_share_templates st
         LEFT JOIN inc_employees ie ON ie.id = st.employee_id
-        LEFT JOIN inc_branches b ON b.id = ie.branch_id
+        LEFT JOIN inc_branches b ON b.id = st.branch_id
         WHERE st.is_active = 1
-        ORDER BY st.channel_code
+        ORDER BY st.branch_id, st.channel_code
       `);
     } catch(qErr) {
       console.warn('[ShareTemplates] Query fallback:', qErr.message);
       [rows] = await sequelize.query(`SELECT * FROM inc_share_templates WHERE is_active = 1`);
     }
 
-    // Group by channel
-    const byChannel = { WA: [], MARKETPLACE: [], WEB: [] };
-    rows.forEach(r => { if (byChannel[r.channel_code]) byChannel[r.channel_code].push(r); });
-
-    // Total % per channel
-    const totals = {};
-    Object.keys(byChannel).forEach(ch => {
-      totals[ch] = byChannel[ch].reduce((s, r) => s + parseFloat(r.share_percentage), 0);
+    // Group by branch_id -> channel
+    const byBranchChannel = {};
+    rows.forEach(r => {
+      const bId = String(r.branch_id);
+      if (!byBranchChannel[bId]) byBranchChannel[bId] = { MARKETPLACE: [], WEB: [] };
+      if (byBranchChannel[bId][r.channel_code]) byBranchChannel[bId][r.channel_code].push(r);
     });
 
-    return res.json({ success: true, data: { templates: rows, byChannel, totals } });
+    // Totals per branch+channel
+    const totals = {};
+    Object.entries(byBranchChannel).forEach(([bId, channels]) => {
+      totals[bId] = {};
+      Object.entries(channels).forEach(([ch, list]) => {
+        totals[bId][ch] = list.reduce((s, r) => s + parseFloat(r.share_percentage), 0);
+      });
+    });
+
+    // Also fetch branches list for reference
+    let branches = [];
+    try { [branches] = await sequelize.query(`SELECT id, name FROM inc_branches ORDER BY name`); } catch {}
+
+    return res.json({ success: true, data: { templates: rows, byBranchChannel, totals, branches } });
   } catch(err) { next(err); }
 };
 
 // ── POST /api/incentive/share-templates/bulk ──────────────────
-// Upsert all templates for a channel at once
+// Upsert all templates for a branch+channel combination at once
 const upsertShareTemplates = async (req, res, next) => {
   try {
-    const { channel_code, templates } = req.body;
-    if (!channel_code || !['WA','MARKETPLACE','WEB'].includes(channel_code))
-      return res.status(400).json({ success: false, message: 'channel_code tidak valid' });
+    const { branch_id, channel_code, templates } = req.body;
+    if (branch_id === undefined || branch_id === null)
+      return res.status(400).json({ success: false, message: 'branch_id wajib diisi' });
+    if (!channel_code || !['MARKETPLACE','WEB'].includes(channel_code))
+      return res.status(400).json({ success: false, message: 'channel_code harus MARKETPLACE atau WEB' });
     if (!templates?.length)
       return res.status(400).json({ success: false, message: 'templates wajib diisi' });
 
@@ -443,26 +457,25 @@ const upsertShareTemplates = async (req, res, next) => {
     const { sequelize } = require('../../config/database');
     const t = await sequelize.transaction();
     try {
-      // Deactivate all existing for this channel
       await sequelize.query(
-        `UPDATE inc_share_templates SET is_active = 0 WHERE channel_code = ?`,
-        { replacements: [channel_code], transaction: t }
+        `UPDATE inc_share_templates SET is_active = 0 WHERE branch_id = ? AND channel_code = ?`,
+        { replacements: [branch_id, channel_code], transaction: t }
       );
 
       for (const tmpl of templates) {
         await sequelize.query(`
-          INSERT INTO inc_share_templates (employee_id, channel_code, share_percentage, notes, is_active, created_by, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 1, ?, NOW(), NOW())
+          INSERT INTO inc_share_templates (branch_id, employee_id, channel_code, share_percentage, notes, is_active, created_by, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 1, ?, NOW(), NOW())
           ON DUPLICATE KEY UPDATE
             share_percentage = VALUES(share_percentage),
             notes = VALUES(notes),
             is_active = 1,
             updated_at = NOW()
-        `, { replacements: [tmpl.employee_id, channel_code, parseFloat(tmpl.share_percentage), tmpl.notes || '', req.user.id], transaction: t });
+        `, { replacements: [branch_id, tmpl.employee_id, channel_code, parseFloat(tmpl.share_percentage), tmpl.notes || '', req.user.id], transaction: t });
       }
 
       await t.commit();
-      return res.json({ success: true, message: `Template porsi ${channel_code} berhasil disimpan` });
+      return res.json({ success: true, message: `Template porsi ${channel_code} untuk cabang ini berhasil disimpan` });
     } catch(e) { await t.rollback(); throw e; }
   } catch(err) { next(err); }
 };
