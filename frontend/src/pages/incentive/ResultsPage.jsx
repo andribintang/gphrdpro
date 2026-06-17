@@ -273,7 +273,7 @@ export default function ResultsPage() {
   );
 
   return (
-    <div className="max-w-lg lg:max-w-4xl mx-auto">
+    <div className="max-w-lg lg:max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/incentive/periods')}
@@ -295,6 +295,12 @@ export default function ResultsPage() {
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
+      {/* ════════ DESKTOP 2-COLUMN LAYOUT ════════ */}
+      <div className="lg:grid lg:grid-cols-[380px_1fr] lg:gap-5 lg:items-start">
+
+      {/* ── LEFT COLUMN: actions + summary ── */}
+      <div className="lg:sticky lg:top-4">
 
       {/* Transfer via Flip */}
       {period && ['approved','locked'].includes(period.status) && results.length > 0 && (
@@ -410,6 +416,12 @@ export default function ResultsPage() {
         </div>
       )}
 
+      </div>
+      {/* ── END LEFT COLUMN ── */}
+
+      {/* ── RIGHT COLUMN: filter + ranking list ── */}
+      <div>
+
       {/* Filter */}
       <div className="mb-3">
         <div className="relative">
@@ -492,6 +504,12 @@ export default function ResultsPage() {
           </div>
         </div>
       )}
+
+      </div>
+      {/* ── END RIGHT COLUMN ── */}
+
+      </div>
+      {/* ════════ END DESKTOP 2-COLUMN LAYOUT ════════ */}
 
       {selectedSlip && (
         <SlipModal
