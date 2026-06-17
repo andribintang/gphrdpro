@@ -18,7 +18,7 @@ export default function ImportPage() {
     { key: 'name',               label: 'Nama Produk *',        required: true  },
     { key: 'sku',                label: 'SKU',                  required: false },
     { key: 'barcode',            label: 'Barcode',              required: false },
-    { key: 'category_id',        label: 'ID Kategori',         required: false },
+    { key: 'category_id',        label: 'Kategori (Nama/ID)',   required: false },
     { key: 'unit',               label: 'Satuan',              required: false },
     { key: 'buy_price',          label: 'Harga Beli (Rp)',     required: false },
     { key: 'sell_price',         label: 'Harga Jual (Rp) *',   required: true  },
@@ -28,8 +28,15 @@ export default function ImportPage() {
     { key: 'stock_min',          label: 'Stok Minimum',        required: false },
     { key: 'initial_stock',      label: 'Stok Awal',           required: false },
     { key: 'store_price',        label: 'Harga Toko Online',   required: false },
-    { key: 'store_active',       label: 'Aktif di Toko (1/0)', required: false },
+    { key: 'store_price_compare',label: 'Harga Coret (Diskon)',required: false },
+    { key: 'store_active_gpr',   label: 'Aktif di Toko GP Racing (1/0)', required: false },
+    { key: 'store_active_gpd',   label: 'Aktif di Toko GP Distro (1/0)', required: false },
     { key: 'store_short_desc',   label: 'Deskripsi Singkat',   required: false },
+    { key: 'store_description',  label: 'Deskripsi Lengkap',   required: false },
+    { key: 'store_tags',         label: 'Tags (pisah koma)',   required: false },
+    { key: 'store_featured',     label: 'Produk Unggulan (1/0)', required: false },
+    { key: 'store_meta_title',   label: 'Meta Title (SEO)',    required: false },
+    { key: 'store_meta_desc',    label: 'Meta Deskripsi (SEO)',required: false },
     { key: 'notes',              label: 'Catatan',             required: false },
   ];
 
@@ -52,7 +59,7 @@ export default function ImportPage() {
       const headers = COLS.map(c => c.key);
       const labels  = COLS.map(c => c.label);
       const example = tab === 'products'
-        ? ['Contoh Produk A', 'SKU001', '1234567890', '1', 'pcs', 50000, 100000, 95000, 90000, 0.5, 5, 10, 100000, 1, 'Deskripsi singkat produk', '']
+        ? ['Contoh Produk A', 'SKU001', '1234567890', 'Spare Part', 'pcs', 50000, 100000, 95000, 90000, 0.5, 5, 10, 100000, '', 1, 0, 'Deskripsi singkat produk', 'Deskripsi lengkap untuk halaman produk', 'racing, sparepart, motor', 0, 'Spare Part Racing Original', 'Beli spare part racing original dengan harga terbaik', '']
         : ['Budi Santoso', '08123456789', 'budi@email.com', 'Jl. Contoh No.1', 'Jakarta', 'DKI Jakarta', '12345', ''];
       const ws = XLSX.utils.aoa_to_sheet([labels, headers, example]);
       ws['!cols'] = headers.map(() => ({ wch: 22 }));
@@ -71,12 +78,17 @@ export default function ImportPage() {
         ['', ''],
         ...(tab === 'products' ? [
           ['CATATAN KOLOM:', ''],
-          ['category_id', 'Isi dengan ID kategori dari menu Master Data → Kategori'],
+          ['category_id', 'Isi NAMA kategori (mis. "Spare Part") — otomatis dibuat jika belum ada. Bisa juga isi ID angka jika sudah tahu.'],
           ['unit', 'Satuan: pcs, kg, liter, set, pasang, dll'],
           ['sell_price', 'Harga jual utama (wajib)'],
           ['sell_price_mp', 'Harga untuk marketplace (opsional)'],
-          ['store_price', 'Harga tampil di toko online (opsional)'],
-          ['store_active', '1 = aktif di toko online, 0 = tidak aktif'],
+          ['store_price', 'Harga tampil di toko online (opsional, default ikut harga marketplace/jual)'],
+          ['store_price_compare', 'Harga coret untuk efek diskon di toko online (opsional)'],
+          ['store_active_gpr', '1 = tampilkan di toko GP Racing, 0 = tidak'],
+          ['store_active_gpd', '1 = tampilkan di toko GP Distro, 0 = tidak'],
+          ['store_tags', 'Tag pencarian, pisahkan dengan koma, mis: racing,sparepart,motor'],
+          ['store_featured', '1 = tampilkan sebagai produk unggulan di toko, 0 = tidak'],
+          ['store_meta_title / store_meta_desc', 'Untuk SEO halaman produk di toko online (opsional)'],
           ['initial_stock', 'Stok awal saat import (hanya untuk produk baru)'],
         ] : []),
       ];

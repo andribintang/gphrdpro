@@ -390,18 +390,51 @@ const importProducts = async (req, res, next) => {
     const num = (v, d=0) => { const n = parseFloat(v); return isNaN(n) ? d : n; };
     const int = (v, d=0) => { const n = parseInt(v);   return isNaN(n) ? d : n; };
     const str = (v)       => (v == null || v === '') ? null : String(v).trim();
+    const bool01 = (v)    => ['1','true','yes','ya','y','aktif'].includes(String(v).trim().toLowerCase()) ? 1 : 0;
+
+    // Cache kategori per nama (case-insensitive) untuk hindari query berulang & auto-create
+    const categoryCache = {};
+    const resolveCategoryId = async (rawValue) => {
+      if (!rawValue) return null;
+      const raw = String(rawValue).trim();
+      if (!raw) return null;
+      // Jika numeric, anggap sudah ID — validasi exists
+      if (/^\d+$/.test(raw)) {
+        const found = await Category.findByPk(parseInt(raw));
+        return found ? found.id : null; // ID tidak valid -> null, jangan paksa insert FK rusak
+      }
+      const key = raw.toLowerCase();
+      if (categoryCache[key] !== undefined) return categoryCache[key];
+      let cat = await Category.findOne({ where: { name: raw } });
+      if (!cat) {
+        // Auto-create kategori baru by nama supaya import tidak gagal karena kategori belum ada
+        cat = await Category.create({ name: raw, branch_id: bid, is_active: true });
+      }
+      categoryCache[key] = cat.id;
+      return cat.id;
+    };
 
     for (const row of (rows||[])) {
       try {
         if (!row.name) { failed++; errors.push(`Baris dilewati: nama kosong`); continue; }
 
+        const categoryId = await resolveCategoryId(row.category_id || row.category_name);
+
+        // store_active: kontrol independen per toko, default ikut cabang produk jika tidak diisi
+        const hasGpdCol = row.store_active_gpd !== undefined && row.store_active_gpd !== '';
+        const hasGprCol = row.store_active_gpr !== undefined && row.store_active_gpr !== '';
+        const storeActiveGpd = hasGpdCol ? bool01(row.store_active_gpd)
+          : (row.store_active !== undefined ? (bid === 2 ? bool01(row.store_active) : 0) : 0);
+        const storeActiveGpr = hasGprCol ? bool01(row.store_active_gpr)
+          : (row.store_active !== undefined ? (bid === 1 ? bool01(row.store_active) : 0) : 0);
+
         // Build safe data object — only valid columns
         const data = {
           branch_id:         bid,
+          category_id:       categoryId,
           name:              str(row.name),
           sku:               str(row.sku),
           barcode:           str(row.barcode),
-          category_id:       row.category_id ? int(row.category_id) : null,
           unit:              str(row.unit) || 'pcs',
           buy_price:         num(row.buy_price),
           sell_price:        num(row.sell_price),
@@ -412,10 +445,16 @@ const importProducts = async (req, res, next) => {
           notes:             str(row.notes),
           is_active:         true,
           // Store fields
-          store_price:       row.store_price ? num(row.store_price) : num(row.sell_price_mp || row.sell_price),
-          store_active_gpd:  bid === 2 ? (int(row.store_active, 0) ? 1 : 0) : 0,
-          store_active_gpr:  bid === 1 ? (int(row.store_active, 0) ? 1 : 0) : 0,
-          store_short_desc:  str(row.store_short_desc),
+          store_price:         row.store_price ? num(row.store_price) : num(row.sell_price_mp || row.sell_price),
+          store_price_compare: row.store_price_compare ? num(row.store_price_compare) : null,
+          store_active_gpd:    storeActiveGpd,
+          store_active_gpr:    storeActiveGpr,
+          store_short_desc:    str(row.store_short_desc),
+          store_description:   str(row.store_description),
+          store_meta_title:    str(row.store_meta_title),
+          store_meta_desc:     str(row.store_meta_desc),
+          store_tags:          row.store_tags ? JSON.stringify(String(row.store_tags).split(',').map(t=>t.trim()).filter(Boolean)) : null,
+          store_featured:      bool01(row.store_featured),
         };
 
         const existing = row.sku ? await Product.findOne({ where: { sku: data.sku, branch_id: bid } }) : null;
@@ -427,8 +466,9 @@ const importProducts = async (req, res, next) => {
           const [, insertMeta] = await sequelize.query(
             `INSERT INTO erp_products (branch_id, category_id, name, sku, barcode, unit,
                buy_price, sell_price, sell_price_mp, sell_price_wa, weight, stock_min,
-               notes, is_active, store_price, store_active_gpd, store_active_gpr,
-               store_short_desc, created_at, updated_at)
+               notes, is_active, store_price, store_price_compare, store_active_gpd, store_active_gpr,
+               store_short_desc, store_description, store_meta_title, store_meta_desc, store_tags, store_featured,
+               created_at, updated_at)
              VALUES (
                ${bid},
                ${data.category_id || 'NULL'},
@@ -442,8 +482,14 @@ const importProducts = async (req, res, next) => {
                ${data.weight}, ${data.stock_min},
                ${sequelize.escape(data.notes || '')},
                1,
-               ${data.store_price}, ${data.store_active_gpd}, ${data.store_active_gpr},
+               ${data.store_price}, ${data.store_price_compare || 'NULL'},
+               ${data.store_active_gpd}, ${data.store_active_gpr},
                ${sequelize.escape(data.store_short_desc || '')},
+               ${sequelize.escape(data.store_description || '')},
+               ${sequelize.escape(data.store_meta_title || '')},
+               ${sequelize.escape(data.store_meta_desc || '')},
+               ${data.store_tags ? sequelize.escape(data.store_tags) : 'NULL'},
+               ${data.store_featured},
                NOW(), NOW()
              )`
           );
@@ -474,17 +520,67 @@ const importProducts = async (req, res, next) => {
 
 const importCustomers = async (req, res, next) => {
   try {
-    const { rows } = req.body;
-    let success = 0, failed = 0, errors = [];
+    const { rows, filename } = req.body;
+    let success = 0, updated = 0, failed = 0, errors = [];
+
+    const str = (v) => (v == null || v === '') ? null : String(v).trim();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRe = /^[0-9+\-\s()]{6,20}$/;
+
+    let rowNum = 2; // baris ke-3 di excel adalah data pertama (header 2 baris)
     for (const row of (rows||[])) {
+      rowNum++;
       try {
-        const existing = row.phone ? await Customer.findOne({ where: { phone: row.phone } }) : null;
-        if (existing) await existing.update(row);
-        else await Customer.create(row);
-        success++;
-      } catch (e) { failed++; errors.push(`Row ${success+failed}: ${e.message}`); }
+        if (!row.name || !String(row.name).trim()) {
+          failed++; errors.push(`Baris ${rowNum}: nama wajib diisi`); continue;
+        }
+
+        const phone = str(row.phone);
+        const email = str(row.email);
+
+        if (phone && !phoneRe.test(phone)) {
+          failed++; errors.push(`Baris ${rowNum}: format No. HP tidak valid (${phone})`); continue;
+        }
+        if (email && !emailRe.test(email)) {
+          failed++; errors.push(`Baris ${rowNum}: format email tidak valid (${email})`); continue;
+        }
+
+        // Hanya kolom yang valid di model Customer — cegah field asing dari Excel ikut terinsert
+        const data = {
+          name:        str(row.name),
+          phone,
+          email,
+          address:     str(row.address),
+          city:        str(row.city),
+          province:    str(row.province),
+          postal_code: str(row.postal_code),
+          notes:       str(row.notes),
+        };
+
+        // Cek duplikat berdasarkan phone ATAU email (mana yang terisi)
+        let existing = null;
+        if (phone) existing = await Customer.findOne({ where: { phone } });
+        if (!existing && email) existing = await Customer.findOne({ where: { email } });
+
+        if (existing) {
+          await existing.update(data);
+          updated++;
+        } else {
+          await Customer.create(data);
+          success++;
+        }
+      } catch (e) {
+        failed++;
+        errors.push(`Baris ${rowNum} "${row.name||'?'}": ${e.message}`);
+      }
     }
-    return res.json({ success:true, data:{ success, failed, errors } });
+
+    await ImportLog.create({
+      type: 'customers', filename: filename || 'import',
+      total: rows?.length || 0, success: success + updated, failed,
+      errors: JSON.stringify(errors), created_by: req.user?.id
+    });
+    return res.json({ success: true, data: { success, updated, failed, errors } });
   } catch (err) { next(err); }
 };
 
