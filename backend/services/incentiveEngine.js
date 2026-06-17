@@ -88,6 +88,7 @@ const calculatePeriod = async (periodId) => {
   // ── 1. WA Sales — cara LAMA: per karyawan sesuai penjualan masing-masing dari ERP ──
   const waSales = await WaSale.findAll({ where: { period_id: periodId } });
   const waByEmp = {};
+  const waByBranch = {}; // untuk hitung bonus target per cabang
   let totalWaSales = 0;
   const waEligibleStatuses = channelsMap['WA']?.eligible_statuses || ['kontrak','tetap'];
 
@@ -100,6 +101,12 @@ const calculatePeriod = async (periodId) => {
     waByEmp[s.employee_id].amount    += parseFloat(s.sale_amount);
     waByEmp[s.employee_id].incentive += recalcIncentive;
     totalWaSales += parseFloat(s.sale_amount);
+
+    // Breakdown per cabang (berdasarkan cabang karyawan pemilik penjualan WA)
+    if (emp?.branch_id != null) {
+      const bId = String(emp.branch_id);
+      waByBranch[bId] = (waByBranch[bId] || 0) + parseFloat(s.sale_amount);
+    }
   }
 
   // ── 2. Marketplace — per CABANG, dibagi pakai master template cabang tersebut ──
@@ -218,16 +225,43 @@ const calculatePeriod = async (periodId) => {
     });
   });
 
-  // ── 5. Bonus Target ───────────────────────────────────────
+  // ── 5. Bonus Target — DIHITUNG PER CABANG, lalu digabung ──────────────
   const totalAllSales = totalWaSales + totalMpSales + totalWebSales;
-  const bonusTargets  = await BonusTarget.findAll({
-    where: { is_active: true, min_amount: { [Op.lte]: totalAllSales } },
+
+  // Kumpulkan semua branch_id yang terlibat dari WA/MP/Web
+  const allBranchIds = new Set([
+    ...Object.keys(waByBranch),
+    ...Object.keys(mpByBranch),
+    ...Object.keys(webByBranch),
+  ]);
+
+  const allBonusTargets = await BonusTarget.findAll({
+    where: { is_active: true },
     order: [['min_amount', 'DESC']],
   });
-  const achievedTarget = bonusTargets[0] || null;
-  const totalBonus     = achievedTarget ? parseFloat(achievedTarget.bonus_amount) : 0;
 
-  // Eligible statuses for bonus from BonusTarget setting
+  // Hitung tier tercapai per cabang, lalu jumlahkan bonusnya
+  const bonusPerBranch = []; // untuk detail/audit
+  let totalBonus = 0;
+  let lastAchievedTarget = null; // untuk fallback eligible_statuses & display
+
+  for (const bId of allBranchIds) {
+    const branchSales = (waByBranch[bId] || 0) + (mpByBranch[bId] || 0) + (webByBranch[bId] || 0);
+    const tier = allBonusTargets.find(t => branchSales >= parseFloat(t.min_amount)) || null;
+    const branchBonus = tier ? parseFloat(tier.bonus_amount) : 0;
+    totalBonus += branchBonus;
+    if (tier) lastAchievedTarget = tier;
+    bonusPerBranch.push({
+      branch_id: parseInt(bId),
+      total_sales: round2(branchSales),
+      tier: tier ? { name: tier.name, min: tier.min_amount, bonus_amount: tier.bonus_amount } : null,
+      bonus: round2(branchBonus),
+    });
+  }
+
+  const achievedTarget = lastAchievedTarget; // dipakai untuk eligible_statuses & label tier di detail
+
+  // Eligible statuses for bonus from BonusTarget setting (fallback default jika belum ada tier tercapai)
   const bonusEligibleStatuses = achievedTarget?.eligible_statuses || ['kontrak','tetap'];
   // Combined eligibility: status kepegawaian DAN toggle per-karyawan eligible_for_bonus
   const isEligibleForBonus = (emp) => isEligible(emp, bonusEligibleStatuses) && emp.eligible_for_bonus !== false;
@@ -258,6 +292,8 @@ const calculatePeriod = async (periodId) => {
         excluded: !isEligibleForBonus(emp),
         excluded_reason: !isEligible(emp, bonusEligibleStatuses) ? 'status_kepegawaian' : (emp.eligible_for_bonus === false ? 'dikecualikan_manual' : null),
         tier: achievedTarget ? { name: achievedTarget.name, min: achievedTarget.min_amount, total_bonus: achievedTarget.bonus_amount } : null,
+        total_bonus_gabungan: round2(totalBonus),
+        per_branch: bonusPerBranch,
       },
     };
 
@@ -311,6 +347,8 @@ const calculatePeriod = async (periodId) => {
     total_incentive_paid:    round2(totalPaid),
     bonus_achieved:          achievedTarget,
     bonus_per_employee:      bonusPerEmp,
+    bonus_per_branch:        bonusPerBranch,
+    bonus_total_gabungan:    round2(totalBonus),
     results,
   };
 };
