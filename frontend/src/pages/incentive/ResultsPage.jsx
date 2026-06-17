@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Award, X, Loader2, RefreshCw,
   FileDown, FileSpreadsheet, Printer, Target,
-  CheckCircle2, ChevronRight, Banknote
+  CheckCircle2, ChevronRight, Banknote, Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -320,68 +320,106 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {/* Period summary */}
+      {/* Period summary — Hero redesign */}
       {period && (
-        <div className="card p-4 mb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label:'Total Penjualan', value: toRpShort(period.total_all_sales),      color:'text-[var(--text-primary)]' },
-              { label:'Total Insentif',  value: toRpShort(period.total_incentive_paid), color:'text-emerald-600 dark:text-emerald-400' },
-            ].map((s,i) => (
-              <div key={i} className="bg-[var(--bg-secondary)] rounded-xl p-3 text-center">
-                <p className={`text-base font-black ${s.color}`}>{s.value}</p>
-                <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{s.label}</p>
+        <div className="space-y-3 mb-4">
+          {/* Hero — Total Insentif (focal point) */}
+          <div className="relative overflow-hidden rounded-2xl p-5"
+            style={{background:'linear-gradient(135deg, #16a34a 0%, #15803d 60%, #14532d 100%)'}}>
+            <div className="absolute top-0 right-0 w-28 h-28 opacity-10"
+              style={{backgroundImage:'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize:'9px 9px'}} />
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white/70 text-[10px] font-bold uppercase tracking-wider">Total Insentif Periode</p>
+                  <p className="text-white font-black text-3xl mt-1">{toRpShort(period.total_incentive_paid)}</p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                  <Award className="w-6 h-6 text-white" />
+                </div>
               </div>
-            ))}
+              <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-white/15">
+                <span className="text-white/60 text-[11px]">Dari total penjualan</span>
+                <span className="text-white font-bold text-xs">{toRpShort(period.total_all_sales)}</span>
+              </div>
+            </div>
           </div>
+
+          {/* Channel stats — colored tint mini cards */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label:'💬 WA',  value: period.total_wa_sales,          color:'text-emerald-600' },
-              { label:'🛒 MP',  value: period.total_marketplace_sales,  color:'text-orange-600' },
-              { label:'🌐 Web', value: period.total_web_sales,          color:'text-blue-600' },
+              { label:'WA',  icon:'💬', value: period.total_wa_sales,         bg:'bg-emerald-50 dark:bg-emerald-950', border:'border-emerald-200 dark:border-emerald-900', text:'text-emerald-700 dark:text-emerald-400' },
+              { label:'MP',  icon:'🛒', value: period.total_marketplace_sales, bg:'bg-orange-50 dark:bg-orange-950',   border:'border-orange-200 dark:border-orange-900',   text:'text-orange-700 dark:text-orange-400' },
+              { label:'Web', icon:'🌐', value: period.total_web_sales,        bg:'bg-blue-50 dark:bg-blue-950',       border:'border-blue-200 dark:border-blue-900',       text:'text-blue-700 dark:text-blue-400' },
             ].map((s,i) => (
-              <div key={i} className="bg-[var(--bg-secondary)] rounded-xl p-2 text-center">
-                <p className={`text-xs font-bold ${s.color}`}>{toRpShort(s.value)}</p>
-                <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">{s.label}</p>
+              <div key={i} className={`rounded-xl p-2.5 border ${s.bg} ${s.border}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm">{s.icon}</span>
+                  <span className={`text-[9px] font-bold uppercase tracking-wide ${s.text} opacity-70`}>{s.label}</span>
+                </div>
+                <p className={`text-xs font-black ${s.text}`}>{toRpShort(s.value)}</p>
               </div>
             ))}
           </div>
+
+          {/* Bonus achievement card */}
           {parseFloat(period.bonus_per_employee) > 0 && (
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-xs text-amber-700 dark:text-amber-400 font-semibold">
-              <Target className="w-4 h-4" />
-              Bonus target tercapai · {toRp(period.bonus_per_employee)} per karyawan ({period.active_employee_count} karyawan aktif)
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl border border-amber-200 dark:border-amber-900 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950">
+              <div className="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Target className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">🎯 Bonus Target Tercapai</p>
+                <p className="text-xs text-amber-600 dark:text-amber-500">{period.active_employee_count} karyawan aktif berhak menerima</p>
+              </div>
+              <p className="text-lg font-black text-amber-700 dark:text-amber-400 flex-shrink-0">{toRp(period.bonus_per_employee)}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Breakdown summary */}
+      {/* Breakdown summary — progress bars per channel */}
       {summary && results.length > 0 && (
-        <div className="card p-3 mb-4">
-          <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Breakdown Insentif</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        <div className="card p-4 mb-4">
+          <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Breakdown Insentif</p>
+          <div className="space-y-2.5">
             {[
-              { label:'💬 WA',           value: summary.total_wa,       color:'text-emerald-600 dark:text-emerald-400' },
-              { label:'🛒 Marketplace',   value: summary.total_mp,       color:'text-orange-600 dark:text-orange-400' },
-              { label:'🌐 Web',           value: summary.total_web,      color:'text-blue-600 dark:text-blue-400' },
-              { label:'⭐ Aktivitas',     value: summary.total_activity, color:'text-purple-600 dark:text-purple-400' },
-              { label:'🎯 Bonus Target',  value: summary.total_bonus,    color:'text-amber-600 dark:text-amber-400' },
-            ].map((s,i) => (
-              <div key={i} className="flex justify-between items-center">
-                <span className="text-xs text-[var(--text-secondary)]">{s.label}</span>
-                <span className={`text-xs font-bold ${s.color}`}>{toRpShort(s.value)}</span>
-              </div>
-            ))}
+              { label:'WA',           icon:'💬', value: summary.total_wa,       color:'#10b981' },
+              { label:'Marketplace',   icon:'🛒', value: summary.total_mp,       color:'#f97316' },
+              { label:'Web',           icon:'🌐', value: summary.total_web,      color:'#3b82f6' },
+              { label:'Aktivitas',     icon:'⭐', value: summary.total_activity, color:'#a855f7' },
+              { label:'Bonus Target',  icon:'🎯', value: summary.total_bonus,    color:'#f59e0b' },
+            ].filter(s => parseFloat(s.value) > 0).map((s,i) => {
+              const total = parseFloat(period?.total_incentive_paid) || 1;
+              const pct = Math.min(100, (parseFloat(s.value) / total) * 100);
+              return (
+                <div key={i}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1.5">
+                      <span>{s.icon}</span>{s.label}
+                    </span>
+                    <span className="text-xs font-bold" style={{color: s.color}}>{toRpShort(s.value)}</span>
+                  </div>
+                  <div className="h-1.5 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{width:`${pct}%`, background: s.color}} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Filter */}
-      <div className="mb-4">
-        <select value={filterBranch} onChange={e => setFB(e.target.value)} className="input-base text-sm w-full">
-          <option value="">Semua Cabang ({results.length} karyawan)</option>
-          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+      <div className="mb-3">
+        <div className="relative">
+          <Users className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+          <select value={filterBranch} onChange={e => setFB(e.target.value)}
+            className="input-base text-sm w-full pl-9 font-medium">
+            <option value="">Semua Cabang ({results.length} karyawan)</option>
+            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Results list */}
@@ -394,39 +432,63 @@ export default function ResultsPage() {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-            <p className="text-xs font-bold text-[var(--text-primary)]">🏆 Ranking Insentif</p>
+          <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center gap-2">
+            <Award className="w-4 h-4 text-amber-500" />
+            <p className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide">Ranking Insentif</p>
           </div>
           <div className="divide-y divide-[var(--border-subtle)]">
-            {results.map((r, i) => (
-              <button key={r.id} onClick={() => setSelectedSlip(r.id)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors text-left">
-                <span className="text-sm font-black w-6 flex-shrink-0 text-center">
-                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span className="text-[var(--text-muted)]">{i+1}</span>}
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {r.employee_name?.[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{r.employee_name}</p>
-                  <p className="text-xs text-[var(--text-muted)] truncate">{r.branch_name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    {parseFloat(r.wa_incentive) > 0 && <span className="text-[10px] text-emerald-600 dark:text-emerald-400">WA {toRpShort(r.wa_incentive)}</span>}
-                    {parseFloat(r.marketplace_incentive) > 0 && <span className="text-[10px] text-orange-500">MP {toRpShort(r.marketplace_incentive)}</span>}
-                    {parseFloat(r.web_incentive) > 0 && <span className="text-[10px] text-blue-500">Web {toRpShort(r.web_incentive)}</span>}
-                    {parseFloat(r.activity_incentive) > 0 && <span className="text-[10px] text-purple-500">Akt {toRpShort(r.activity_incentive)}</span>}
-                    {parseFloat(r.bonus_target) > 0 && <span className="text-[10px] text-amber-500">Bonus {toRpShort(r.bonus_target)}</span>}
+            {results.map((r, i) => {
+              const isTop3 = i < 3;
+              const rankTint = i === 0 ? 'bg-amber-50 dark:bg-amber-950/40' : i === 1 ? 'bg-slate-50 dark:bg-slate-800/40' : i === 2 ? 'bg-orange-50 dark:bg-orange-950/30' : '';
+              const medalBg  = i === 0 ? '#fbbf24' : i === 1 ? '#cbd5e1' : '#fb923c';
+
+              const TAGS = [
+                parseFloat(r.wa_incentive)          > 0 && { l:'WA',     v:r.wa_incentive,          bg:'#d1fae5', fg:'#047857' },
+                parseFloat(r.marketplace_incentive) > 0 && { l:'MP',     v:r.marketplace_incentive, bg:'#ffedd5', fg:'#c2410c' },
+                parseFloat(r.web_incentive)         > 0 && { l:'Web',    v:r.web_incentive,         bg:'#dbeafe', fg:'#1d4ed8' },
+                parseFloat(r.activity_incentive)    > 0 && { l:'Akt',    v:r.activity_incentive,    bg:'#f3e8ff', fg:'#7e22ce' },
+                parseFloat(r.bonus_target)          > 0 && { l:'Bonus',  v:r.bonus_target,           bg:'#fef3c7', fg:'#b45309' },
+              ].filter(Boolean);
+
+              return (
+                <button key={r.id} onClick={() => setSelectedSlip(r.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--bg-secondary)] transition-colors text-left ${rankTint}`}>
+                  {!isTop3 && (
+                    <span className="text-xs font-bold w-5 flex-shrink-0 text-center text-[var(--text-muted)]">{i+1}</span>
+                  )}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                      {r.employee_name?.[0]}
+                    </div>
+                    {isTop3 && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm border-2 border-[var(--bg-card)]"
+                        style={{background: medalBg}}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-base font-black text-emerald-600 dark:text-emerald-400">{toRpShort(r.total_incentive)}</p>
-                  <div className="flex items-center gap-1 justify-end mt-0.5">
-                    <p className="text-[10px] text-[var(--text-muted)]">Tap slip</p>
-                    <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{r.employee_name}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] truncate">{r.branch_name}</p>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {TAGS.map((t, ti) => (
+                        <span key={ti} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                          style={{background: t.bg, color: t.fg}}>
+                          {t.l} {toRpShort(t.v)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-base font-black text-emerald-600 dark:text-emerald-400">{toRpShort(r.total_incentive)}</p>
+                    <div className="flex items-center gap-0.5 justify-end mt-0.5">
+                      <p className="text-[10px] text-[var(--text-muted)]">Tap slip</p>
+                      <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
