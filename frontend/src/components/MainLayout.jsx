@@ -111,8 +111,10 @@ const NAV = [
     group: 'Pengaturan',
     items: [
       { to:'/company-settings',   icon:Building2,         label:'Perusahaan',    roles:['admin'] },
-      { to:'/backup',              icon:HardDrive,         label:'Backup & Restore', roles:['admin'] },
-      { to:'/cleanup',             icon:Trash2,            label:'Data Cleanup',  roles:['admin'] },
+      { to:'/backup',              icon:HardDrive,         label:'Backup & Restore (HRD)', roles:['admin'] },
+      { to:'/cleanup',             icon:Trash2,            label:'Data Cleanup (HRD)',  roles:['admin'] },
+      { to:'/backup-erp',          icon:HardDrive,         label:'Backup & Restore (ERP)', roles:['admin'] },
+      { to:'/cleanup-erp',         icon:Trash2,            label:'Data Cleanup (ERP)',  roles:['admin'] },
       { to:'/payroll-components', icon:SlidersHorizontal, label:'Komponen Gaji', roles:['admin','hr'] },
       { to:'/user-access',        icon:Shield,            label:'Hak Akses',     roles:['admin','hr'] },
       { to:'/self-service',        icon:User,              label:'Self Service',  roles:['admin','hr','supervisor','employee'] },

@@ -24,6 +24,8 @@ const notificationRoutes   = require('./routes/notifications');
 const newsRoutes           = require('./routes/news');
 const cleanupRoutes        = require('./routes/cleanup');
 const backupRoutes         = require('./routes/backup');
+const cleanupErpRoutes     = require('./routes/cleanupErp');
+const backupErpRoutes      = require('./routes/backupErp');
 const aiProxyRoutes        = require('./routes/aiProxy');
 const quotesRoutes         = require('./routes/quotes');
 
@@ -421,6 +423,28 @@ app.post('/run-alter', async (req, res) => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         frequency ENUM('daily','weekly','monthly') DEFAULT 'daily',
         hour INT DEFAULT 2,
+        enabled TINYINT(1) DEFAULT 1,
+        last_run DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+      // Backup tables — ERP (separate from HRD backup)
+      `CREATE TABLE IF NOT EXISTS backup_erp_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        url TEXT NOT NULL,
+        size_kb INT DEFAULT 0,
+        total_rows INT DEFAULT 0,
+        triggered_by VARCHAR(50) DEFAULT 'manual',
+        status ENUM('success','failed') DEFAULT 'success',
+        error TEXT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_created (created_at)
+      )`,
+      `CREATE TABLE IF NOT EXISTS backup_erp_schedule (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        frequency ENUM('daily','weekly','monthly') DEFAULT 'daily',
+        hour INT DEFAULT 3,
         enabled TINYINT(1) DEFAULT 1,
         last_run DATETIME NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1034,6 +1058,8 @@ app.use('/api/notifications',  notificationRoutes);
 app.use('/api/news',           newsRoutes);
 app.use('/api/cleanup',        cleanupRoutes);
 app.use('/api/backup',         backupRoutes);
+app.use('/api/cleanup-erp',    cleanupErpRoutes);
+app.use('/api/backup-erp',     backupErpRoutes);
 app.use('/api/quotes',         quotesRoutes);
 app.use('/api/ai',             aiProxyRoutes);
 
@@ -1051,6 +1077,14 @@ const startServer = async () => {
     console.log(`📡 Env: ${process.env.NODE_ENV || 'production'}`);
     console.log(`❤️  Health: /health\n`);
   });
+
+  // Auto-start backup cron jobs (delayed to let DB migrations settle first)
+  setTimeout(() => {
+    try { require('./services/backupCron').startCron(); } catch(e) { console.warn('[Backup Cron] Auto-start skipped:', e.message); }
+  }, 5000);
+  setTimeout(() => {
+    try { require('./services/backupErpCron').startErpCron(); } catch(e) { console.warn('[Backup ERP Cron] Auto-start skipped:', e.message); }
+  }, 6000);
 };
 
 startServer();
