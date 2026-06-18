@@ -1,15 +1,21 @@
 // ════════════════════════════════════════════════════════════════════
 // Wilayah Indonesia helper
 // Sumber data: emsifa/api-wilayah-indonesia (data resmi Kemendagri RI)
-// https://emsifa.github.io/api-wilayah-indonesia/api/
+//
+// ⚠️ Update Jun 2026: emsifa.github.io melakukan redirect ke HTTP custom
+// domain yang menyebabkan mixed-content blocked + CORS error.
+// Diganti ke raw.githubusercontent.com yang:
+//   ✓ HTTPS murni, no redirect
+//   ✓ access-control-allow-origin: *
+//   ✓ Sumber data identik (file repo emsifa)
 //
 // Cache per level di localStorage dengan TTL 30 hari.
 // Provinsi jarang berubah, jadi aman untuk dicache lama.
 // ════════════════════════════════════════════════════════════════════
 
-const BASE = 'https://emsifa.github.io/api-wilayah-indonesia/api';
+const BASE = 'https://raw.githubusercontent.com/emsifa/api-wilayah-indonesia/master/static/api';
 const TTL  = 1000 * 60 * 60 * 24 * 30; // 30 hari
-const PREFIX = 'wilayah:';
+const PREFIX = 'wilayah:v2:'; // bump dari v1 untuk invalidate cache lama yg error
 
 // ── Cache helpers ─────────────────────────────────────────────
 const getCache = (key) => {
@@ -76,8 +82,9 @@ export const getVillages = (districtId) =>
 // ── Clear cache (untuk debug / settings) ──────────────────────
 export const clearWilayahCache = () => {
   try {
+    // Clear semua versi cache (v1 lama + v2 baru) supaya bersih
     Object.keys(localStorage)
-      .filter(k => k.startsWith(PREFIX))
+      .filter(k => k.startsWith('wilayah:'))
       .forEach(k => localStorage.removeItem(k));
     return true;
   } catch { return false; }
