@@ -43,9 +43,13 @@ export const erpService = {
   adjustStock:      (d)      => api.post(`${BASE}/products/${d.product_id}/adjust-stock`, d),
 
   // Customers
-  getCustomers:     (p)      => api.get(`${BASE}/customers`, { params: p }),
-  createCustomer:   (d)      => api.post(`${BASE}/customers`, d),
-  updateCustomer:   (id,d)   => api.put(`${BASE}/customers/${id}`, d),
+  getCustomers:        (p)      => api.get(`${BASE}/customers`, { params: p }),
+  getCustomerDetail:   (id)     => api.get(`${BASE}/customers/${id}`),
+  getCustomerOrders:   (id, p)  => api.get(`${BASE}/customers/${id}/orders`, { params: p }),
+  checkDuplicate:      (p)      => api.get(`${BASE}/customers/check-duplicate`, { params: p }),
+  createCustomer:      (d)      => api.post(`${BASE}/customers`, d),
+  updateCustomer:      (id, d)  => api.put(`${BASE}/customers/${id}`, d),
+  deleteCustomer:      (id)     => api.delete(`${BASE}/customers/${id}`),
 
   // Orders
   getOrders:        (p)      => api.get(`${BASE}/orders`, { params: p }),
