@@ -11,6 +11,7 @@ const { authenticate, authorize } = require('../../middleware/auth');
 const allRoles = authorize('admin','hr','supervisor','employee');
 
 const master    = require('../../controllers/erp/masterController');
+const customer  = require('../../controllers/erp/customerController');
 const target    = require('../../controllers/erp/channelTargetController');
 const inventory = require('../../controllers/erp/inventoryController');
 const order    = require('../../controllers/erp/orderController');
@@ -55,10 +56,14 @@ router.put   ('/products/:id',        authenticate, allRoles, master.updateProdu
 router.delete('/products/:id',        authenticate, allRoles, master.deleteProduct);
 router.post  ('/products/:id/adjust-stock', authenticate, allRoles, master.adjustStock);
 
-// ── Customers ─────────────────────────────────────────────────
-router.get   ('/customers',           authenticate, allRoles, master.getCustomers);
-router.post  ('/customers',           authenticate, allRoles, master.createCustomer);
-router.put   ('/customers/:id',       authenticate, allRoles, master.updateCustomer);
+// ── Customers (NEW dedicated controller) ─────────────────────
+router.get   ('/customers',                   authenticate, allRoles, customer.getCustomers);
+router.get   ('/customers/check-duplicate',   authenticate, allRoles, customer.checkDuplicate);
+router.get   ('/customers/:id',               authenticate, allRoles, customer.getCustomerDetail);
+router.get   ('/customers/:id/orders',        authenticate, allRoles, customer.getCustomerOrders);
+router.post  ('/customers',                   authenticate, allRoles, customer.createCustomer);
+router.put   ('/customers/:id',               authenticate, allRoles, customer.updateCustomer);
+router.delete('/customers/:id',               authenticate, allRoles, customer.deleteCustomer);
 
 // ── Orders ───────────────────────────────────────────────────
 router.get   ('/orders',              authenticate, allRoles, order.getOrders);
