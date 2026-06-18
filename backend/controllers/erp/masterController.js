@@ -509,11 +509,16 @@ const importProducts = async (req, res, next) => {
       }
     }
 
-    await ImportLog.create({
-      type: 'products', filename: filename || 'import',
-      total: rows?.length || 0, success: success + updated, failed,
-      errors: JSON.stringify(errors), created_by: req.user?.id
-    });
+    // Defensive: log gagal tidak boleh crash response
+    try {
+      await ImportLog.create({
+        type: 'products', filename: filename || 'import',
+        total: rows?.length || 0, success: success + updated, failed,
+        errors: JSON.stringify(errors), created_by: req.user?.id
+      });
+    } catch (logErr) {
+      console.error('[ImportLog] Gagal simpan log:', logErr.message);
+    }
     return res.json({ success: true, data: { success, updated, failed, errors } });
   } catch (err) { next(err); }
 };
@@ -575,11 +580,16 @@ const importCustomers = async (req, res, next) => {
       }
     }
 
-    await ImportLog.create({
-      type: 'customers', filename: filename || 'import',
-      total: rows?.length || 0, success: success + updated, failed,
-      errors: JSON.stringify(errors), created_by: req.user?.id
-    });
+    // Defensive: log gagal tidak boleh crash response
+    try {
+      await ImportLog.create({
+        type: 'customers', filename: filename || 'import',
+        total: rows?.length || 0, success: success + updated, failed,
+        errors: JSON.stringify(errors), created_by: req.user?.id
+      });
+    } catch (logErr) {
+      console.error('[ImportLog] Gagal simpan log:', logErr.message);
+    }
     return res.json({ success: true, data: { success, updated, failed, errors } });
   } catch (err) { next(err); }
 };
