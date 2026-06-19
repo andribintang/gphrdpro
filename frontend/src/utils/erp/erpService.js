@@ -51,6 +51,15 @@ export const erpService = {
   updateCustomer:      (id, d)  => api.put(`${BASE}/customers/${id}`, d),
   deleteCustomer:      (id)     => api.delete(`${BASE}/customers/${id}`),
 
+  // Product Variants
+  getProductVariants:   (productId)     => api.get(`${BASE}/products/${productId}/variants`),
+  createVariant:        (productId, d)  => api.post(`${BASE}/products/${productId}/variants`, d),
+  generateVariants:     (productId, d)  => api.post(`${BASE}/products/${productId}/variants/generate`, d),
+  updateVariant:        (id, d)         => api.put(`${BASE}/variants/${id}`, d),
+  deleteVariant:        (id)            => api.delete(`${BASE}/variants/${id}`),
+  toggleVariant:        (id)            => api.post(`${BASE}/variants/${id}/toggle`),
+  adjustVariantStock:   (id, d)         => api.post(`${BASE}/variants/${id}/adjust-stock`, d),
+
   // Orders
   getOrders:        (p)      => api.get(`${BASE}/orders`, { params: p }),
   updateOrderStatus:(id,d)   => {

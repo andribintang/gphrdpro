@@ -12,6 +12,7 @@ const allRoles = authorize('admin','hr','supervisor','employee');
 
 const master    = require('../../controllers/erp/masterController');
 const customer  = require('../../controllers/erp/customerController');
+const variant  = require('../../controllers/erp/variantController');
 const target    = require('../../controllers/erp/channelTargetController');
 const inventory = require('../../controllers/erp/inventoryController');
 const order    = require('../../controllers/erp/orderController');
@@ -55,6 +56,15 @@ router.post  ('/products',            authenticate, allRoles, master.createProdu
 router.put   ('/products/:id',        authenticate, allRoles, master.updateProduct);
 router.delete('/products/:id',        authenticate, allRoles, master.deleteProduct);
 router.post  ('/products/:id/adjust-stock', authenticate, allRoles, master.adjustStock);
+
+// ── Product Variants ─────────────────────────────────────────
+router.get   ('/products/:productId/variants',          authenticate, allRoles, variant.getVariants);
+router.post  ('/products/:productId/variants',          authenticate, allRoles, variant.createVariant);
+router.post  ('/products/:productId/variants/generate', authenticate, allRoles, variant.generateCombinations);
+router.put   ('/variants/:id',                          authenticate, allRoles, variant.updateVariant);
+router.delete('/variants/:id',                          authenticate, allRoles, variant.deleteVariant);
+router.post  ('/variants/:id/toggle',                   authenticate, allRoles, variant.toggleVariant);
+router.post  ('/variants/:id/adjust-stock',             authenticate, allRoles, variant.adjustVariantStock);
 
 // ── Customers (NEW dedicated controller) ─────────────────────
 router.get   ('/customers',                   authenticate, allRoles, customer.getCustomers);

@@ -3,6 +3,7 @@ import {
   Package, Plus, Edit3, X, Loader2, CheckCircle2, AlertTriangle, Trash2,
   Store, ChevronDown, Upload, Image as ImageIcon,
   Search, MoreHorizontal, Copy, ChevronLeft, ChevronRight, Eye,
+  Layers, Sparkles, RefreshCw, Power, PowerOff, Check, Wrench, Tag,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../../components/DataTable';
@@ -273,6 +274,375 @@ const EMPTY = {
   meta_title: '', meta_desc: '', tags: '',
 };
 
+// ════════════════════════════════════════════════════════════════════
+// VariantCombinationsManager — kelola kombinasi varian (Phase 1)
+// Hanya tampil jika product sudah disave (punya id)
+// ════════════════════════════════════════════════════════════════════
+function VariantCombinationsManager({ productId, attributeSchema, sellPrice, branchId }) {
+  const [variants, setVariants]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [generating, setGen]      = useState(false);
+  const [editing, setEditing]     = useState(null);    // variant being edited
+  const [adjusting, setAdjusting] = useState(null);    // variant for stock adjust
+
+  const fetchVariants = useCallback(async () => {
+    if (!productId) return;
+    setLoading(true);
+    try {
+      const res = await erpService.getProductVariants(productId);
+      setVariants(res.data?.data?.variants || []);
+    } catch (e) {
+      toast.error('Gagal memuat varian');
+    } finally { setLoading(false); }
+  }, [productId]);
+
+  useEffect(() => { fetchVariants(); }, [fetchVariants]);
+
+  const hasValidSchema = attributeSchema &&
+    Object.keys(attributeSchema).length > 0 &&
+    Object.values(attributeSchema).every(arr => Array.isArray(arr) && arr.length > 0);
+
+  const expectedCount = hasValidSchema
+    ? Object.values(attributeSchema).reduce((acc, arr) => acc * arr.length, 1)
+    : 0;
+
+  const handleGenerate = async (overwrite = false) => {
+    if (!hasValidSchema) {
+      toast.error('Definisikan atribut varian dulu di atas');
+      return;
+    }
+    if (variants.length > 0 && !overwrite) {
+      if (!confirm(`Sudah ada ${variants.length} varian. Generate akan menambahkan kombinasi yang belum ada, BUKAN menimpa. Lanjut?`)) return;
+    }
+    setGen(true);
+    try {
+      const res = await erpService.generateVariants(productId, {
+        schema: attributeSchema,
+        overwrite,
+      });
+      toast.success(res.data?.message || 'Berhasil');
+      await fetchVariants();
+    } catch (e) {
+      const code = e.response?.data?.code;
+      if (code === 'VARIANTS_USED_IN_ORDERS') {
+        toast.error(e.response.data.message);
+      } else {
+        toast.error(e.response?.data?.message || 'Gagal generate');
+      }
+    } finally { setGen(false); }
+  };
+
+  const handleDelete = async (v) => {
+    if (!confirm(`Hapus varian "${v.name}"?`)) return;
+    try {
+      await erpService.deleteVariant(v.id);
+      toast.success('Varian dihapus');
+      await fetchVariants();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Gagal hapus');
+    }
+  };
+
+  const handleToggle = async (v) => {
+    try {
+      await erpService.toggleVariant(v.id);
+      await fetchVariants();
+    } catch { toast.error('Gagal toggle'); }
+  };
+
+  if (!productId) {
+    return (
+      <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-2">
+        <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+        <span>Simpan produk dulu (klik "Simpan" di bawah), lalu buka kembali untuk mengelola kombinasi varian.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Header & Generator */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <p className="text-xs font-bold text-[var(--text-primary)]">Kombinasi Varian</p>
+          <p className="text-[10px] text-[var(--text-muted)]">
+            {variants.length} kombinasi
+            {hasValidSchema && expectedCount > variants.length && ` · ${expectedCount - variants.length} kombinasi baru dapat di-generate`}
+            {hasValidSchema && expectedCount === variants.length && variants.length > 0 && ' · semua kombinasi ter-generate'}
+          </p>
+        </div>
+        {hasValidSchema && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => handleGenerate(false)} disabled={generating}
+              className="btn-secondary text-xs h-8 px-3 gap-1">
+              {generating ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12}/>}
+              Generate Kombinasi
+            </button>
+            {variants.length > 0 && (
+              <button type="button"
+                onClick={() => { if (confirm('OVERWRITE akan hapus semua varian existing dan stock-nya. Lanjut?')) handleGenerate(true); }}
+                disabled={generating}
+                className="btn-icon-sm hover:text-red-600" title="Overwrite (reset)">
+                <RefreshCw size={12}/>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* List varian */}
+      {loading ? (
+        <div className="space-y-1.5">{[...Array(3)].map((_,i) => <div key={i} className="skeleton h-12 rounded-lg"/>)}</div>
+      ) : variants.length === 0 ? (
+        <div className="text-center py-6 bg-[var(--bg-secondary)] rounded-xl">
+          <Layers size={28} className="mx-auto mb-2 text-[var(--text-muted)] opacity-30"/>
+          <p className="text-xs text-[var(--text-muted)]">
+            {hasValidSchema
+              ? 'Belum ada kombinasi. Klik "Generate Kombinasi" untuk membuat otomatis dari atribut di atas.'
+              : 'Definisikan atribut varian di atas dulu (mis. Ukuran, Warna), lalu generate kombinasi.'}
+          </p>
+        </div>
+      ) : (
+        <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-[var(--bg-secondary)]">
+                <tr>
+                  <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">Varian</th>
+                  <th className="px-3 py-2 text-left font-bold text-[var(--text-muted)] uppercase tracking-wide">SKU</th>
+                  <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase tracking-wide">Harga</th>
+                  <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase tracking-wide">Stok</th>
+                  <th className="px-3 py-2 text-center font-bold text-[var(--text-muted)] uppercase tracking-wide">Min</th>
+                  <th className="px-3 py-2 text-right font-bold text-[var(--text-muted)] uppercase tracking-wide">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {variants.map(v => {
+                  const price = v.price_override != null ? parseFloat(v.price_override) : parseFloat(sellPrice || 0);
+                  const totalStock = v.stock_total || 0;
+                  const isLow = v.stock_min > 0 && totalStock <= v.stock_min;
+                  return (
+                    <tr key={v.id} className={!v.is_active ? 'opacity-40' : ''}>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Tag size={11} className="text-[var(--text-muted)] flex-shrink-0"/>
+                          <span className="font-semibold">{v.name}</span>
+                          {!v.is_active && (
+                            <span className="text-[9px] bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full">Nonaktif</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-[var(--text-muted)]">{v.sku || '—'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {v.price_override != null
+                          ? <span className="text-emerald-600 font-semibold">{toRpShort(price)}</span>
+                          : <span className="text-[var(--text-muted)]">{toRpShort(price)} <span className="text-[9px]">(default)</span></span>}
+                      </td>
+                      <td className={`px-3 py-2 text-center font-bold ${isLow ? 'text-red-600' : ''}`}>{totalStock}</td>
+                      <td className="px-3 py-2 text-center text-[var(--text-muted)]">{v.stock_min || 0}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <button type="button" onClick={() => setAdjusting(v)}
+                            className="btn-icon-sm" title="Adjust stok">
+                            <Wrench size={11}/>
+                          </button>
+                          <button type="button" onClick={() => setEditing(v)}
+                            className="btn-icon-sm" title="Edit">
+                            <Edit3 size={11}/>
+                          </button>
+                          <button type="button" onClick={() => handleToggle(v)}
+                            className="btn-icon-sm" title={v.is_active ? 'Nonaktifkan' : 'Aktifkan'}>
+                            {v.is_active ? <Power size={11}/> : <PowerOff size={11}/>}
+                          </button>
+                          <button type="button" onClick={() => handleDelete(v)}
+                            className="btn-icon-sm hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950" title="Hapus">
+                            <Trash2 size={11}/>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editing && (
+        <VariantEditModal
+          variant={editing}
+          defaultPrice={sellPrice}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); fetchVariants(); }}
+        />
+      )}
+
+      {/* Adjust stock modal */}
+      {adjusting && (
+        <VariantStockAdjustModal
+          variant={adjusting}
+          defaultBranch={branchId}
+          onClose={() => setAdjusting(null)}
+          onSaved={() => { setAdjusting(null); fetchVariants(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modal: Edit single variant ────────────────────────────────
+function VariantEditModal({ variant, defaultPrice, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: variant.name || '',
+    sku: variant.sku || '',
+    barcode: variant.barcode || '',
+    price_override: variant.price_override ?? '',
+    stock_min: variant.stock_min ?? 0,
+    notes: variant.notes || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handle = async () => {
+    setSaving(true);
+    try {
+      await erpService.updateVariant(variant.id, form);
+      toast.success('Varian diperbarui');
+      onSaved?.();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop"/>
+      <div className="modal-box max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="text-sm font-bold">Edit Varian</h3>
+          <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
+        </div>
+        <div className="modal-body space-y-3">
+          <div>
+            <label className="field-label">Nama Varian</label>
+            <input value={form.name} onChange={e => sf('name', e.target.value)} className="input-base" autoFocus/>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">SKU</label>
+              <input value={form.sku} onChange={e => sf('sku', e.target.value)} className="input-base font-mono text-xs"/>
+            </div>
+            <div>
+              <label className="field-label">Barcode</label>
+              <input value={form.barcode} onChange={e => sf('barcode', e.target.value)} className="input-base font-mono text-xs"/>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Harga Override</label>
+              <input type="number" value={form.price_override}
+                onChange={e => sf('price_override', e.target.value)}
+                className="input-base" placeholder={`Default: ${defaultPrice || 0}`}/>
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Kosongkan = pakai harga produk</p>
+            </div>
+            <div>
+              <label className="field-label">Stok Minimum</label>
+              <input type="number" value={form.stock_min}
+                onChange={e => sf('stock_min', e.target.value)}
+                className="input-base"/>
+            </div>
+          </div>
+          <div>
+            <label className="field-label">Catatan</label>
+            <textarea value={form.notes} onChange={e => sf('notes', e.target.value)}
+              rows={2} className="input-base resize-none"/>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handle} disabled={saving} className="btn-primary flex-1">
+            {saving ? <Loader2 size={14} className="animate-spin"/> : <CheckCircle2 size={14}/>}
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: Adjust stock per variant per branch ─────────────────
+function VariantStockAdjustModal({ variant, defaultBranch, onClose, onSaved }) {
+  const [branch, setBranch] = useState(defaultBranch || 1);
+  const [delta, setDelta]   = useState('');
+  const [notes, setNotes]   = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const current = (variant.stock_branches || []).find(s => s.branch_id == branch);
+  const currentQty = current?.qty || 0;
+  const after = currentQty + (parseInt(delta) || 0);
+
+  const handle = async () => {
+    const d = parseInt(delta);
+    if (!Number.isFinite(d) || d === 0) { toast.error('Masukkan jumlah perubahan (boleh +/-)'); return; }
+    setSaving(true);
+    try {
+      await erpService.adjustVariantStock(variant.id, { branch_id: parseInt(branch), qty_change: d, notes });
+      toast.success(`Stok berubah ${d > 0 ? '+' : ''}${d}`);
+      onSaved?.();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-backdrop"/>
+      <div className="modal-box max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="text-sm font-bold">Adjust Stok</h3>
+          <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
+        </div>
+        <div className="modal-body space-y-3">
+          <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Varian</p>
+            <p className="text-sm font-bold">{variant.name}</p>
+          </div>
+          <div>
+            <label className="field-label">Cabang</label>
+            <select value={branch} onChange={e => setBranch(e.target.value)} className="input-base">
+              <option value="1">GP Racing</option>
+              <option value="2">GP Distro</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Perubahan Qty (boleh negatif)</label>
+            <input type="number" value={delta} onChange={e => setDelta(e.target.value)}
+              placeholder="+10 atau -5" className="input-base text-center text-base font-bold" autoFocus/>
+          </div>
+          <div className="bg-[var(--bg-secondary)] rounded-lg p-3 grid grid-cols-3 gap-2 text-center">
+            <div><p className="text-[10px] text-[var(--text-muted)]">Sebelum</p><p className="text-sm font-bold">{currentQty}</p></div>
+            <div className="text-[var(--brand-600)] font-bold self-center">→</div>
+            <div><p className="text-[10px] text-[var(--text-muted)]">Sesudah</p><p className={`text-sm font-bold ${after < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{after}</p></div>
+          </div>
+          <div>
+            <label className="field-label">Catatan (opsional)</label>
+            <input value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="mis. Inisialisasi stok awal" className="input-base text-xs"/>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
+          <button onClick={handle} disabled={saving || after < 0} className="btn-primary flex-1">
+            {saving ? <Loader2 size={14} className="animate-spin"/> : <CheckCircle2 size={14}/>}
+            Adjust Stok
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
 function ProductModal({ product, allCategories, onClose, onSuccess }) {
   const isEdit = !!product;
   const [tab, setTab] = useState('basic');
@@ -553,14 +923,24 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
                 <ImageUploader images={form.images} onChange={v => sf('images', v)}/>
               </div>
               <div>
-                <label className="field-label mb-2 block">Varian Produk</label>
+                <label className="field-label mb-2 block">Atribut Varian</label>
                 <p className="text-[11px] text-[var(--text-muted)] mb-3">
-                  Kosongkan jika tidak ada varian.
+                  Definisikan grup atribut (mis. Ukuran, Warna). Setelah selesai, generate kombinasi di bawah.
                 </p>
                 <VariantEditor
                   variants={form.variants}
                   onChange={v => sf('variants', v)}
                   brand={form.branch_id === 2 ? 'gpdistro' : 'gpracing'}
+                />
+              </div>
+
+              {/* Section baru: Kombinasi Varian (Phase 1) */}
+              <div className="border-t border-[var(--border)] pt-5">
+                <VariantCombinationsManager
+                  productId={isEdit ? product?.id : null}
+                  attributeSchema={form.variants}
+                  sellPrice={form.sell_price}
+                  branchId={form.branch_id}
                 />
               </div>
             </div>
