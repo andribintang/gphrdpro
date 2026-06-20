@@ -1,144 +1,73 @@
-# 🎯 GPDISTRO — Upgrade Tabel ERP ke Format SaaS Profesional
+# 🎯 Fix: Stok Opname Belum Tampilkan Varian Produk
 
-Upgrade `DataTable.jsx` (komponen reusable) + migrasi/penambahan fitur di 8 halaman ERP. **Pure frontend — tidak ada perubahan database/migration untuk paket ini.**
+## Akar Masalah
 
----
+`StockOpnamePage` selama ini memanggil endpoint generik `/products` dan baca `p.stock?.qty` — yang di backend pakai relasi `Product.hasOne(Stock, {as:'stock'})`. Untuk produk **dengan varian**, satu produk punya **banyak baris Stock** (satu per kombinasi varian per cabang), jadi `hasOne` cuma ambil **satu baris secara acak/tidak tepat** — bukan breakdown per varian. Hasilnya: produk dengan varian di opname cuma kelihatan sebagai 1 baris dengan angka stok yang tidak mewakili kondisi sebenarnya, dan varian-nya sendiri **tidak muncul sama sekali**.
 
-## 📦 Isi Paket (9 file)
+Sudah ada endpoint khusus `/stock-opname` (`getStockOpname`/`submitStockOpname`) yang dibuat sebelumnya, tapi **frontend tidak pernah memakainya** dan endpoint itu sendiri **juga belum variant-aware**.
 
-```
-frontend/src/
-├── components/
-│   └── DataTable.jsx          ← UPGRADE (komponen inti)
-└── pages/erp/
-    ├── ProductsPage.jsx       ← + Sort kolom (basis: live repo terbaru, sudah termasuk Variant Manager)
-    ├── ExpensesPage.jsx       ← + Filter kategori, bulk-select, export CSV
-    ├── ShipmentsPage.jsx      ← FIX BUG search + export CSV
-    ├── ReturnsPage.jsx        ← + Export CSV (filter pill existing dipertahankan)
-    ├── StockOpnamePage.jsx    ← MIGRASI penuh ke DataTable + bulk reset
-    ├── InventoryPage.jsx      ← MIGRASI tab Reorder Alert + bulk action
-    ├── SalesTargetPage.jsx    ← MIGRASI tab Set Target + filter channel
-    └── SalesReportPage.jsx    ← MIGRASI (FIX: sebelumnya 0 pagination)
-```
+## Yang Diperbaiki
 
----
+### Backend — `purchaseController.js`
 
-## 🚀 Upgrade `DataTable.jsx` — 3 Fitur Baru
+**`getStockOpname`** sekarang mengembalikan **flat list per "unit hitung"**:
+- Produk **tanpa varian** → 1 baris (sama seperti sebelumnya)
+- Produk **dengan varian** → 1 baris **per kombinasi varian aktif**, masing-masing dengan stok sendiri-sendiri dari tabel `erp_stock` yang sudah difilter `variant_id` yang tepat
 
-| Fitur | Prop | Keterangan |
-|---|---|---|
-| **Bulk Select + Aksi Massal** | `selectable`, `bulkActions` | Checkbox per baris + "Pilih semua di halaman ini" / "Pilih semua N hasil". `bulkActions` adalah render-prop yang terima `(selectedRows, clearSelection)` — Anda render toolbar aksi sendiri (delete, reset, dll) |
-| **Export CSV** | `exportable`, `exportFilename` | Tombol export yang hormat filter/search aktif (cuma export apa yang sedang tampil di filter, bukan semua data mentah). Per-kolom bisa override dengan `exportValue`/`exportLabel` di definisi kolom |
-| **Page Size Selector** | `pageSizeOptions` | Dropdown 10/25/50/100 baris per halaman, menggantikan `pageSize` tetap |
-
-**100% backward compatible** — semua page yang sudah pakai `DataTable` sebelumnya (OrdersPage, PurchasesPage, CustomersPage) **tidak perlu diubah**, tetap jalan normal tanpa fitur baru kecuali Anda tambahkan prop-nya.
-
-### Contoh Penggunaan Bulk Action
-
-```jsx
-<DataTable
-  columns={columns}
-  data={expenses}
-  selectable
-  bulkActions={(selected, clear) => (
-    <div className="flex gap-2">
-      <span className="text-xs">{selected.length} dipilih</span>
-      <button onClick={() => handleBulkDelete(selected, clear)} className="btn-danger-sm">
-        Hapus {selected.length}
-      </button>
-    </div>
-  )}
-  exportable
-  exportFilename="pengeluaran"
-  pageSizeOptions={[10,25,50,100]}
-  ...
-/>
+```json
+{
+  "items": [
+    { "row_id": "p12", "product_id": 12, "variant_id": null, "name": "Helm Polos", "variant_name": null, "stock_qty": 8, "has_variants": false },
+    { "row_id": "v45", "product_id": 20, "variant_id": 45, "name": "Kaos GP Racing", "variant_name": "Merah / L", "stock_qty": 12, "has_variants": true },
+    { "row_id": "v46", "product_id": 20, "variant_id": 46, "name": "Kaos GP Racing", "variant_name": "Merah / XL", "stock_qty": 5, "has_variants": true }
+  ]
+}
 ```
 
----
+**`submitStockOpname`** sekarang terima `variant_id` opsional per item, dan update baris `Stock` yang tepat (`product_id + variant_id + branch_id`), bukan asal product_id saja.
 
-## 📋 Detail Per Halaman
+### Frontend — `StockOpnamePage.jsx`
 
-### ProductsPage — Sort Kolom
-Tabel produk **tetap custom** (bulk-select, expand-row variant, action menu yang sudah ada **TIDAK dibongkar**) — cuma ditambah klik-header untuk sort: Nama, SKU, Qty Stok, Harga Beli, Harga Jual, Harga Toko. Klik sekali = ascending, klik lagi = descending, ada indikator panah.
+- Ganti sumber data dari `erpService.getProducts()` → `erpService.getStockOpname()` (endpoint yang memang dibuat untuk ini)
+- Key opname diganti dari `product.id` jadi **key komposit** `product_id:variant_id` — supaya tidak tabrakan saat satu produk punya banyak baris varian
+- Kolom "Produk" sekarang tampilkan **badge nama varian** di bawah nama produk (mis. "Kaos GP Racing" + badge "Merah / L")
+- Search sekarang juga bisa cari berdasarkan nama varian
+- Excel export/import disesuaikan — kolom baru `variant_id`, `varian`, dan `row_key` (dipakai untuk matching saat import supaya akurat per-varian)
+- Info banner otomatis kasih tahu kalau ada produk dengan varian di cabang yang dipilih
 
-> ⚠️ File ini dibangun di atas versi **live repo Anda yang TERBARU** (sudah termasuk fitur Variant Manager dari fix sebelumnya) — bukan versi lama. Aman langsung replace.
+## Yang TIDAK Berubah
 
-### ExpensesPage — Filter + Bulk + Export
-- Filter dropdown kategori (baru)
-- Bulk-select + bulk-delete pengeluaran
-- Export CSV (menghormati filter kategori & search aktif)
-
-### ShipmentsPage — Bug Fix + Export
-**Bug nyata ditemukan & diperbaiki**: prop lama `customFilter` **tidak pernah benar-benar didukung** oleh `DataTable` (silently diabaikan) — artinya search by nama customer **selama ini tidak pernah berfungsi**. Diganti ke `searchFn` (prop yang benar-benar didukung). Plus tambah export CSV.
-
-### ReturnsPage — Export Ditambahkan
-Filter pill status (Pending/Approved/dst) yang sudah ada **dipertahankan** karena UX-nya sudah bagus — cuma ditambah export CSV.
-
-### StockOpnamePage — Migrasi Penuh
-Dari `<table>` manual ke `DataTable`. Input "Stok Aktual" yang bisa diedit langsung **tetap berfungsi** (pakai `render` prop yang terhubung ke state eksternal). Tambahan: search nama/SKU, sort kolom, toggle "tampilkan yang berubah saja", bulk-select dengan aksi "Reset ke Stok Sistem".
-
-### InventoryPage — Migrasi Tab Reorder Alert
-**Hanya tab "🔔 Reorder Alert"** yang dimigrasi (Dashboard/Mutasi Stok/Nilai Stok **tidak disentuh** — sudah cukup baik / pagination server-side). Bulk-select lama diganti pakai mekanisme `DataTable`, tambah filter urgensi & sort kolom.
-
-### SalesTargetPage — Migrasi Tab Set Target
-Input target_revenue/target_orders/notes yang editable **tetap berfungsi**. Tambah search nama sub-channel, filter channel (WA/Marketplace/Langsung), export CSV. Tab Dashboard & History (pivot dinamis) **tidak disentuh** — by design, karena strukturnya pivot bukan list.
-
-### SalesReportPage — Migrasi (Fix Kritis)
-**Sebelumnya tabel order detail render SEMUA baris sekaligus tanpa pagination** — kalau sebulan ada ratusan order, browser bisa lemot. Sekarang dipaginasi, sortable (tanggal/subtotal/total), filter channel, export CSV.
-
----
-
-## ❌ Yang SENGAJA Tidak Disentuh (Sesuai Hasil Review)
-
-| Halaman | Alasan |
-|---|---|
-| **DailyReportPage** | Pivot tanggal×channel dengan sticky kolom kompleks — bukan kandidat DataTable generik |
-| **ChannelReportPage** | Grouped header (rowSpan/colSpan) — sama, perlu treatment beda |
-| **ProfitLossPage** | Bukan tabel — laporan laba-rugi gaya statement |
-| **ImportPage** | Tabel preview transient (maks 50 baris in-memory), bukan entity list persisten |
-| **MasterDataPage** | Pakai card grid, bukan tabel sama sekali |
-| **OrdersPage, PurchasesPage, CustomersPage** | Sudah cukup lengkap (search+sort+filter+pagination), tidak diubah di paket ini |
+- Bulk-select, bulk reset ke stok sistem, filter "tampilkan yang berubah saja", sort kolom, pagination — semua fitur dari upgrade SaaS table sebelumnya **tetap jalan persis sama**
+- Produk tanpa varian tampil & berfungsi exactly seperti sebelumnya
 
 ---
 
 ## 🚀 Deployment
 
-1. Extract zip, drop folder `frontend/` ke root repo (auto-replace 9 file)
-2. **Tidak ada migrasi database** — pure frontend
-3. `git add . && git commit -m "feat(erp): upgrade tables to professional SaaS format (sort, filter, bulk, export, pagination)" && git push`
-4. Tunggu Railway redeploy frontend
-5. Hard refresh browser (Ctrl+Shift+R)
+1. Extract zip, drop ke root repo (2 file ter-replace):
+   - `backend/controllers/erp/purchaseController.js`
+   - `frontend/src/pages/erp/StockOpnamePage.jsx`
+2. **Tidak ada migrasi database baru** — semua kolom (`variant_id` di `erp_stock`/`erp_stock_movements`) sudah ada dari Phase 1 variant migration sebelumnya
+3. `git add . && git commit -m "fix(erp): stock opname now shows variant rows separately" && git push`
+4. Tunggu Railway redeploy backend & frontend
+5. Hard refresh browser
 
----
+## ✅ Testing
 
-## ✅ Testing Checklist
-
-- [ ] **ProductsPage**: klik header "Nama Produk" / "Harga Jual" dll → urut naik/turun, indikator panah muncul
-- [ ] **ExpensesPage**: pilih beberapa baris (checkbox) → tombol "Hapus N" muncul → test hapus massal. Filter kategori jalan. Export CSV download file
-- [ ] **ShipmentsPage**: search nama customer di kotak pencarian → **harus filter hasil** (sebelumnya bug, tidak jalan). Export CSV jalan
-- [ ] **ReturnsPage**: filter pill status masih jalan seperti biasa. Export CSV jalan
-- [ ] **StockOpnamePage**: input "Stok Aktual" masih bisa diedit & tersimpan. Search produk jalan. Sort kolom jalan. Bulk-select → "Reset ke Stok Sistem" jalan
-- [ ] **InventoryPage**: tab "Reorder Alert" — filter urgensi, sort kolom, bulk-select "Saran Reorder" jalan. Tab lain (Dashboard/Mutasi/Nilai) **tidak berubah**
-- [ ] **SalesTargetPage**: tab "Set Target" — input target masih bisa diedit. Filter channel jalan. Export CSV jalan
-- [ ] **SalesReportPage**: order detail sekarang ada pagination (cek kalau data >20 baris). Sort tanggal/total jalan
-- [ ] Semua halaman: dropdown "10/25/50/100 per halaman" muncul di pagination dan berfungsi
-
----
+1. Buka **Stok Opname** → pilih cabang yang punya produk dengan varian (mis. GP Distro)
+2. Produk dengan varian (mis. "Kaos GP Racing") sekarang muncul sebagai **beberapa baris terpisah** — satu per kombinasi (Merah/S, Merah/M, Hitam/S, dst), masing-masing dengan badge nama varian
+3. Edit "Stok Aktual" salah satu baris varian → Simpan → cek di **ProductsPage → tab Foto & Varian → Kombinasi Varian** bahwa stok varian tersebut benar ter-update
+4. Coba search nama varian (mis. ketik "Merah") di kotak pencarian → harus filter baris yang sesuai
+5. Test Download Excel → Edit beberapa baris (termasuk baris varian) → Import kembali → pastikan matching benar (cek kolom `row_key` di file Excel)
+6. Bulk-select beberapa baris (campur produk biasa + varian) → "Reset ke Stok Sistem" → pastikan reset tepat per baris
 
 ## 🔧 Troubleshooting
 
-**Q: Export CSV file kosong / cuma header?**
-A: Pastikan ada data yang ter-load & filter tidak menyembunyikan semua baris. Export ikut filter aktif.
+**Q: Setelah deploy, varian masih tidak muncul?**
+A: Cek dulu apakah produk tersebut memang sudah punya kombinasi varian yang **di-generate dan aktif** (buka ProductsPage → edit produk → tab Foto & Varian → harus ada baris di "Kombinasi Varian", dan status bukan "Nonaktif").
 
-**Q: Bulk action button tidak muncul walau sudah pilih baris?**
-A: Cek apakah `bulkActions` prop di-pass ke `<DataTable>`. Untuk Returns/Shipments memang sengaja tidak ada bulk action (lihat alasan di README halaman tersebut).
+**Q: Submit opname error / stok tidak berubah untuk baris varian?**
+A: Pastikan backend sudah ke-redeploy (cek Railway logs ada perubahan terbaru). Endpoint `/stock-opname` butuh `ProductVariant` model yang sudah ter-export dari fix sebelumnya — kalau itu belum ter-deploy, error akan muncul di response.
 
-**Q: ProductsPage hilang fitur Variant Manager setelah update?**
-A: Tidak seharusnya — file ini dibangun di atas versi live terbaru. Kalau hilang, kemungkinan Anda meng-overwrite dengan versi lama dari paket lain. Cek `git diff` sebelum commit.
-
----
-
-**Project:** GPDISTRO RACING ID
-**Scope:** Frontend table standardization (Grup A + Grup B + ProductsPage sort)
-**Tidak termasuk:** Grup C (report/pivot pages — export CSV bisa jadi paket terpisah kalau dibutuhkan)
+**Q: Produk tanpa varian jadi hilang/berubah perilakunya?**
+A: Tidak seharusnya — produk tanpa varian tetap 1 baris seperti biasa, hanya sumber datanya pindah ke endpoint yang lebih akurat.

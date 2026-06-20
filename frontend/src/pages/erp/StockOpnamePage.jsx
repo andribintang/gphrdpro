@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, RefreshCw, Save, Loader2, Download, Upload, RotateCcw } from 'lucide-react';
+import { ClipboardList, RefreshCw, Save, Loader2, Download, Upload, RotateCcw, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataTable from '../../components/DataTable';
-import { erpService, toRpShort } from '../../utils/erp/erpService';
+import { erpService } from '../../utils/erp/erpService';
+
+// Key komposit unik per baris opname (produk biasa ATAU varian spesifik)
+const rowKey = (item) => `${item.product_id}:${item.variant_id || 0}`;
 
 export default function StockOpnamePage() {
-  const [products, setProducts] = useState([]);
-  const [opname, setOpname]     = useState({});
+  const [items, setItems]       = useState([]);   // flat list dari backend (produk / varian)
+  const [opname, setOpname]     = useState({});    // { [rowKey]: actual_qty }
   const [loading, setLoad]      = useState(true);
   const [saving, setSave]       = useState(false);
   const [importing, setImport]  = useState(false);
@@ -16,13 +19,13 @@ export default function StockOpnamePage() {
   const fetch = useCallback(async () => {
     setLoad(true);
     try {
-      const res = await erpService.getProducts({ branch_id: branch, limit: 500 });
-      const prods = res.data.data.products || [];
-      setProducts(prods);
+      const res = await erpService.getStockOpname({ branch_id: branch });
+      const list = res.data.data.items || [];
+      setItems(list);
       const init = {};
-      prods.forEach(p => { init[p.id] = p.stock?.qty || 0; });
+      list.forEach(it => { init[rowKey(it)] = it.stock_qty || 0; });
       setOpname(init);
-    } catch { toast.error('Gagal memuat produk'); }
+    } catch { toast.error('Gagal memuat data stok opname'); }
     finally { setLoad(false); }
   }, [branch]);
 
@@ -32,17 +35,20 @@ export default function StockOpnamePage() {
   const downloadExcel = async () => {
     try {
       const XLSX = await import('xlsx');
-      const headers = ['product_id','sku','name','stok_sistem','stok_aktual'];
-      const rows = products.map(p => [
-        p.id,
-        p.sku || '',
-        p.name,
-        p.stock?.qty || 0,
-        p.stock?.qty || 0, // user akan edit kolom ini
+      const headers = ['row_key','product_id','variant_id','sku','nama_produk','varian','stok_sistem','stok_aktual'];
+      const rows = items.map(it => [
+        rowKey(it),
+        it.product_id,
+        it.variant_id || '',
+        it.sku || '',
+        it.name,
+        it.variant_name || '',
+        it.stock_qty || 0,
+        it.stock_qty || 0, // user akan edit kolom ini
       ]);
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
       ws['!cols'] = [
-        { wch: 10 }, { wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 14 }
+        { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 40 }, { wch: 20 }, { wch: 12 }, { wch: 12 }
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Stok Opname');
@@ -67,31 +73,36 @@ export default function StockOpnamePage() {
       const newOpname = { ...opname };
       let matched = 0;
       rows.forEach(row => {
-        const pid = parseInt(row.product_id);
+        // Cocokkan via row_key (paling akurat). Fallback ke product_id (tanpa varian) untuk file lama.
+        const key = String(row.row_key || `${row.product_id}:0`).trim();
         const aktual = parseInt(row.stok_aktual) || 0;
-        if (pid && newOpname.hasOwnProperty(pid)) {
-          newOpname[pid] = aktual;
+        if (newOpname.hasOwnProperty(key)) {
+          newOpname[key] = aktual;
           matched++;
         }
       });
       setOpname(newOpname);
-      toast.success(`${matched} produk diimport dari Excel — cek perubahan lalu klik Simpan`);
+      toast.success(`${matched} baris diimport dari Excel — cek perubahan lalu klik Simpan`);
     } catch { toast.error('Gagal baca file Excel'); }
     finally { setImport(false); e.target.value = ''; }
   };
 
   // ── Submit stok opname ────────────────────────────────────────
   const handleSubmit = async () => {
-    const changes = products.filter(p => parseInt(opname[p.id] ?? 0) !== (p.stock?.qty || 0));
+    const changes = items.filter(it => parseInt(opname[rowKey(it)] ?? 0) !== (it.stock_qty || 0));
     if (!changes.length) { toast('Tidak ada perubahan stok'); return; }
-    if (!confirm(`Update stok untuk ${changes.length} produk?`)) return;
+    if (!confirm(`Update stok untuk ${changes.length} item?`)) return;
     setSave(true);
     try {
       await erpService.submitStockOpname({
         branch_id: parseInt(branch),
-        items: changes.map(p => ({ product_id: p.id, actual_qty: parseInt(opname[p.id] ?? 0) })),
+        items: changes.map(it => ({
+          product_id: it.product_id,
+          variant_id: it.variant_id || null,
+          actual_qty: parseInt(opname[rowKey(it)] ?? 0),
+        })),
       });
-      toast.success(`${changes.length} produk stok diperbarui`);
+      toast.success(`${changes.length} item stok diperbarui`);
       fetch();
     } catch(e) { toast.error(e.response?.data?.message || 'Gagal'); }
     finally { setSave(false); }
@@ -100,27 +111,41 @@ export default function StockOpnamePage() {
   // ── Bulk reset ke stok sistem untuk baris terpilih ─────────────
   const bulkResetToSystem = (rows, clearSelection) => {
     const next = { ...opname };
-    rows.forEach(p => { next[p.id] = p.stock?.qty || 0; });
+    rows.forEach(it => { next[rowKey(it)] = it.stock_qty || 0; });
     setOpname(next);
     clearSelection();
-    toast.success(`${rows.length} produk direset ke stok sistem`);
+    toast.success(`${rows.length} item direset ke stok sistem`);
   };
 
-  const changesCount = products.filter(p => parseInt(opname[p.id] ?? 0) !== (p.stock?.qty || 0)).length;
+  const changesCount = items.filter(it => parseInt(opname[rowKey(it)] ?? 0) !== (it.stock_qty || 0)).length;
+  const variantRowCount = items.filter(it => it.has_variants).length;
 
-  // ── Data untuk DataTable: tambah field _diff & _changed agar bisa dipakai render/filter ──
+  // ── Data untuk DataTable: tambah field turunan agar bisa dipakai render/filter/sort ──
   const tableData = useMemo(() => {
-    return products
-      .map(p => {
-        const sistem = p.stock?.qty || 0;
-        const aktual = parseInt(opname[p.id] ?? sistem);
-        return { ...p, _sistem: sistem, _aktual: aktual, _diff: aktual - sistem, _changed: aktual !== sistem };
+    return items
+      .map(it => {
+        const key    = rowKey(it);
+        const sistem = it.stock_qty || 0;
+        const aktual = parseInt(opname[key] ?? sistem);
+        return { ...it, _key: key, _sistem: sistem, _aktual: aktual, _diff: aktual - sistem, _changed: aktual !== sistem };
       })
-      .filter(p => !showChangedOnly || p._changed);
-  }, [products, opname, showChangedOnly]);
+      .filter(it => !showChangedOnly || it._changed);
+  }, [items, opname, showChangedOnly]);
 
   const columns = [
-    { key: 'name', label: 'Produk', sortable: true, render: (v) => <p className="font-medium truncate max-w-xs">{v}</p> },
+    {
+      key: 'name', label: 'Produk', sortable: true,
+      render: (v, row) => (
+        <div>
+          <p className="font-medium truncate max-w-xs">{v}</p>
+          {row.variant_name && (
+            <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-[var(--brand-600)] bg-[var(--brand-600)]/8 px-1.5 py-0.5 rounded-full">
+              <Tag size={9}/>{row.variant_name}
+            </span>
+          )}
+        </div>
+      ),
+    },
     { key: 'sku', label: 'SKU', sortable: true, nowrap: true, render: v => <span className="font-mono text-xs text-[var(--text-muted)]">{v || '—'}</span> },
     { key: '_sistem', label: 'Stok Sistem', sortable: true, align: 'center', nowrap: true, render: v => <span className="font-bold">{v}</span> },
     {
@@ -129,7 +154,7 @@ export default function StockOpnamePage() {
       render: (v, row) => (
         <input type="number" min={0} value={row._aktual}
           onClick={e => e.stopPropagation()}
-          onChange={e => setOpname(prev => ({ ...prev, [row.id]: parseInt(e.target.value) || 0 }))}
+          onChange={e => setOpname(prev => ({ ...prev, [row._key]: parseInt(e.target.value) || 0 }))}
           className={`input-base h-8 text-center w-24 text-sm mx-auto block ${row._changed ? 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30' : ''}`} />
       ),
     },
@@ -148,7 +173,10 @@ export default function StockOpnamePage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Stok Opname</h1>
-          <p className="body-sm text-[var(--text-muted)]">Update stok aktual vs sistem</p>
+          <p className="body-sm text-[var(--text-muted)]">
+            Update stok aktual vs sistem
+            {variantRowCount > 0 && <span className="ml-1">· {variantRowCount} baris varian</span>}
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <select value={branch} onChange={e=>setBranch(e.target.value)} className="input-base h-9 text-sm">
@@ -157,7 +185,7 @@ export default function StockOpnamePage() {
           <button onClick={fetch} className="btn-icon"><RefreshCw size={16}/></button>
 
           {/* Download Excel */}
-          <button onClick={downloadExcel} disabled={loading||!products.length} className="btn-secondary gap-2">
+          <button onClick={downloadExcel} disabled={loading||!items.length} className="btn-secondary gap-2">
             <Download size={15}/> Download Excel
           </button>
 
@@ -181,16 +209,21 @@ export default function StockOpnamePage() {
       <div className="card-sm mb-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
         <p className="text-xs text-blue-700 dark:text-blue-400 font-semibold">📊 Cara Import Excel:</p>
         <ol className="text-xs text-blue-600 dark:text-blue-500 list-decimal list-inside mt-1 space-y-0.5">
-          <li>Klik <strong>Download Excel</strong> — file berisi data stok saat ini</li>
+          <li>Klik <strong>Download Excel</strong> — file berisi data stok saat ini (termasuk per-varian)</li>
           <li>Edit kolom <strong>stok_aktual</strong> sesuai hasil penghitungan fisik</li>
           <li>Klik <strong>Import Excel</strong> — data akan diload ke tabel</li>
           <li>Klik <strong>Simpan</strong> untuk mengupdate stok di sistem</li>
         </ol>
+        {variantRowCount > 0 && (
+          <p className="text-xs text-blue-600 dark:text-blue-500 mt-1.5">
+            🏷️ Produk dengan varian ditampilkan <strong>per kombinasi varian</strong> (baris terpisah untuk tiap Ukuran/Warna dst), bukan total gabungan.
+          </p>
+        )}
       </div>
 
       {changesCount > 0 && (
         <div className="card-sm mb-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 flex items-center justify-between flex-wrap gap-2">
-          <p className="text-sm text-amber-700 dark:text-amber-400 font-semibold">⚠ {changesCount} produk memiliki perubahan stok — klik Simpan untuk update</p>
+          <p className="text-sm text-amber-700 dark:text-amber-400 font-semibold">⚠ {changesCount} item memiliki perubahan stok — klik Simpan untuk update</p>
           <label className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 cursor-pointer select-none">
             <input type="checkbox" checked={showChangedOnly} onChange={e=>setShowChangedOnly(e.target.checked)} className="w-3.5 h-3.5 rounded"/>
             Tampilkan yang berubah saja
@@ -202,10 +235,11 @@ export default function StockOpnamePage() {
         columns={columns}
         data={tableData}
         loading={loading}
-        searchKeys={['name','sku']}
-        searchPlaceholder="Cari nama produk, SKU..."
+        rowKey="_key"
+        searchKeys={['name','sku','variant_name']}
+        searchPlaceholder="Cari nama produk, SKU, varian..."
         emptyIcon={<ClipboardList size={40}/>}
-        emptyText={showChangedOnly ? 'Tidak ada produk yang berubah' : 'Belum ada produk'}
+        emptyText={showChangedOnly ? 'Tidak ada item yang berubah' : 'Belum ada produk'}
         selectable
         bulkActions={(rows, clear) => (
           <button onClick={() => bulkResetToSystem(rows, clear)} className="btn-secondary h-8 text-xs px-3 gap-1.5">

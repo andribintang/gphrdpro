@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
 const {
-  Product, Stock, StockMovement,
+  Product, Stock, StockMovement, ProductVariant,
   Order, OrderItem, Return, ReturnItem,
   Purchase, PurchaseItem, Expense,
 } = require('../../models/erp');
@@ -261,14 +261,85 @@ const deleteExpense = async (req, res, next) => {
   catch (err) { next(err); }
 };
 
-// ── Stock Opname ──────────────────────────────────────────────
+// ── Stock Opname (variant-aware) ────────────────────────────────
+// Mengembalikan FLAT list — satu baris per "unit hitung":
+//   - Produk tanpa varian → 1 baris (variant_id: null)
+//   - Produk dengan varian → 1 baris PER VARIAN AKTIF (variant_id terisi)
+// Frontend tinggal render apa adanya tanpa perlu logic nested/expand.
 const getStockOpname = async (req, res, next) => {
   try {
     const { branch_id } = req.query;
     const where = { is_active: true };
     if (branch_id) where.branch_id = branch_id;
-    const products = await Product.findAll({ where, include:[{ model: Stock, as:'stock', required:false }], order:[['name','ASC']] });
-    return res.json({ success:true, data:{ products } });
+
+    const products = await Product.findAll({ where, order: [['name','ASC']] });
+    if (!products.length) return res.json({ success:true, data:{ items: [] } });
+
+    const productIds = products.map(p => p.id);
+
+    // Bulk-fetch semua varian aktif untuk produk-produk ini
+    const variants = await ProductVariant.findAll({
+      where: { product_id: { [Op.in]: productIds }, is_active: true },
+      order: [['sort_order','ASC'], ['id','ASC']],
+    });
+    const variantsByProduct = variants.reduce((acc, v) => {
+      (acc[v.product_id] = acc[v.product_id] || []).push(v);
+      return acc;
+    }, {});
+
+    // Bulk-fetch semua Stock row terkait (baik level produk maupun level varian)
+    const stockWhere = { product_id: { [Op.in]: productIds } };
+    if (branch_id) stockWhere.branch_id = branch_id;
+    const stocks = await Stock.findAll({ where: stockWhere });
+    // key: `${product_id}:${variant_id||0}:${branch_id}` → qty
+    const stockMap = {};
+    stocks.forEach(s => {
+      const key = `${s.product_id}:${s.variant_id || 0}:${s.branch_id}`;
+      stockMap[key] = (stockMap[key] || 0) + (parseInt(s.qty) || 0);
+    });
+
+    const targetBranch = branch_id ? parseInt(branch_id) : null;
+    const items = [];
+
+    for (const p of products) {
+      const pVariants = variantsByProduct[p.id] || [];
+
+      if (pVariants.length === 0) {
+        // Produk tanpa varian — perilaku lama dipertahankan
+        const bId = targetBranch ?? p.branch_id;
+        const qty = stockMap[`${p.id}:0:${bId}`] || 0;
+        items.push({
+          row_id: `p${p.id}`,
+          product_id: p.id,
+          variant_id: null,
+          branch_id: bId,
+          name: p.name,
+          variant_name: null,
+          sku: p.sku,
+          stock_qty: qty,
+          has_variants: false,
+        });
+      } else {
+        // Produk dengan varian — satu baris per varian aktif
+        const bId = targetBranch ?? p.branch_id;
+        for (const v of pVariants) {
+          const qty = stockMap[`${p.id}:${v.id}:${bId}`] || 0;
+          items.push({
+            row_id: `v${v.id}`,
+            product_id: p.id,
+            variant_id: v.id,
+            branch_id: bId,
+            name: p.name,
+            variant_name: v.name,
+            sku: v.sku || p.sku,
+            stock_qty: qty,
+            has_variants: true,
+          });
+        }
+      }
+    }
+
+    return res.json({ success:true, data:{ items } });
   } catch (err) { next(err); }
 };
 
@@ -278,14 +349,20 @@ const submitStockOpname = async (req, res, next) => {
     const { branch_id, items=[] } = req.body;
     let updated = 0;
     for (const item of items) {
-      let stock = await Stock.findOne({ where:{ product_id: item.product_id, branch_id }, transaction: t });
-      if (!stock) stock = await Stock.create({ product_id: item.product_id, branch_id, qty: 0 }, { transaction: t });
+      const variantId = item.variant_id || null;
+      let stock = await Stock.findOne({
+        where: { product_id: item.product_id, variant_id: variantId, branch_id },
+        transaction: t,
+      });
+      if (!stock) {
+        stock = await Stock.create({ product_id: item.product_id, variant_id: variantId, branch_id, qty: 0 }, { transaction: t });
+      }
       const qtyBefore = stock.qty;
       const qtyAfter  = parseInt(item.actual_qty);
       if (qtyBefore !== qtyAfter) {
         await stock.update({ qty: qtyAfter }, { transaction: t });
         await StockMovement.create({
-          product_id: item.product_id, branch_id,
+          product_id: item.product_id, variant_id: variantId, branch_id,
           type: 'adjustment', qty: qtyAfter - qtyBefore,
           qty_before: qtyBefore, qty_after: qtyAfter,
           ref_type: 'opname', notes: 'Stock Opname', created_by: req.user?.id,
@@ -295,7 +372,7 @@ const submitStockOpname = async (req, res, next) => {
       }
     }
     await t.commit();
-    return res.json({ success:true, message:`${updated} produk diupdate`, data:{ updated } });
+    return res.json({ success:true, message:`${updated} item diupdate`, data:{ updated } });
   } catch (err) { await t.rollback(); next(err); }
 };
 
