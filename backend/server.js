@@ -652,6 +652,52 @@ app.post('/run-alter', async (req, res) => {
         INDEX idx_loan_user (user_id),
         INDEX idx_loan_status (status)
       )`,
+
+      // ════ Customer Module Upgrade (Paket A) ════
+      `ALTER TABLE erp_customers ADD COLUMN tags TEXT NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN source VARCHAR(50) NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN birthday DATE NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN province_code VARCHAR(10) NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN city_code VARCHAR(10) NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN district VARCHAR(100) NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN district_code VARCHAR(10) NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN village VARCHAR(100) NULL`,
+      `ALTER TABLE erp_customers ADD COLUMN village_code VARCHAR(10) NULL`,
+      `CREATE INDEX idx_erp_customers_province ON erp_customers (province_code)`,
+      `CREATE INDEX idx_erp_customers_city ON erp_customers (city_code)`,
+      `CREATE INDEX idx_erp_customers_source ON erp_customers (source)`,
+      `CREATE INDEX idx_erp_customers_phone ON erp_customers (phone)`,
+
+      // ════ Product Variants Phase 1 ════
+      `CREATE TABLE IF NOT EXISTS erp_product_variants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        name VARCHAR(150) NOT NULL,
+        sku VARCHAR(50) NULL,
+        barcode VARCHAR(100) NULL,
+        attributes JSON NULL,
+        price_override DECIMAL(15,2) NULL,
+        buy_price_override DECIMAL(15,2) NULL,
+        weight_override DECIMAL(8,2) NULL,
+        stock_min INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        sort_order INT DEFAULT 0,
+        image_url TEXT NULL,
+        notes TEXT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_product (product_id),
+        KEY idx_sku (sku),
+        KEY idx_active (product_id, is_active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+      `ALTER TABLE erp_stock ADD COLUMN variant_id INT NULL AFTER product_id`,
+      `CREATE INDEX idx_stock_variant ON erp_stock (variant_id)`,
+      `CREATE INDEX idx_stock_lookup ON erp_stock (product_id, variant_id, branch_id)`,
+      `ALTER TABLE erp_stock_movements ADD COLUMN variant_id INT NULL AFTER product_id`,
+      `CREATE INDEX idx_movement_variant ON erp_stock_movements (variant_id)`,
+      `ALTER TABLE erp_order_items ADD COLUMN variant_id INT NULL AFTER product_id`,
+      `ALTER TABLE erp_order_items ADD COLUMN variant_name VARCHAR(150) NULL AFTER variant_id`,
+      `CREATE INDEX idx_orderitem_variant ON erp_order_items (variant_id)`,
     ];
 
     for (const sql of alters) {
@@ -660,7 +706,7 @@ app.post('/run-alter', async (req, res) => {
         results.push('OK: ' + sql.substring(0, 60) + '...');
       } catch (e) {
         // Column already exists = OK
-        if (e.message.includes('Duplicate column') || e.message.includes('already exists')) {
+        if (e.message.includes('Duplicate column') || e.message.includes('already exists') || e.message.includes('Duplicate key name')) {
           results.push('SKIP (already exists): ' + sql.substring(0, 50));
         } else {
           errors.push('ERR: ' + e.message.substring(0, 100));
