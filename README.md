@@ -1,73 +1,83 @@
-# 🎯 Fix: Stok Opname Belum Tampilkan Varian Produk
+# 🎨 Order Module: UI Beda per Cabang + Order Bisa Pilih Varian
 
-## Akar Masalah
+## Latar Belakang
 
-`StockOpnamePage` selama ini memanggil endpoint generik `/products` dan baca `p.stock?.qty` — yang di backend pakai relasi `Product.hasOne(Stock, {as:'stock'})`. Untuk produk **dengan varian**, satu produk punya **banyak baris Stock** (satu per kombinasi varian per cabang), jadi `hasOne` cuma ambil **satu baris secara acak/tidak tepat** — bukan breakdown per varian. Hasilnya: produk dengan varian di opname cuma kelihatan sebagai 1 baris dengan angka stok yang tidak mewakili kondisi sebenarnya, dan varian-nya sendiri **tidak muncul sama sekali**.
+Sebelumnya halaman "Buat Order Baru" terlihat **identik** untuk GP Racing maupun GP Distro — cuma beda warna highlight tipis di kartu pemilihan cabang. Begitu staff scroll ke bawah (pelanggan, produk, ringkasan), tidak ada penanda visual lagi sedang input order untuk cabang yang mana. Ditambah satu masalah fungsional yang lebih serius: **produk dengan varian (Ukuran/Warna) sama sekali tidak bisa dipilih variannya saat dibuatkan order** — order langsung mengambil produk mentah tanpa tahu varian mana, sehingga stok yang terpotong nanti salah/asal.
 
-Sudah ada endpoint khusus `/stock-opname` (`getStockOpname`/`submitStockOpname`) yang dibuat sebelumnya, tapi **frontend tidak pernah memakainya** dan endpoint itu sendiri **juga belum variant-aware**.
+## Yang Dikerjakan
 
-## Yang Diperbaiki
+### 1. Identitas visual penuh per cabang (bukan cuma kartu pemilihan)
 
-### Backend — `purchaseController.js`
+| | GP Racing | GP Distro |
+|---|---|---|
+| Warna | Merah racing `#dc2626` → `#7f1d1d` | Navy-magenta `#1a1a2e` → `#db2777` |
+| Ikon | 🔧 Wrench | 👕 Shirt |
+| Label divisi | DIVISI SPARE PART | DIVISI FASHION & APPAREL |
+| Pola aksen | Garis diagonal (motif racing) | Titik-titik (motif label baju) |
 
-**`getStockOpname`** sekarang mengembalikan **flat list per "unit hitung"**:
-- Produk **tanpa varian** → 1 baris (sama seperti sebelumnya)
-- Produk **dengan varian** → 1 baris **per kombinasi varian aktif**, masing-masing dengan stok sendiri-sendiri dari tabel `erp_stock` yang sudah difilter `variant_id` yang tepat
+Warna ini sekarang konsisten diterapkan ke: **pita identitas cabang** di paling atas (selalu terlihat, ikut menampilkan jumlah produk di keranjang), kartu pemilihan cabang, tombol channel & metode pembayaran terpilih, ikon + placeholder kolom cari produk, badge varian di keranjang, border atas panel Ringkasan, warna teks Total, dan tombol "Konfirmasi Order" — supaya warna cabang terasa di **seluruh halaman**, bukan cuma di satu tempat yang gampang kelewat saat scroll.
 
-```json
-{
-  "items": [
-    { "row_id": "p12", "product_id": 12, "variant_id": null, "name": "Helm Polos", "variant_name": null, "stock_qty": 8, "has_variants": false },
-    { "row_id": "v45", "product_id": 20, "variant_id": 45, "name": "Kaos GP Racing", "variant_name": "Merah / L", "stock_qty": 12, "has_variants": true },
-    { "row_id": "v46", "product_id": 20, "variant_id": 46, "name": "Kaos GP Racing", "variant_name": "Merah / XL", "stock_qty": 5, "has_variants": true }
-  ]
-}
+### 2. Pengaman ganti cabang dengan keranjang terisi
+
+Kalau staff sudah menambahkan produk lalu klak-klik pindah ke cabang lain, sekarang muncul konfirmasi: *"Anda sudah menambahkan N produk untuk GP Racing. Ganti ke GP Distro akan MENGOSONGKAN keranjang..."*. Mencegah order kecampur produk dua cabang secara tidak sengaja.
+
+### 3. 🎯 Perbaikan fungsional inti: Order sekarang variant-aware
+
+Ini akar masalah paling kritis untuk "user tidak salah input data" di GP Distro:
+
+- Saat staff klik produk hasil pencarian, sistem **otomatis cek** apakah produk itu punya varian aktif (Ukuran/Warna dst).
+- Kalau **punya varian** → muncul modal wajib pilih varian (kartu per varian, ada badge stok merah/kuning/hijau, varian yang stoknya 0 otomatis tidak bisa diklik) — **staff tidak bisa lanjut tanpa memilih varian**.
+- Kalau **tidak punya varian** (mayoritas sparepart GP Racing) → langsung masuk keranjang seperti biasa, tanpa langkah tambahan.
+- Backend (`orderController.js`) sekarang juga **menolak order** kalau ada produk yang punya varian aktif tapi `variant_id` tidak disertakan — jadi pengamanan tetap berlaku walau ada yang coba lewat API langsung, bukan cuma di UI.
+- Pemotongan stok saat order dikonfirmasi sekarang **tepat ke baris stok varian yang benar** (bukan ke produk agregat), demikian juga saat order dibatalkan (restock kembali ke varian yang tepat).
+
+### 🐛 Bonus bug fix yang ditemukan saat investigasi
+
+Order **draft** yang dibatalkan sebelumnya **tidak pernah melepas reservasi stok** (`qty_reserved`) — hanya order berstatus confirmed/processing yang dilepas. Akibatnya stok yang "tertahan" oleh draft yang dibatalkan tidak pernah kembali tersedia sampai ada intervensi manual. Sudah diperbaiki di `cancelOrder`.
+
+## File yang Diubah
+
+```
+backend/controllers/erp/orderController.js   ← createOrder, confirmOrder, cancelOrder: variant-aware
+frontend/src/pages/erp/NewOrderPage.jsx      ← UI beda per cabang + variant picker
 ```
 
-**`submitStockOpname`** sekarang terima `variant_id` opsional per item, dan update baris `Stock` yang tepat (`product_id + variant_id + branch_id`), bukan asal product_id saja.
-
-### Frontend — `StockOpnamePage.jsx`
-
-- Ganti sumber data dari `erpService.getProducts()` → `erpService.getStockOpname()` (endpoint yang memang dibuat untuk ini)
-- Key opname diganti dari `product.id` jadi **key komposit** `product_id:variant_id` — supaya tidak tabrakan saat satu produk punya banyak baris varian
-- Kolom "Produk" sekarang tampilkan **badge nama varian** di bawah nama produk (mis. "Kaos GP Racing" + badge "Merah / L")
-- Search sekarang juga bisa cari berdasarkan nama varian
-- Excel export/import disesuaikan — kolom baru `variant_id`, `varian`, dan `row_key` (dipakai untuk matching saat import supaya akurat per-varian)
-- Info banner otomatis kasih tahu kalau ada produk dengan varian di cabang yang dipilih
+**Tidak ada migrasi database baru** — kolom `variant_id` di `erp_order_items`/`erp_stock`/`erp_stock_movements` sudah ada dari Phase 1 variant migration sebelumnya.
 
 ## Yang TIDAK Berubah
 
-- Bulk-select, bulk reset ke stok sistem, filter "tampilkan yang berubah saja", sort kolom, pagination — semua fitur dari upgrade SaaS table sebelumnya **tetap jalan persis sama**
-- Produk tanpa varian tampil & berfungsi exactly seperti sebelumnya
+`AddCustomerModal`, `TagInput`, deteksi pelanggan duplikat, `WilayahPicker`, pencarian pelanggan, sub-channel marketplace/langsung, sinkronisasi insentif — semua persis sama seperti sebelumnya, tidak disentuh sama sekali.
 
 ---
 
 ## 🚀 Deployment
 
 1. Extract zip, drop ke root repo (2 file ter-replace):
-   - `backend/controllers/erp/purchaseController.js`
-   - `frontend/src/pages/erp/StockOpnamePage.jsx`
-2. **Tidak ada migrasi database baru** — semua kolom (`variant_id` di `erp_stock`/`erp_stock_movements`) sudah ada dari Phase 1 variant migration sebelumnya
-3. `git add . && git commit -m "fix(erp): stock opname now shows variant rows separately" && git push`
+   - `backend/controllers/erp/orderController.js`
+   - `frontend/src/pages/erp/NewOrderPage.jsx`
+2. **Tidak ada migrasi database** — langsung deploy
+3. `git add . && git commit -m "feat(erp): branch-differentiated order UI + variant-aware order flow" && git push`
 4. Tunggu Railway redeploy backend & frontend
 5. Hard refresh browser
 
 ## ✅ Testing
 
-1. Buka **Stok Opname** → pilih cabang yang punya produk dengan varian (mis. GP Distro)
-2. Produk dengan varian (mis. "Kaos GP Racing") sekarang muncul sebagai **beberapa baris terpisah** — satu per kombinasi (Merah/S, Merah/M, Hitam/S, dst), masing-masing dengan badge nama varian
-3. Edit "Stok Aktual" salah satu baris varian → Simpan → cek di **ProductsPage → tab Foto & Varian → Kombinasi Varian** bahwa stok varian tersebut benar ter-update
-4. Coba search nama varian (mis. ketik "Merah") di kotak pencarian → harus filter baris yang sesuai
-5. Test Download Excel → Edit beberapa baris (termasuk baris varian) → Import kembali → pastikan matching benar (cek kolom `row_key` di file Excel)
-6. Bulk-select beberapa baris (campur produk biasa + varian) → "Reset ke Stok Sistem" → pastikan reset tepat per baris
+1. **Visual**: Buka Buat Order Baru → pilih GP Racing → seluruh halaman (pita atas, tombol channel, total, tombol konfirmasi) berwarna merah dengan ikon kunci pas. Ganti ke GP Distro → semua berubah jadi navy-magenta dengan ikon baju, label "DIVISI FASHION & APPAREL".
+2. **Ganti cabang dengan keranjang terisi**: Tambah 1 produk → coba klik cabang lain → harus muncul dialog konfirmasi peringatan keranjang akan kosong.
+3. **Produk tanpa varian** (mayoritas GP Racing): klik hasil pencarian → langsung masuk keranjang, tidak ada modal tambahan, persis seperti sebelumnya.
+4. **Produk dengan varian** (GP Distro, mis. "Kaos GP Racing"): klik hasil pencarian → modal "Pilih Varian" wajib muncul → pilih salah satu (mis. "Merah / L") → masuk keranjang dengan badge nama varian terlihat di baris produk.
+5. **Stok habis di varian tertentu**: kartu varian yang stoknya 0 harus tampak pudar dan tidak bisa diklik.
+6. **Submit order dengan item varian** → Konfirmasi Order & Kurangi Stok → cek di ProductsPage tab Varian bahwa stok yang terpotong adalah **varian yang dipilih**, bukan total produk.
+7. **Reject tanpa variant_id**: (opsional, test API langsung) kirim order dengan produk yang punya varian aktif tapi `variant_id: null` → harus ditolak dengan pesan "Pilih varian untuk produk...".
+8. **Cancel draft order**: buat order draft dengan beberapa item → batalkan → cek `qty_reserved` produk tersebut di database sudah turun kembali (sebelumnya tidak pernah turun).
 
 ## 🔧 Troubleshooting
 
-**Q: Setelah deploy, varian masih tidak muncul?**
-A: Cek dulu apakah produk tersebut memang sudah punya kombinasi varian yang **di-generate dan aktif** (buka ProductsPage → edit produk → tab Foto & Varian → harus ada baris di "Kombinasi Varian", dan status bukan "Nonaktif").
+**Q: Modal varian tidak pernah muncul sama sekali walau produk punya varian?**
+A: Pastikan backend sudah ter-redeploy dengan fix `ProductVariant` model sebelumnya (dari sesi sebelumnya — `fix-models-erp-productvariant.zip`). Endpoint `GET /products/:id/variants` butuh model itu untuk berfungsi.
 
-**Q: Submit opname error / stok tidak berubah untuk baris varian?**
-A: Pastikan backend sudah ke-redeploy (cek Railway logs ada perubahan terbaru). Endpoint `/stock-opname` butuh `ProductVariant` model yang sudah ter-export dari fix sebelumnya — kalau itu belum ter-deploy, error akan muncul di response.
+**Q: Warna tidak berubah saat ganti cabang?**
+A: Hard refresh / clear cache browser — pastikan file `NewOrderPage.jsx` yang ter-deploy adalah versi baru (cek timestamp di Railway build log).
 
-**Q: Produk tanpa varian jadi hilang/berubah perilakunya?**
-A: Tidak seharusnya — produk tanpa varian tetap 1 baris seperti biasa, hanya sumber datanya pindah ke endpoint yang lebih akurat.
+**Q: Order dengan varian gagal terus dengan pesan "Pilih varian untuk produk..."?**
+A: Itu memang perilaku yang disengaja kalau produk punya varian aktif tapi `variant_id` tidak terkirim — cek apakah modal varian sempat ke-skip (mis. karena error jaringan saat cek varian, sistem fail-open dan menambahkan produk tanpa varian). Coba ulangi pencarian produk.

@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
 const {
-  SubChannel, Category, Product, Stock, StockMovement,
+  SubChannel, Category, Product, Stock, StockMovement, ProductVariant,
   Customer, Order, OrderItem, Payment, Shipment,
   Return, ReturnItem,
 } = require('../../models/erp');
@@ -85,18 +85,37 @@ const createOrder = async (req, res, next) => {
     for (const item of items) {
       const product = await Product.findByPk(item.product_id, { transaction: t });
       if (!product) throw new Error(`Produk ID ${item.product_id} tidak ditemukan`);
-      const stock = await Stock.findOne({ where: { product_id: item.product_id, branch_id }, transaction: t });
+
+      // Validasi varian (jika diisi) — pastikan benar-benar milik produk ini
+      let variant = null;
+      if (item.variant_id) {
+        variant = await ProductVariant.findOne({ where: { id: item.variant_id, product_id: item.product_id }, transaction: t });
+        if (!variant) throw new Error(`Varian tidak valid untuk produk ${product.name}`);
+      } else {
+        // Produk yang PUNYA varian aktif wajib menyertakan variant_id — cegah order "buta varian"
+        const activeVariantCount = await ProductVariant.count({ where: { product_id: item.product_id, is_active: true }, transaction: t });
+        if (activeVariantCount > 0) throw new Error(`Pilih varian untuk produk ${product.name} (mis. Ukuran/Warna)`);
+      }
+
+      const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id || null, branch_id }, transaction: t });
       const availableQty = stock ? stock.qty - (stock.qty_reserved||0) : 0;
-      if (availableQty < item.qty) throw new Error(`Stok ${product.name} tidak cukup (tersedia: ${availableQty})`);
-      const sellPrice    = toNum(item.sell_price || product.sell_price);
+      const displayName  = variant ? `${product.name} (${variant.name})` : product.name;
+      if (availableQty < item.qty) throw new Error(`Stok ${displayName} tidak cukup (tersedia: ${availableQty})`);
+
+      const basePrice     = variant?.price_override != null ? toNum(variant.price_override) : toNum(product.sell_price);
+      const sellPrice      = toNum(item.sell_price || basePrice);
+      const baseBuyPrice  = variant?.buy_price_override != null ? toNum(variant.buy_price_override) : toNum(product.buy_price);
       const discountPct  = toNum(item.discount_pct);
       const discountAmt  = sellPrice * item.qty * discountPct / 100;
       const itemSubtotal = (sellPrice * item.qty) - discountAmt;
-      const itemProfit   = itemSubtotal - (toNum(product.buy_price) * item.qty);
+      const itemProfit   = itemSubtotal - (baseBuyPrice * item.qty);
       subtotal += itemSubtotal;
-      itemsData.push({ product_id: item.product_id, product_name: product.name, product_sku: product.sku,
-        qty: item.qty, buy_price: product.buy_price, sell_price: sellPrice,
-        discount_pct: discountPct, subtotal: itemSubtotal, profit: itemProfit });
+      itemsData.push({
+        product_id: item.product_id, variant_id: item.variant_id || null, variant_name: variant?.name || null,
+        product_name: product.name, product_sku: variant?.sku || product.sku,
+        qty: item.qty, buy_price: item.buy_price || baseBuyPrice, sell_price: sellPrice,
+        discount_pct: discountPct, subtotal: itemSubtotal, profit: itemProfit,
+      });
       if (stock) await stock.update({ qty_reserved: (stock.qty_reserved||0) + item.qty }, { transaction: t });
     }
 
@@ -162,16 +181,17 @@ const confirmOrder = async (req, res, next) => {
     if (!order) { await t.rollback(); return res.status(404).json({ success: false, message: 'Order tidak ditemukan' }); }
     if (order.status !== 'draft') { await t.rollback(); return res.status(400).json({ success: false, message: `Order sudah ${order.status}` }); }
     for (const item of order.items) {
-      const stock = await Stock.findOne({ where: { product_id: item.product_id, branch_id: order.branch_id }, transaction: t });
-      if (!stock || stock.qty < item.qty) { await t.rollback(); return res.status(400).json({ success: false, message: `Stok ${item.product_name} tidak cukup` }); }
+      const displayName = item.variant_name ? `${item.product_name} (${item.variant_name})` : item.product_name;
+      const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id || null, branch_id: order.branch_id }, transaction: t });
+      if (!stock || stock.qty < item.qty) { await t.rollback(); return res.status(400).json({ success: false, message: `Stok ${displayName} tidak cukup` }); }
       const qtyBefore = stock.qty;
       await stock.update({ qty: qtyBefore - item.qty, qty_reserved: Math.max(0, (stock.qty_reserved||0) - item.qty) }, { transaction: t });
-      await StockMovement.create({ product_id: item.product_id, branch_id: order.branch_id,
+      await StockMovement.create({ product_id: item.product_id, variant_id: item.variant_id || null, branch_id: order.branch_id,
         type: 'out', qty: -item.qty, qty_before: qtyBefore, qty_after: qtyBefore - item.qty,
         ref_type: 'order', ref_id: order.id, notes: `Order ${order.order_no}`, created_by: req.user?.id,
           created_at: new Date(), updated_at: new Date()}, { transaction: t });
-      // Update product sell price if changed
-      if (item.sell_price && parseFloat(item.sell_price) > 0) {
+      // Update product/varian sell price if changed (hanya untuk produk TANPA varian — produk dgn varian, harga dikelola per-varian)
+      if (!item.variant_id && item.sell_price && parseFloat(item.sell_price) > 0) {
         const updateFields = { sell_price: item.sell_price };
         if (item.buy_price && parseFloat(item.buy_price) > 0) updateFields.buy_price = item.buy_price;
         await Product.update(updateFields, { where: { id: item.product_id }, transaction: t });
@@ -213,15 +233,21 @@ const cancelOrder = async (req, res, next) => {
     if (['completed','cancelled'].includes(order.status)) { await t.rollback(); return res.status(400).json({ success: false, message: `Order sudah ${order.status}` }); }
     if (['confirmed','processing'].includes(order.status)) {
       for (const item of order.items) {
-        const stock = await Stock.findOne({ where: { product_id: item.product_id, branch_id: order.branch_id }, transaction: t });
+        const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id || null, branch_id: order.branch_id }, transaction: t });
         if (stock) {
           const qtyBefore = stock.qty;
           await stock.update({ qty: qtyBefore + item.qty }, { transaction: t });
-          await StockMovement.create({ product_id: item.product_id, branch_id: order.branch_id,
+          await StockMovement.create({ product_id: item.product_id, variant_id: item.variant_id || null, branch_id: order.branch_id,
             type: 'in', qty: item.qty, qty_before: qtyBefore, qty_after: qtyBefore + item.qty,
             ref_type: 'order', ref_id: order.id, notes: `Cancel ${order.order_no}`, created_by: req.user?.id,
           created_at: new Date(), updated_at: new Date()}, { transaction: t });
         }
+      }
+    } else if (order.status === 'draft') {
+      // Draft belum decrement stok asli, tapi qty_reserved sudah dipotong saat createOrder — lepas reservasinya
+      for (const item of order.items) {
+        const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id || null, branch_id: order.branch_id }, transaction: t });
+        if (stock) await stock.update({ qty_reserved: Math.max(0, (stock.qty_reserved||0) - item.qty) }, { transaction: t });
       }
     }
     await order.update({ status: 'cancelled' }, { transaction: t });
