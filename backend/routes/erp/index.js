@@ -130,6 +130,7 @@ router.post  ('/stock-opname',         authenticate, allRoles, purchase.submitSt
 // ── Import ───────────────────────────────────────────────────
 router.post  ('/import/products',      authenticate, allRoles, master.importProducts);
 router.post  ('/import/customers',     authenticate, allRoles, master.importCustomers);
+router.post  ('/import/orders',        authenticate, allRoles, master.importOrders);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);

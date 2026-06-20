@@ -137,6 +137,7 @@ const Order = sequelize.define('ErpOrder', {
   sub_channel_id:      { type: DataTypes.INTEGER, allowNull: true },
   sub_channel_name:    { type: DataTypes.STRING(100), allowNull: true },
   marketplace_name:    { type: DataTypes.STRING(100), allowNull: true },
+  external_ref:        { type: DataTypes.STRING(100), allowNull: true }, // No. order asli dari marketplace, dipakai cegah duplikat saat import
   salesperson_id:      { type: DataTypes.INTEGER, allowNull: true },
   salesperson_user_id: { type: DataTypes.INTEGER, allowNull: true },
   customer_name:       { type: DataTypes.STRING(200), allowNull: true },

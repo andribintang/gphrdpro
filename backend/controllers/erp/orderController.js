@@ -66,80 +66,94 @@ const getOrderDetail = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── Inti pembuatan order — dipakai bareng oleh createOrder (HTTP, 1 order)
+// dan importOrders di masterController.js (bulk, banyak order sekaligus dari
+// Excel marketplace). Supaya logic validasi varian/stok/harga TIDAK terduplikasi
+// dan selalu konsisten di kedua jalur. Melempar Error biasa kalau gagal —
+// caller yang menentukan bagaimana menangani (response HTTP vs kumpulkan ke
+// daftar error import).
+const buildOrder = async (payload, t) => {
+  const {
+    branch_id, customer_id, channel, marketplace_name,
+    salesperson_id, salesperson_user_id,
+    customer_name, customer_phone, customer_address, customer_city,
+    items, discount_amount = 0, shipping_cost = 0, admin_fee = 0,
+    sub_channel_id, sub_channel_name,
+    notes, order_date, payment_method, external_ref, status = 'draft',
+    created_by,
+  } = payload;
+
+  if (!items?.length) throw new Error('Minimal 1 produk');
+
+  let subtotal = 0;
+  const itemsData = [];
+  for (const item of items) {
+    const product = await Product.findByPk(item.product_id, { transaction: t });
+    if (!product) throw new Error(`Produk ID ${item.product_id} tidak ditemukan`);
+
+    // Validasi varian (jika diisi) — pastikan benar-benar milik produk ini
+    let variant = null;
+    if (item.variant_id) {
+      variant = await ProductVariant.findOne({ where: { id: item.variant_id, product_id: item.product_id }, transaction: t });
+      if (!variant) throw new Error(`Varian tidak valid untuk produk ${product.name}`);
+    } else {
+      // Produk yang PUNYA varian aktif wajib menyertakan variant_id — cegah order "buta varian"
+      const activeVariantCount = await ProductVariant.count({ where: { product_id: item.product_id, is_active: true }, transaction: t });
+      if (activeVariantCount > 0) throw new Error(`Pilih varian untuk produk ${product.name} (mis. Ukuran/Warna)`);
+    }
+
+    const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id || null, branch_id }, transaction: t });
+    const availableQty = stock ? stock.qty - (stock.qty_reserved||0) : 0;
+    const displayName  = variant ? `${product.name} (${variant.name})` : product.name;
+    if (availableQty < item.qty) throw new Error(`Stok ${displayName} tidak cukup (tersedia: ${availableQty})`);
+
+    const basePrice     = variant?.price_override != null ? toNum(variant.price_override) : toNum(product.sell_price);
+    const sellPrice      = toNum(item.sell_price || basePrice);
+    const baseBuyPrice  = variant?.buy_price_override != null ? toNum(variant.buy_price_override) : toNum(product.buy_price);
+    const discountPct  = toNum(item.discount_pct);
+    const discountAmt  = sellPrice * item.qty * discountPct / 100;
+    const itemSubtotal = (sellPrice * item.qty) - discountAmt;
+    const itemProfit   = itemSubtotal - (baseBuyPrice * item.qty);
+    subtotal += itemSubtotal;
+    itemsData.push({
+      product_id: item.product_id, variant_id: item.variant_id || null, variant_name: variant?.name || null,
+      product_name: product.name, product_sku: variant?.sku || product.sku,
+      qty: item.qty, buy_price: item.buy_price || baseBuyPrice, sell_price: sellPrice,
+      discount_pct: discountPct, subtotal: itemSubtotal, profit: itemProfit,
+    });
+    if (stock) await stock.update({ qty_reserved: (stock.qty_reserved||0) + item.qty }, { transaction: t });
+  }
+
+  const adminFeeAmt = channel === 'marketplace' ? toNum(admin_fee) : 0;
+  const totalAmount = subtotal - toNum(discount_amount) + toNum(shipping_cost) + adminFeeAmt;
+  const orderNo     = await generateOrderNo(branch_id);
+  const order = await Order.create({
+    order_no: orderNo, branch_id, customer_id, channel,
+    marketplace_name: marketplace_name || null,
+    salesperson_id: salesperson_id || null,
+    salesperson_user_id: salesperson_user_id || null,
+    customer_name, customer_phone, customer_address, customer_city,
+    sub_channel_id: sub_channel_id || null,
+    sub_channel_name: sub_channel_name || null,
+    admin_fee: adminFeeAmt,
+    subtotal, discount_amount: toNum(discount_amount),
+    shipping_cost: toNum(shipping_cost), total_amount: totalAmount,
+    status,
+    external_ref: external_ref || null,
+    order_date: order_date || new Date().toISOString().split('T')[0],
+    notes, created_by: created_by || null,
+  }, { transaction: t });
+
+  await OrderItem.bulkCreate(itemsData.map(i => ({ ...i, order_id: order.id })), { transaction: t });
+  if (payment_method) await Payment.create({ order_id: order.id, method: payment_method, amount: totalAmount, status: 'pending' }, { transaction: t });
+
+  return { order, orderNo };
+};
+
 const createOrder = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const {
-      branch_id, customer_id, channel, marketplace_name,
-      salesperson_id, salesperson_user_id,
-      customer_name, customer_phone, customer_address, customer_city,
-      items, discount_amount = 0, shipping_cost = 0, admin_fee = 0,
-      sub_channel_id, sub_channel_name,
-      notes, order_date, payment_method,
-    } = req.body;
-
-    if (!items?.length) { await t.rollback(); return res.status(400).json({ success: false, message: 'Minimal 1 produk' }); }
-
-    let subtotal = 0;
-    const itemsData = [];
-    for (const item of items) {
-      const product = await Product.findByPk(item.product_id, { transaction: t });
-      if (!product) throw new Error(`Produk ID ${item.product_id} tidak ditemukan`);
-
-      // Validasi varian (jika diisi) — pastikan benar-benar milik produk ini
-      let variant = null;
-      if (item.variant_id) {
-        variant = await ProductVariant.findOne({ where: { id: item.variant_id, product_id: item.product_id }, transaction: t });
-        if (!variant) throw new Error(`Varian tidak valid untuk produk ${product.name}`);
-      } else {
-        // Produk yang PUNYA varian aktif wajib menyertakan variant_id — cegah order "buta varian"
-        const activeVariantCount = await ProductVariant.count({ where: { product_id: item.product_id, is_active: true }, transaction: t });
-        if (activeVariantCount > 0) throw new Error(`Pilih varian untuk produk ${product.name} (mis. Ukuran/Warna)`);
-      }
-
-      const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id || null, branch_id }, transaction: t });
-      const availableQty = stock ? stock.qty - (stock.qty_reserved||0) : 0;
-      const displayName  = variant ? `${product.name} (${variant.name})` : product.name;
-      if (availableQty < item.qty) throw new Error(`Stok ${displayName} tidak cukup (tersedia: ${availableQty})`);
-
-      const basePrice     = variant?.price_override != null ? toNum(variant.price_override) : toNum(product.sell_price);
-      const sellPrice      = toNum(item.sell_price || basePrice);
-      const baseBuyPrice  = variant?.buy_price_override != null ? toNum(variant.buy_price_override) : toNum(product.buy_price);
-      const discountPct  = toNum(item.discount_pct);
-      const discountAmt  = sellPrice * item.qty * discountPct / 100;
-      const itemSubtotal = (sellPrice * item.qty) - discountAmt;
-      const itemProfit   = itemSubtotal - (baseBuyPrice * item.qty);
-      subtotal += itemSubtotal;
-      itemsData.push({
-        product_id: item.product_id, variant_id: item.variant_id || null, variant_name: variant?.name || null,
-        product_name: product.name, product_sku: variant?.sku || product.sku,
-        qty: item.qty, buy_price: item.buy_price || baseBuyPrice, sell_price: sellPrice,
-        discount_pct: discountPct, subtotal: itemSubtotal, profit: itemProfit,
-      });
-      if (stock) await stock.update({ qty_reserved: (stock.qty_reserved||0) + item.qty }, { transaction: t });
-    }
-
-    const adminFeeAmt = channel === 'marketplace' ? toNum(admin_fee) : 0;
-    const totalAmount = subtotal - toNum(discount_amount) + toNum(shipping_cost) + adminFeeAmt;
-    const orderNo     = await generateOrderNo(branch_id);
-    const order = await Order.create({
-      order_no: orderNo, branch_id, customer_id, channel,
-      marketplace_name: marketplace_name || null,
-      salesperson_id: salesperson_id || null,
-      salesperson_user_id: salesperson_user_id || null,
-      customer_name, customer_phone, customer_address, customer_city,
-      sub_channel_id: sub_channel_id || null,
-      sub_channel_name: sub_channel_name || null,
-      admin_fee: adminFeeAmt,
-      subtotal, discount_amount: toNum(discount_amount),
-      shipping_cost: toNum(shipping_cost), total_amount: totalAmount,
-      status: 'draft',
-      order_date: order_date || new Date().toISOString().split('T')[0],
-      notes, created_by: req.user?.id,
-    }, { transaction: t });
-
-    await OrderItem.bulkCreate(itemsData.map(i => ({ ...i, order_id: order.id })), { transaction: t });
-    if (payment_method) await Payment.create({ order_id: order.id, method: payment_method, amount: totalAmount, status: 'pending' }, { transaction: t });
+    const { order, orderNo } = await buildOrder({ ...req.body, created_by: req.user?.id }, t);
     await t.commit();
     const created = await Order.findByPk(order.id, { include: [{ model: OrderItem, as: 'items' }, { model: Payment, as: 'payments' }] });
     return res.status(201).json({ success: true, message: `Order ${orderNo} berhasil dibuat`, data: { order: created } });
@@ -479,7 +493,7 @@ const getChannelReport = async (req, res, next) => {
 };
 
 module.exports = {
-  getOrders, getOrderDetail, createOrder,
+  getOrders, getOrderDetail, createOrder, buildOrder,
   confirmOrder, completeOrder, cancelOrder,
   addPayment, verifyPayment,
   addShipment, updateShipment,

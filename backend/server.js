@@ -713,6 +713,13 @@ app.post('/run-alter', async (req, res) => {
       // sudah dijamin di level aplikasi via findOne-before-create di setiap
       // titik Stock.create(), jadi tidak perlu diganti unique key baru. ════
       `ALTER TABLE erp_stock DROP INDEX erp_stock_product_id_branch_id`,
+
+      // ════ Import Order dari Excel (marketplace) ════
+      // Kolom referensi No. Order asli dari marketplace, dipakai untuk
+      // mendeteksi & melewati baris yang sudah pernah diimport sebelumnya
+      // (cegah order kedobel kalau file yang sama tidak sengaja diupload ulang).
+      `ALTER TABLE erp_orders ADD COLUMN external_ref VARCHAR(100) NULL AFTER marketplace_name`,
+      `CREATE INDEX idx_orders_external_ref ON erp_orders (external_ref)`,
     ];
 
     for (const sql of alters) {

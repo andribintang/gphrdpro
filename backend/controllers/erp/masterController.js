@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize } = require('../../config/database');
 const {
-  SubChannel, Category, Product, Stock, StockMovement,
+  SubChannel, Category, Product, Stock, StockMovement, ProductVariant,
   Customer, Order, OrderItem, Payment, Shipment, ImportLog,
 } = require('../../models/erp');
 
@@ -610,10 +610,121 @@ const importCustomers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── Import Order dari Excel (marketplace) ──────────────────────
+// Format file: 1 BARIS = 1 item produk. Order dengan banyak produk berarti
+// banyak baris dengan order_ref yang SAMA — dikelompokkan di sini jadi 1 order.
+// Setiap order dibuat dalam transaksi sendiri-sendiri (1 order gagal tidak
+// menggagalkan order lain dalam batch yang sama). Status hasil import selalu
+// 'draft' — TIDAK langsung memotong stok permanen, supaya staff bisa review
+// dulu sebelum bulk-confirm (lihat fitur bulk action di halaman Order).
+const importOrders = async (req, res, next) => {
+  try {
+    const { buildOrder } = require('./orderController');
+    const { branch_id, sub_channel_id, sub_channel_name, rows, filename } = req.body;
+    const bid = parseInt(branch_id) || 1;
+    let success = 0, skipped = 0, failed = 0;
+    const errors = [];
+    const notes  = [];
+
+    // Kelompokkan baris per order_ref — 1 order bisa terdiri dari banyak baris produk
+    const groups = {};
+    for (const row of (rows || [])) {
+      const ref = String(row.order_ref || '').trim();
+      if (!ref) { failed++; errors.push('Baris dilewati: No. Order kosong'); continue; }
+      (groups[ref] = groups[ref] || []).push(row);
+    }
+
+    for (const [ref, groupRows] of Object.entries(groups)) {
+      const t = await sequelize.transaction();
+      try {
+        // Cegah duplikat — order dgn ref yg sama di cabang yg sama dianggap sudah pernah diimport
+        const existing = await Order.findOne({ where: { external_ref: ref, branch_id: bid }, transaction: t });
+        if (existing) {
+          await t.rollback();
+          skipped++;
+          errors.push(`Order ${ref}: dilewati, sudah pernah diimport sebagai ${existing.order_no}`);
+          continue;
+        }
+
+        const first = groupRows[0];
+        const items = [];
+        for (const row of groupRows) {
+          const sku = String(row.product_sku || '').trim();
+          if (!sku) throw new Error('Kolom SKU Produk kosong pada salah satu baris');
+          const product = await Product.findOne({ where: { sku, branch_id: bid }, transaction: t });
+          if (!product) throw new Error(`SKU "${sku}" tidak ditemukan di cabang ini`);
+
+          let variantId = null;
+          const variantRaw = String(row.variant_name || '').trim();
+          const activeVariants = await ProductVariant.findAll({ where: { product_id: product.id, is_active: true }, transaction: t });
+          if (activeVariants.length > 0) {
+            if (!variantRaw) throw new Error(`Produk "${product.name}" punya varian — kolom Varian wajib diisi`);
+            const matched = activeVariants.find(v => v.name.trim().toLowerCase() === variantRaw.toLowerCase());
+            if (!matched) throw new Error(`Varian "${variantRaw}" tidak ditemukan untuk produk "${product.name}"`);
+            variantId = matched.id;
+          }
+
+          const qty = parseInt(row.qty) || 0;
+          if (qty <= 0) throw new Error(`Qty tidak valid untuk SKU "${sku}"`);
+
+          items.push({
+            product_id: product.id,
+            variant_id: variantId,
+            qty,
+            sell_price: row.sell_price ? toNum(row.sell_price) : undefined,
+            discount_pct: 0,
+          });
+        }
+
+        const { orderNo } = await buildOrder({
+          branch_id: bid,
+          channel: 'marketplace',
+          sub_channel_id: sub_channel_id ? parseInt(sub_channel_id) : null,
+          sub_channel_name: sub_channel_name || null,
+          customer_name:    first.customer_name || '',
+          customer_phone:   first.customer_phone || '',
+          customer_address: first.customer_address || '',
+          customer_city:    first.customer_city || '',
+          items,
+          discount_amount: toNum(first.discount_amount),
+          shipping_cost:   toNum(first.shipping_cost),
+          admin_fee: 0,
+          notes: first.notes || `Import marketplace — Ref: ${ref}`,
+          order_date: first.order_date || new Date().toISOString().split('T')[0],
+          payment_method: null,
+          external_ref: ref,
+          status: 'draft',
+          created_by: req.user?.id,
+        }, t);
+
+        await t.commit();
+        success++;
+        notes.push(`Order ${ref} → ${orderNo}`);
+      } catch (e) {
+        await t.rollback();
+        failed++;
+        errors.push(`Order ${ref}: ${e.message}`);
+      }
+    }
+
+    try {
+      await ImportLog.create({
+        type: 'orders', filename: filename || 'import',
+        total: Object.keys(groups).length, success, failed,
+        errors: JSON.stringify(errors), created_by: req.user?.id,
+      });
+    } catch (logErr) {
+      console.error('[ImportLog] Gagal simpan log:', logErr.message);
+    }
+
+    return res.json({ success: true, data: { success, skipped, failed, errors, notes } });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getSubChannels, getAllSubChannels, createSubChannel, updateSubChannel, deleteSubChannel,
   getCategories, createCategory, updateCategory, deleteCategory,
   getProducts, getProductByBarcode, createProduct, updateProduct, deleteProduct, adjustStock,
   getCustomers, createCustomer, updateCustomer,
-  importProducts, importCustomers,
+  importProducts, importCustomers, importOrders,
 };

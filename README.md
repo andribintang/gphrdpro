@@ -1,61 +1,88 @@
-# 🐛 Fix: Produk Bervarian Muncul Berkali-kali (Duplikat) di Daftar Produk
+# 🛒 Fitur Baru: Import Order Marketplace dari Excel (Prioritas #4)
 
-## Jawaban Singkat
+Bagian dari rencana 4 perbaikan untuk menangani 100+ order/hari, dikerjakan sesuai urutan yang diminta: **#4 dulu** (fitur ini), lalu #3 (bulk action), #1 (bulk resi), #2 (row locking) menyusul di delivery berikutnya.
 
-**Bukan, itu bukan perilaku yang seharusnya.** "Batik Honda One Heart Hitam 2022" yang muncul 5 kali dengan stok berbeda-beda (1, 5, 5, 5, 5) itu **bug nyata di query backend**, bukan data ganda di database. Setelah fix ini, produk tersebut akan tampil **1 baris saja**, dengan stok total = jumlah semua variannya.
+## Apa yang Bisa Dilakukan Sekarang
 
-## Akar Masalah
+Halaman **Import Data** punya tab baru **🛒 Order**. Staff bisa download laporan order dari dashboard seller marketplace (Tokopedia/Shopee/dll, biasanya tersedia sebagai export Excel/CSV di sana), susun ulang ke format template yang disediakan, lalu upload sekali jalan — alih-alih mengetik ulang satu-satu lewat "Buat Order Baru".
 
-Query `getProducts` (dipakai di halaman Produk, dan juga oleh pencarian produk di Buat Order Baru) melakukan:
-```sql
-LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
-```
+### Format Template
 
-Dulu (sebelum fitur varian ada), ini aman — 1 produk + 1 cabang = 1 baris stok, jadi JOIN-nya selalu 1-ke-1. Tapi sekarang produk dengan varian punya **banyak baris stok** (1 per kombinasi varian, mis. M/L/XL = 3 baris). JOIN tanpa agregasi ini jadi **fan-out**: 1 produk dengan 4 varian → query menghasilkan 4-5 baris SQL (1 per baris stok yang cocok), dan setiap baris itu dirender sebagai "produk" terpisah di halaman — persis seperti di screenshot. Angka stok yang beda-beda di tiap baris duplikat itu sebenarnya adalah stok dari **varian yang berbeda-beda** (4 baris dari 4 varian + kemungkinan 1 baris sisa dari sebelum produk ini punya varian).
+**1 baris = 1 produk dalam order.** Order yang isinya beberapa produk berarti beberapa baris dengan **No. Order yang sama persis** — sistem otomatis mengelompokkan baris-baris itu jadi 1 order.
 
-Ini adalah gap yang sama persis dengan yang sudah ditemukan sebelumnya di Stok Opname (`getStockOpname`) dan Adjust Stok — bagian dari rangkaian tempat yang perlu disesuaikan setelah fitur varian ditambahkan, yang ternyata masih ada beberapa titik tersisa.
+Kolom: No. Order Marketplace*, Nama Pembeli*, No. HP, Alamat, Kota, SKU Produk*, Varian, Qty*, Harga Jual (opsional), Ongkir, Diskon, Tanggal Order, Catatan. Kolom Ongkir/Diskon cukup diisi di baris PERTAMA tiap order (nilai per-order, bukan per-produk). Template & panduan lengkap ada di sheet "Panduan" pada file yang didownload.
 
-## Yang Diperbaiki
+### Aturan Penting
 
-Semua JOIN yang berpotensi fan-out diganti pakai **subquery teragregasi** (`SUM(qty) GROUP BY product_id, branch_id`), supaya hasilnya tetap maksimal 1 baris per produk+cabang — stok yang ditampilkan jadi **total dari semua varian**, bukan baris terpisah per varian.
+- **SKU harus persis sama** dengan SKU di Master Produk sistem ini (bukan SKU marketplace).
+- **Varian wajib diisi** kalau produknya punya varian aktif (mis. "Merah, L") — sama persis dengan nama varian di sistem. Ini konsisten dengan pengaman yang sudah ada di "Buat Order Baru": tidak bisa membuat order untuk produk bervarian tanpa pilih variannya.
+- **Semua order hasil import masuk sebagai Draft** — belum memotong stok sama sekali. Staff tetap perlu cek & konfirmasi sebelum stok benar-benar terpotong. Ini sengaja, supaya kesalahan mapping SKU/harga bisa dikoreksi dulu sebelum berdampak ke stok riil.
+- **Anti-duplikat otomatis**: kalau No. Order yang sama diupload lagi (misal tidak sengaja upload file yang sama dua kali), baris itu dilewati dan dilaporkan sebagai "Dilewati (Duplikat)" — tidak akan membuat order ganda.
+- Pilih **Cabang** dan **Toko Marketplace** (dari Master Data → Sub Channel) sekali untuk seluruh file yang diupload.
 
-| File | Fungsi | Dampak Sebelum Fix |
-|---|---|---|
-| `masterController.js` | `getProducts` (query utama + fallback) | **Halaman Produk** & **pencarian produk di Buat Order Baru** menampilkan produk bervarian berkali-kali |
-| `masterController.js` | `getProductByBarcode` | Scan barcode produk bervarian mengambil stok dari **varian acak** (bukan total) — diganti pakai agregat manual, bukan `include` Sequelize yang tidak reliable untuk produk multi-baris stok |
-| `inventoryController.js` | `getSummary` | **Dashboard ERP** & tab **Reorder Alert** di Inventory menampilkan produk bervarian berkali-kali, bikin total SKU/nilai stok jadi salah hitung |
-| `inventoryController.js` | `createReorderSuggestion` | Saran pemesanan ulang untuk produk bervarian akan duplikat dengan qty yang salah |
+## Perubahan Teknis
 
-**Tidak perlu diubah** (sudah aman, sempat dicek): `getStockValue` (sudah `GROUP BY` kategori + `COUNT(DISTINCT)`) dan `getMovementTrend` (tidak JOIN ke `erp_stock` sama sekali).
+**Backend** — Logic pembuatan order (validasi varian, cek & reservasi stok, hitung harga/profit) **diekstrak** dari `createOrder` jadi fungsi `buildOrder()` yang dipakai bareng oleh order manual (1 order) maupun import (banyak order sekaligus). Ini supaya kedua jalur selalu konsisten — perbaikan/pengaman yang sudah ada di alur order manual (mis. wajib pilih varian) otomatis berlaku juga di import, tidak perlu ditulis ulang dan berisiko beda perilaku.
+
+- `backend/controllers/erp/orderController.js` — ekstrak `buildOrder()`, di-export.
+- `backend/controllers/erp/masterController.js` — fungsi baru `importOrders` (kelompokkan baris per No. Order, match SKU/varian, panggil `buildOrder()` per order dalam transaksi terpisah — 1 order gagal tidak menggagalkan order lain dalam batch).
+- `backend/models/erp/index.js` — tambah kolom `external_ref` ke model Order (simpan No. Order marketplace, dipakai cek duplikat).
+- `backend/server.js` — 2 statement baru di `/run-alter`: tambah kolom `external_ref` + index.
+- `backend/routes/erp/index.js` — route baru `POST /import/orders`.
+- `frontend/src/utils/erp/erpService.js` — method baru `importOrders`.
+- `frontend/src/pages/erp/ImportPage.jsx` — tab Order baru lengkap (kolom, template+panduan, selector cabang & toko marketplace, preview pengelompokan order, hasil import).
+
+**Catatan**: `ImportPage.jsx` di repo ternyata sudah lebih maju dari draft yang sempat saya pegang sebelumnya (sudah ada kolom store_active_gpr/gpd terpisah dll) — saya pakai versi LIVE terbaru sebagai basis, jadi semua fitur produk/pelanggan yang sudah ada tidak tersentuh sama sekali (sudah dicek tidak ada fungsi yang hilang).
 
 ## Yang TIDAK Berubah
 
-Semua fungsi lain di kedua file ini (create/update/delete produk, semua endpoint inventory lainnya) **tidak disentuh sama sekali** — sudah dicek daftar fungsinya identik sebelum/sesudah patch.
+Import Produk dan Import Pelanggan — tidak disentuh sama sekali, sudah dicek byte-level tidak ada perubahan di luar penambahan tab Order. Alur "Buat Order Baru" manual juga tidak berubah perilakunya — `createOrder` sekarang cuma pemanggil tipis ke `buildOrder()`, logicnya identik dengan sebelumnya.
 
 ---
 
 ## 🚀 Deployment
 
-1. Extract zip, drop 2 file ke root repo:
-   - `backend/controllers/erp/masterController.js`
-   - `backend/controllers/erp/inventoryController.js`
-2. **Tidak ada migrasi database** — ini murni perbaikan query, langsung deploy.
-3. `git add . && git commit -m "fix(erp): product list duplicates for variant products due to unaggregated stock join" && git push`
-4. Tunggu Railway redeploy backend.
+### Langkah 1 — Deploy kode
+Extract zip, drop ke root repo (7 file):
+- `backend/controllers/erp/orderController.js`
+- `backend/controllers/erp/masterController.js`
+- `backend/models/erp/index.js`
+- `backend/server.js`
+- `backend/routes/erp/index.js`
+- `frontend/src/utils/erp/erpService.js`
+- `frontend/src/pages/erp/ImportPage.jsx`
+
+```
+git add . && git commit -m "feat(erp): import order marketplace dari Excel (batch)" && git push
+```
+Tunggu Railway selesai redeploy backend & frontend.
+
+### Langkah 2 — Jalankan `/run-alter` via Postman
+```
+POST https://backend-gphrdpro.up.railway.app/run-alter
+Header: x-migrate-secret: hrd2024migrateNow!
+```
+Cek response ada baris `OK: ALTER TABLE erp_orders ADD COLUMN external_ref...`.
 
 ## ✅ Testing
 
-1. Buka halaman **Produk** → cari "Batik Honda One Heart Hitam 2022" → harus muncul **1 baris saja**, dengan angka stok = total semua variannya (bukan 1/5/5/5/5 yang terpisah).
-2. Buka **Dashboard ERP** → cek total SKU & nilai stok masuk akal (tidak lagi menghitung produk bervarian berkali-kali).
-3. Buka **Inventory → tab Reorder Alert** → produk bervarian harus muncul 1 baris.
-4. Buat order baru → cari produk yang punya varian di kolom pencarian produk → harus muncul **1 hasil saja** per produk (sebelumnya mungkin juga duplikat di sini, sekarang dengan modal pilih varian dari fix sebelumnya akan jalan normal).
-5. Scan barcode produk bervarian (kalau barcode-nya ada di level produk, bukan per-varian) → stok yang ditampilkan sekarang adalah total, bukan dari varian acak.
-6. Cek produk yang **tidak** punya varian — pastikan masih tampil & berfungsi normal seperti sebelumnya, tidak ada regresi.
+1. Pastikan minimal ada 1 **Toko Marketplace** terdaftar di Master Data ERP → Sub Channel (kalau belum ada, tambah dulu, mis. "Tokopedia GP Distro #1").
+2. Buka **Import Data → tab 🛒 Order** → Download Template → isi 1-2 contoh order (boleh pakai contoh bawaan di template, sudah berisi 1 order 2 produk) → pilih Cabang & Toko Marketplace → Upload.
+3. Cek preview menunjukkan jumlah "order unik" yang benar (mis. file 5 baris dari 2 order berbeda → harus tampil "2 order unik").
+4. Klik Import → cek hasil: "Order Dibuat" sesuai jumlah order unik, ada daftar No. Order → No. Order Sistem yang baru dibuat.
+5. Buka halaman **Order** → order hasil import harus muncul dengan status **Draft**, channel **Marketplace**, nama toko sesuai yang dipilih.
+6. Upload **file yang sama lagi** → kali ini harus muncul di "Dilewati (Duplikat)", bukan membuat order baru.
+7. Test produk bervarian: buat baris dengan SKU produk yang punya varian tapi kolom Varian dikosongkan → import → order itu harus gagal dengan pesan jelas "kolom Varian wajib diisi".
+8. Test SKU salah ketik / tidak ada di sistem → harus gagal dengan pesan jelas menyebutkan SKU mana yang bermasalah, bukan error generik.
+9. Konfirmasi salah satu order hasil import (klik manual di halaman Order) → cek stok produk terkait berkurang dengan benar sesuai qty yang diimport.
 
 ## 🔧 Troubleshooting
 
-**Q: Masih ada produk yang muncul dobel setelah deploy?**
-A: Hard refresh / clear cache browser dulu. Kalau masih terjadi, kemungkinan ada titik lain yang belum ketemu saat audit — kirim screenshot produk mana yang masih dobel, saya cek lagi dari endpoint API yang dipakai halaman tersebut.
+**Q: Semua order gagal dengan pesan terkait varian padahal produknya tidak ada variannya?**
+A: Cek lagi SKU yang dipakai — kemungkinan SKU tersebut salah cocok ke produk lain yang justru punya varian. Pastikan SKU di file Excel benar-benar SKU produk yang dimaksud.
 
-**Q: Total stok di halaman Produk sekarang beda dari sebelumnya untuk produk bervarian?**
-A: Itu memang yang diharapkan — sekarang angkanya benar (total dari semua varian), sebelumnya angka yang tampil di tiap baris duplikat itu cuma stok dari satu varian saja, bukan total.
+**Q: Dropdown Toko Marketplace kosong?**
+A: Belum ada Sub Channel dengan channel marketplace terdaftar — tambah dulu di Master Data ERP, sama seperti yang dipakai di "Buat Order Baru".
+
+**Q: Order hasil import statusnya Draft terus, kapan stok kepotong?**
+A: Memang sengaja — stok baru terpotong saat order di-**konfirmasi** (manual atau nanti lewat fitur bulk-confirm yang menyusul di Prioritas #3). Ini jeda aman untuk staff sempat cek dulu hasil import sebelum berdampak ke stok riil.

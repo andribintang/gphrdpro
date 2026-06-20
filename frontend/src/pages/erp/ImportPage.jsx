@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { erpService } from '../../utils/erp/erpService';
-import { FileSpreadsheet, Download, Upload, Check, AlertTriangle, Loader2, X } from 'lucide-react';
+import { FileSpreadsheet, Download, Upload, Check, AlertTriangle, Loader2, X, Info } from 'lucide-react';
 
 export default function ImportPage() {
   const [tab,      setTab]      = useState('products');
@@ -12,6 +12,16 @@ export default function ImportPage() {
   const [step,     setStep]     = useState('upload'); // upload|preview|result
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState(null);
+  const [subChannels, setSubChannels] = useState([]);
+  const [subChannelId, setSubChannelId] = useState('');
+
+  // Muat daftar toko marketplace (Tokopedia/Shopee dst) untuk tab Order
+  useEffect(() => {
+    if (tab !== 'orders') return;
+    erpService.getSubChannels({ channel: 'marketplace' })
+      .then(r => setSubChannels(r.data?.data?.sub_channels || []))
+      .catch(() => setSubChannels([]));
+  }, [tab]);
 
   // ── Column definitions ──────────────────────────────────────
   const PRODUCT_COLS = [
@@ -51,17 +61,44 @@ export default function ImportPage() {
     { key: 'notes',       label: 'Catatan',         required: false },
   ];
 
-  const COLS = tab === 'products' ? PRODUCT_COLS : CUSTOMER_COLS;
+  // 1 BARIS = 1 produk dalam order. Order dgn banyak produk = banyak baris
+  // dengan order_ref yg SAMA — dikelompokkan jadi 1 order di backend.
+  const ORDER_COLS = [
+    { key: 'order_ref',        label: 'No. Order Marketplace *', required: true  },
+    { key: 'customer_name',    label: 'Nama Pembeli *',          required: true  },
+    { key: 'customer_phone',   label: 'No. HP Pembeli',          required: false },
+    { key: 'customer_address', label: 'Alamat Pembeli',          required: false },
+    { key: 'customer_city',    label: 'Kota',                    required: false },
+    { key: 'product_sku',      label: 'SKU Produk *',            required: true  },
+    { key: 'variant_name',     label: 'Varian (Ukuran/Warna)',   required: false },
+    { key: 'qty',              label: 'Qty *',                   required: true  },
+    { key: 'sell_price',       label: 'Harga Jual (opsional)',   required: false },
+    { key: 'shipping_cost',    label: 'Ongkir (isi di baris 1 tiap order)', required: false },
+    { key: 'discount_amount',  label: 'Diskon (isi di baris 1 tiap order)', required: false },
+    { key: 'order_date',       label: 'Tanggal Order (YYYY-MM-DD)', required: false },
+    { key: 'notes',            label: 'Catatan',                 required: false },
+  ];
+
+  const COLS = tab === 'products' ? PRODUCT_COLS : tab === 'customers' ? CUSTOMER_COLS : ORDER_COLS;
+
+  // Jumlah order unik dalam file (dikelompokkan dari order_ref) — khusus tab Order
+  const orderGroupCount = tab === 'orders' ? new Set(rows.map(r => r.order_ref).filter(Boolean)).size : null;
 
   // ── Download template ───────────────────────────────────────
   const downloadTemplate = () => {
     try {
       const headers = COLS.map(c => c.key);
       const labels  = COLS.map(c => c.label);
-      const example = tab === 'products'
-        ? ['Contoh Produk A', 'SKU001', '1234567890', 'Spare Part', 'pcs', 50000, 100000, 95000, 90000, 0.5, 5, 10, 100000, '', 1, 0, 'Deskripsi singkat produk', 'Deskripsi lengkap untuk halaman produk', 'racing, sparepart, motor', 0, 'Spare Part Racing Original', 'Beli spare part racing original dengan harga terbaik', '']
-        : ['Budi Santoso', '08123456789', 'budi@email.com', 'Jl. Contoh No.1', 'Jakarta', 'DKI Jakarta', '12345', ''];
-      const ws = XLSX.utils.aoa_to_sheet([labels, headers, example]);
+      const exampleRows = tab === 'products'
+        ? [['Contoh Produk A', 'SKU001', '1234567890', 'Spare Part', 'pcs', 50000, 100000, 95000, 90000, 0.5, 5, 10, 100000, '', 1, 0, 'Deskripsi singkat produk', 'Deskripsi lengkap untuk halaman produk', 'racing, sparepart, motor', 0, 'Spare Part Racing Original', 'Beli spare part racing original dengan harga terbaik', '']]
+        : tab === 'customers'
+        ? [['Budi Santoso', '08123456789', 'budi@email.com', 'Jl. Contoh No.1', 'Jakarta', 'DKI Jakarta', '12345', '']]
+        : [
+            // Contoh 1 order berisi 2 produk — order_ref & data pembeli SAMA di kedua baris
+            ['TKP-2026062100123', 'Budi Santoso', '08123456789', 'Jl. Contoh No.1', 'Jakarta', 'SKU001', '', 2, 95000, 15000, 0, '2026-06-21', ''],
+            ['TKP-2026062100123', 'Budi Santoso', '08123456789', 'Jl. Contoh No.1', 'Jakarta', 'SKU002', 'Merah, L', 1, 120000, '', '', '', ''],
+          ];
+      const ws = XLSX.utils.aoa_to_sheet([labels, headers, ...exampleRows]);
       ws['!cols'] = headers.map(() => ({ wch: 22 }));
 
       // Freeze header rows
@@ -69,7 +106,7 @@ export default function ImportPage() {
 
       // Guide sheet
       const guide = [
-        ['PANDUAN IMPORT ' + (tab === 'products' ? 'PRODUK' : 'PELANGGAN'), ''],
+        ['PANDUAN IMPORT ' + (tab === 'products' ? 'PRODUK' : tab === 'customers' ? 'PELANGGAN' : 'ORDER MARKETPLACE'), ''],
         ['', ''],
         ['PENTING:', ''],
         ['- Baris 1 (label) dan baris 2 (key) adalah header — jangan diubah', ''],
@@ -91,12 +128,25 @@ export default function ImportPage() {
           ['store_meta_title / store_meta_desc', 'Untuk SEO halaman produk di toko online (opsional)'],
           ['initial_stock', 'Stok awal saat import (hanya untuk produk baru)'],
         ] : []),
+        ...(tab === 'orders' ? [
+          ['CARA ISI (PENTING — BEDA DARI IMPORT PRODUK/PELANGGAN):', ''],
+          ['1 baris = 1 produk dalam order', 'Order yang isinya 2 produk berarti DUA baris dengan order_ref yang SAMA persis (lihat contoh di baris 3-4)'],
+          ['order_ref', 'No. Order dari marketplace (Tokopedia/Shopee/dll) — dipakai mengelompokkan baris jadi 1 order, dan mencegah order yang sama keimport dua kali'],
+          ['product_sku', 'Harus PERSIS sama dengan SKU di Master Produk sistem ini (bukan SKU dari marketplace)'],
+          ['variant_name', 'WAJIB diisi kalau produknya punya varian (Ukuran/Warna dst) — harus sama persis dengan nama varian di sistem, mis: "Merah, L". Kosongkan untuk produk tanpa varian'],
+          ['qty', 'Jumlah pcs untuk baris produk ini'],
+          ['sell_price', 'Kosongkan untuk pakai harga marketplace default produk, atau isi manual kalau harga jualnya beda'],
+          ['shipping_cost / discount_amount', 'Ini nilai PER ORDER (bukan per produk) — cukup isi di baris PERTAMA tiap order, kosongkan di baris berikutnya untuk order yang sama'],
+          ['order_date', 'Format YYYY-MM-DD, kosongkan untuk pakai tanggal hari ini'],
+          ['Status setelah import', 'Semua order masuk sebagai DRAFT — belum memotong stok. Cek & konfirmasi dulu di halaman Order sebelum stok benar-benar terpotong (bisa pakai bulk-confirm untuk proses banyak order sekaligus)'],
+        ] : []),
       ];
       const wsGuide = XLSX.utils.aoa_to_sheet(guide);
-      wsGuide['!cols'] = [{ wch: 30 }, { wch: 60 }];
+      wsGuide['!cols'] = [{ wch: 34 }, { wch: 70 }];
 
+      const sheetName = tab === 'products' ? 'Import Produk' : tab === 'customers' ? 'Import Pelanggan' : 'Import Order';
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws,      tab === 'products' ? 'Import Produk' : 'Import Pelanggan');
+      XLSX.utils.book_append_sheet(wb, ws,      sheetName);
       XLSX.utils.book_append_sheet(wb, wsGuide, 'Panduan');
       XLSX.writeFile(wb, `template_import_${tab}.xlsx`);
       toast.success('Template didownload');
@@ -144,12 +194,17 @@ export default function ImportPage() {
   // ── Import ──────────────────────────────────────────────────
   const handleImport = async () => {
     if (errors.length) { toast.error('Perbaiki error dulu'); return; }
+    if (tab === 'orders' && !subChannelId) { toast.error('Pilih toko marketplace dulu'); return; }
     setLoading(true);
     try {
-      const payload = { branch_id: parseInt(branch), rows, filename: `import_${tab}.xlsx` };
+      const payload = tab === 'orders'
+        ? { branch_id: parseInt(branch), sub_channel_id: parseInt(subChannelId), sub_channel_name: subChannels.find(s => s.id == subChannelId)?.name || '', rows, filename: `import_${tab}.xlsx` }
+        : { branch_id: parseInt(branch), rows, filename: `import_${tab}.xlsx` };
       const r = tab === 'products'
         ? await erpService.importProducts(payload)
-        : await erpService.importCustomers(payload);
+        : tab === 'customers'
+        ? await erpService.importCustomers(payload)
+        : await erpService.importOrders(payload);
       setResult(r.data.data);
       setStep('result');
     } catch(e) {
@@ -170,7 +225,7 @@ export default function ImportPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
-        {[{k:'products',l:'📦 Produk'},{k:'customers',l:'👥 Pelanggan'}].map(t => (
+        {[{k:'products',l:'📦 Produk'},{k:'customers',l:'👥 Pelanggan'},{k:'orders',l:'🛒 Order'}].map(t => (
           <button key={t.k} onClick={() => { setTab(t.k); reset(); }}
             className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
               tab === t.k ? 'bg-[var(--brand-600)] text-white shadow-sm' : 'bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -184,13 +239,27 @@ export default function ImportPage() {
         {/* Left — Steps */}
         <div className="space-y-4">
           {/* Branch selector */}
-          {tab === 'products' && (
+          {(tab === 'products' || tab === 'orders') && (
             <div className="table-wrapper p-4">
               <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Cabang</label>
               <select value={branch} onChange={e => setBranch(e.target.value)} className="input-base text-sm">
                 <option value="1">GP Racing Store</option>
                 <option value="2">GP Distro</option>
               </select>
+            </div>
+          )}
+
+          {/* Toko marketplace — khusus tab Order */}
+          {tab === 'orders' && (
+            <div className="table-wrapper p-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Toko Marketplace</label>
+              <select value={subChannelId} onChange={e => setSubChannelId(e.target.value)} className="input-base text-sm">
+                <option value="">Pilih toko...</option>
+                {subChannels.map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+              </select>
+              {subChannels.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-1.5">⚠ Belum ada toko marketplace. Tambah dulu di Master Data ERP.</p>
+              )}
             </div>
           )}
 
@@ -247,6 +316,14 @@ export default function ImportPage() {
           {/* Preview */}
           {step === 'preview' && (
             <div className="space-y-4">
+              {tab === 'orders' && (
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 flex items-center gap-2">
+                  <Info size={15} className="text-blue-600 flex-shrink-0"/>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    <strong>{orderGroupCount} order unik</strong> akan dibuat dari {rows.length} baris produk (dikelompokkan berdasarkan No. Order). Semua masuk sebagai <strong>Draft</strong>.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="table-wrapper p-4 text-center">
                   <p className="text-2xl font-bold text-green-600">{rows.length}</p>
@@ -324,17 +401,30 @@ export default function ImportPage() {
                 <h3 className="font-bold text-lg">Import Selesai!</h3>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label:'Berhasil', value: result.success, c:'green' },
-                  { label:'Diperbarui', value: result.updated || 0, c:'blue' },
-                  { label:'Gagal', value: result.failed, c:'red' },
-                ].map(({ label, value, c }) => (
+                {(tab === 'orders'
+                  ? [
+                      { label:'Order Dibuat',          value: result.success,       c:'green' },
+                      { label:'Dilewati (Duplikat)',   value: result.skipped || 0,  c:'amber' },
+                      { label:'Gagal',                 value: result.failed,        c:'red'   },
+                    ]
+                  : [
+                      { label:'Berhasil',   value: result.success,     c:'green' },
+                      { label:'Diperbarui', value: result.updated || 0, c:'blue' },
+                      { label:'Gagal',      value: result.failed,       c:'red'  },
+                    ]
+                ).map(({ label, value, c }) => (
                   <div key={label} className={`bg-${c}-50 border border-${c}-200 rounded-xl p-4 text-center`}>
                     <p className={`text-3xl font-bold text-${c}-700`}>{value}</p>
                     <p className={`text-xs text-${c}-600 mt-1`}>{label}</p>
                   </div>
                 ))}
               </div>
+              {tab === 'orders' && result.notes?.length > 0 && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-bold text-emerald-700 mb-2">Order yang Berhasil Dibuat:</p>
+                  {result.notes.map((n,i) => <p key={i} className="text-xs text-emerald-700 mb-0.5">• {n}</p>)}
+                </div>
+              )}
               {result.errors?.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto">
                   <p className="text-xs font-bold text-red-700 mb-2">Detail Error:</p>
