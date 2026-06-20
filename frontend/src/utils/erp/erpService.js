@@ -43,9 +43,22 @@ export const erpService = {
   adjustStock:      (d)      => api.post(`${BASE}/products/${d.product_id}/adjust-stock`, d),
 
   // Customers
-  getCustomers:     (p)      => api.get(`${BASE}/customers`, { params: p }),
-  createCustomer:   (d)      => api.post(`${BASE}/customers`, d),
-  updateCustomer:   (id,d)   => api.put(`${BASE}/customers/${id}`, d),
+  getCustomers:        (p)      => api.get(`${BASE}/customers`, { params: p }),
+  getCustomerDetail:   (id)     => api.get(`${BASE}/customers/${id}`),
+  getCustomerOrders:   (id, p)  => api.get(`${BASE}/customers/${id}/orders`, { params: p }),
+  checkDuplicate:      (p)      => api.get(`${BASE}/customers/check-duplicate`, { params: p }),
+  createCustomer:      (d)      => api.post(`${BASE}/customers`, d),
+  updateCustomer:      (id, d)  => api.put(`${BASE}/customers/${id}`, d),
+  deleteCustomer:      (id)     => api.delete(`${BASE}/customers/${id}`),
+
+  // Product Variants
+  getProductVariants:   (productId)     => api.get(`${BASE}/products/${productId}/variants`),
+  createVariant:        (productId, d)  => api.post(`${BASE}/products/${productId}/variants`, d),
+  generateVariants:     (productId, d)  => api.post(`${BASE}/products/${productId}/variants/generate`, d),
+  updateVariant:        (id, d)         => api.put(`${BASE}/variants/${id}`, d),
+  deleteVariant:        (id)            => api.delete(`${BASE}/variants/${id}`),
+  toggleVariant:        (id)            => api.post(`${BASE}/variants/${id}/toggle`),
+  adjustVariantStock:   (id, d)         => api.post(`${BASE}/variants/${id}/adjust-stock`, d),
 
   // Orders
   getOrders:        (p)      => api.get(`${BASE}/orders`, { params: p }),

@@ -3,39 +3,260 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Search, Plus, Minus, Trash2,
   User, ChevronLeft, CheckCircle2, Loader2,
-  Package, X, Barcode
+  Package, X, Barcode, Cake, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { erpService, toRp, toRpShort, CHANNELS, PAYMENT_METHODS } from '../../utils/erp/erpService';
+import WilayahPicker from '../../components/WilayahPicker';
 
-// ── Add Customer Modal ────────────────────────────────────────
+// ── Constants for AddCustomerModal ────────────────────────────
+const PREDEFINED_TAGS = ['VIP', 'Reseller', 'Dropshipper', 'Member', 'Bermasalah'];
+const SOURCES = [
+  { key: 'wa',           label: 'WhatsApp',    icon: '💬' },
+  { key: 'instagram',    label: 'Instagram',   icon: '📷' },
+  { key: 'marketplace',  label: 'Marketplace', icon: '🛒' },
+  { key: 'walkin',       label: 'Walk-in',     icon: '🚶' },
+  { key: 'referral',     label: 'Referral',    icon: '🤝' },
+  { key: 'other',        label: 'Lainnya',     icon: '❔' },
+];
+
+// ── Tag chip input ────────────────────────────────────────────
+const TagInput = ({ value = [], onChange }) => {
+  const [custom, setCustom] = useState('');
+  const tags = Array.isArray(value) ? value : [];
+  const toggle = (t) => onChange(tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
+  const addCustom = () => {
+    const v = custom.trim();
+    if (v && !tags.includes(v)) onChange([...tags, v]);
+    setCustom('');
+  };
+  return (
+    <div>
+      <label className="field-label">Label / Tag</label>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {PREDEFINED_TAGS.map(t => (
+          <button key={t} type="button" onClick={() => toggle(t)}
+            className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition ${
+              tags.includes(t)
+                ? 'bg-[var(--brand-600)] text-white'
+                : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--bg)] border border-[var(--border)]'
+            }`}>{t}</button>
+        ))}
+      </div>
+      {tags.filter(t => !PREDEFINED_TAGS.includes(t)).length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {tags.filter(t => !PREDEFINED_TAGS.includes(t)).map(t => (
+            <span key={t} className="text-[11px] px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
+              {t}
+              <button type="button" onClick={() => onChange(tags.filter(x => x !== t))} className="hover:text-purple-900">
+                <X size={10}/>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input value={custom} onChange={e => setCustom(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+          placeholder="Tambah tag custom..." className="input-base text-xs flex-1 h-8"/>
+        <button type="button" onClick={addCustom} className="btn-secondary h-8 text-xs px-3">+ Tambah</button>
+      </div>
+    </div>
+  );
+};
+
+// ── Add Customer Modal (sinkron dengan CustomersPage) ─────────
 const AddCustomerModal = ({ onClose, onAdd }) => {
-  const [form, setForm] = useState({ name:'', phone:'', city:'' });
-  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name:'', phone:'', email:'', source:'', birthday:'',
+    tags: [], address:'', province:'', province_code:'',
+    city:'', city_code:'', district:'', district_code:'',
+    village:'', village_code:'', postal_code:'', notes:'',
+  });
+  const [saving, setSaving]    = useState(false);
+  const [duplicates, setDupes] = useState([]);
+  const [activeTab, setTab]    = useState('info');
+  const debounceRef = useRef(null);
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Duplicate detection — debounced
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!form.phone && (!form.name || form.name.trim().length < 3)) {
+      setDupes([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const params = {};
+        if (form.phone) params.phone = form.phone;
+        if (form.name?.trim().length >= 3) params.name = form.name.trim();
+        const res = await erpService.checkDuplicate(params);
+        setDupes(res.data?.data?.matches || []);
+      } catch { setDupes([]); }
+    }, 500);
+    return () => clearTimeout(debounceRef.current);
+  }, [form.name, form.phone]);
+
   const handle = async () => {
-    if (!form.name.trim()) { toast.error('Nama wajib'); return; }
+    if (!form.name.trim()) { toast.error('Nama wajib diisi'); return; }
     setSaving(true);
     try {
       const res = await erpService.createCustomer(form);
       toast.success('Pelanggan ditambahkan');
       onAdd(res.data.data.customer);
       onClose();
-    } catch(e) { toast.error(e.response?.data?.message||'Gagal'); }
-    finally { setSaving(false); }
+    } catch (e) {
+      const code = e.response?.data?.code;
+      if (code === 'DUPLICATE_PHONE') {
+        toast.error(e.response.data.message);
+      } else {
+        toast.error(e.response?.data?.message || 'Gagal menambah pelanggan');
+      }
+    } finally { setSaving(false); }
   };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-backdrop"/>
-      <div className="modal-box max-w-sm" onClick={e=>e.stopPropagation()}>
-        <div className="modal-header"><h3 className="text-sm font-bold">Tambah Pelanggan Baru</h3><button onClick={onClose} className="btn-icon-sm"><X size={14}/></button></div>
-        <div className="modal-body">
-          <div><label className="field-label">Nama *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="input-base" autoFocus/></div>
-          <div><label className="field-label">No. HP</label><input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} className="input-base" type="tel"/></div>
-          <div><label className="field-label">Kota</label><input value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} className="input-base"/></div>
+      <div className="modal-box max-w-2xl" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="text-sm font-bold">Tambah Pelanggan Baru</h3>
+          <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
         </div>
+
+        {/* Tabs */}
+        <div className="px-5 border-b border-[var(--border)] flex gap-1">
+          {[{ k: 'info', l: 'Info Dasar' }, { k: 'address', l: 'Alamat' }].map(t => (
+            <button key={t.k} onClick={() => setTab(t.k)}
+              className={`px-3 py-2 text-xs font-semibold border-b-2 transition ${
+                activeTab === t.k
+                  ? 'border-[var(--brand-600)] text-[var(--brand-600)]'
+                  : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+
+        <div className="modal-body space-y-4">
+          {activeTab === 'info' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label">Nama Lengkap *</label>
+                  <input value={form.name} onChange={e => sf('name', e.target.value)} className="input-base" autoFocus/>
+                </div>
+                <div>
+                  <label className="field-label">No. HP / WhatsApp</label>
+                  <input type="tel" value={form.phone} onChange={e => sf('phone', e.target.value)} className="input-base" placeholder="08xxxxxxxxxx"/>
+                </div>
+              </div>
+
+              {/* Duplicate detection */}
+              {duplicates.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
+                  <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-1">
+                    <AlertTriangle size={12}/> Sepertinya pelanggan ini sudah terdaftar:
+                  </p>
+                  <div className="space-y-1">
+                    {duplicates.slice(0, 3).map(d => (
+                      <div key={d.id} className="text-[11px] text-amber-800 dark:text-amber-200 flex items-center justify-between gap-2">
+                        <span><strong>{d.name}</strong> · {d.phone || 'tanpa HP'} · {d.city || '—'}</span>
+                        <button type="button" onClick={() => { onAdd(d); onClose(); }}
+                          className="text-[10px] bg-amber-200 dark:bg-amber-800 px-2 py-0.5 rounded-full hover:bg-amber-300 font-bold">
+                          Pakai
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label">Email</label>
+                  <input type="email" value={form.email} onChange={e => sf('email', e.target.value)} className="input-base"/>
+                </div>
+                <div>
+                  <label className="field-label flex items-center gap-1"><Cake size={11}/> Tanggal Lahir</label>
+                  <input type="date" value={form.birthday || ''} onChange={e => sf('birthday', e.target.value)} className="input-base"/>
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">Sumber / Channel Akuisisi</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SOURCES.map(s => (
+                    <button key={s.key} type="button"
+                      onClick={() => sf('source', form.source === s.key ? '' : s.key)}
+                      className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition ${
+                        form.source === s.key
+                          ? 'bg-[var(--brand-600)] text-white'
+                          : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--bg)] border border-[var(--border)]'
+                      }`}>
+                      {s.icon} {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <TagInput value={form.tags} onChange={(t) => sf('tags', t)}/>
+
+              <div>
+                <label className="field-label">Catatan</label>
+                <textarea value={form.notes} onChange={e => sf('notes', e.target.value)} rows={3} className="input-base resize-none"/>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'address' && (
+            <>
+              <WilayahPicker
+                value={{
+                  province_code: form.province_code,
+                  province_name: form.province,
+                  city_code: form.city_code,
+                  city_name: form.city,
+                  district_code: form.district_code,
+                  district_name: form.district,
+                  village_code: form.village_code,
+                  village_name: form.village,
+                }}
+                onChange={(val) => setForm(f => ({ ...f, ...val }))}
+              />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="field-label">Alamat Lengkap</label>
+                  <textarea value={form.address} onChange={e => sf('address', e.target.value)} rows={2}
+                    placeholder="Nama jalan, no. rumah, RT/RW..." className="input-base resize-none"/>
+                </div>
+                <div>
+                  <label className="field-label">Kode Pos</label>
+                  <input type="text" maxLength={5} value={form.postal_code}
+                    onChange={e => sf('postal_code', e.target.value.replace(/\D/g,''))}
+                    className="input-base"/>
+                </div>
+              </div>
+              {(form.province || form.city) && (
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-bold mb-1">Preview Alamat</p>
+                  <p className="text-xs text-[var(--text-primary)]">
+                    {[form.address, form.village, form.district, form.city, form.province, form.postal_code].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         <div className="modal-footer">
           <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
-          <button onClick={handle} disabled={saving} className="btn-primary flex-1">{saving?<Loader2 size={15} className="animate-spin"/>:<CheckCircle2 size={15}/>} Tambah</button>
+          <button onClick={handle} disabled={saving} className="btn-primary flex-1">
+            {saving ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>}
+            Tambah Pelanggan
+          </button>
         </div>
       </div>
     </div>
