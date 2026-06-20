@@ -698,6 +698,21 @@ app.post('/run-alter', async (req, res) => {
       `ALTER TABLE erp_order_items ADD COLUMN variant_id INT NULL AFTER product_id`,
       `ALTER TABLE erp_order_items ADD COLUMN variant_name VARCHAR(150) NULL AFTER variant_id`,
       `CREATE INDEX idx_orderitem_variant ON erp_order_items (variant_id)`,
+
+      // ════ Fix: erp_stock created_at/updated_at tanpa default (penyebab error
+      // "Field 'created_at' doesn't have a default value" saat Stock.create()) ════
+      `ALTER TABLE erp_stock MODIFY COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      `ALTER TABLE erp_stock MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+
+      // ════ Fix: erp_stock punya UNIQUE KEY lama (product_id, branch_id) dari
+      // sebelum fitur varian ada — memaksa cuma 1 baris stok per produk per
+      // cabang. Sekarang 1 produk+cabang butuh banyak baris (1 per varian),
+      // jadi constraint lama ini HARUS dihapus, atau insert stok varian ke-2
+      // dst akan gagal dengan "Duplicate entry ... for key
+      // erp_stock_product_id_branch_id". Uniqueness yang benar (per varian)
+      // sudah dijamin di level aplikasi via findOne-before-create di setiap
+      // titik Stock.create(), jadi tidak perlu diganti unique key baru. ════
+      `ALTER TABLE erp_stock DROP INDEX erp_stock_product_id_branch_id`,
     ];
 
     for (const sql of alters) {
@@ -705,9 +720,11 @@ app.post('/run-alter', async (req, res) => {
         await sequelize.query(sql);
         results.push('OK: ' + sql.substring(0, 60) + '...');
       } catch (e) {
-        // Column already exists = OK
-        if (e.message.includes('Duplicate column') || e.message.includes('already exists') || e.message.includes('Duplicate key name')) {
-          results.push('SKIP (already exists): ' + sql.substring(0, 50));
+        // Column/index already exists, ATAU index yg mau di-DROP sudah tidak
+        // ada (re-run aman) = OK, bukan error sungguhan
+        if (e.message.includes('Duplicate column') || e.message.includes('already exists') || e.message.includes('Duplicate key name')
+          || e.message.includes('check that column/key exists')) {
+          results.push('SKIP (already applied): ' + sql.substring(0, 50));
         } else {
           errors.push('ERR: ' + e.message.substring(0, 100));
         }
