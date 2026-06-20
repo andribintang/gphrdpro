@@ -61,15 +61,35 @@ const Product = sequelize.define('ErpProduct', {
 const Stock = sequelize.define('ErpStock', {
   id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   product_id:   { type: DataTypes.INTEGER, allowNull: false },
+  variant_id:   { type: DataTypes.INTEGER, allowNull: true },
   branch_id:    { type: DataTypes.INTEGER, allowNull: false },
   qty:          { type: DataTypes.INTEGER, defaultValue: 0 },
   qty_reserved: { type: DataTypes.INTEGER, defaultValue: 0 },
 }, { tableName: 'erp_stock', timestamps: false });
 
+// ── PRODUCT VARIANT ───────────────────────────────────────────
+const ProductVariant = sequelize.define('ErpProductVariant', {
+  id:                  { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  product_id:          { type: DataTypes.INTEGER, allowNull: false },
+  name:                { type: DataTypes.STRING(150), allowNull: false },
+  sku:                 { type: DataTypes.STRING(50),  allowNull: true },
+  barcode:             { type: DataTypes.STRING(100), allowNull: true },
+  attributes:          { type: DataTypes.JSON, allowNull: true },
+  price_override:      { type: DataTypes.DECIMAL(15,2), allowNull: true },
+  buy_price_override:  { type: DataTypes.DECIMAL(15,2), allowNull: true },
+  weight_override:     { type: DataTypes.DECIMAL(8,2),  allowNull: true },
+  stock_min:           { type: DataTypes.INTEGER, defaultValue: 0 },
+  is_active:           { type: DataTypes.BOOLEAN, defaultValue: true },
+  sort_order:          { type: DataTypes.INTEGER, defaultValue: 0 },
+  image_url:           { type: DataTypes.TEXT, allowNull: true },
+  notes:               { type: DataTypes.TEXT, allowNull: true },
+}, { tableName: 'erp_product_variants', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
+
 // ── STOCK MOVEMENT ────────────────────────────────────────────
 const StockMovement = sequelize.define('ErpStockMovement', {
   id:         { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   product_id: { type: DataTypes.INTEGER, allowNull: false },
+  variant_id: { type: DataTypes.INTEGER, allowNull: true },
   branch_id:  { type: DataTypes.INTEGER, allowNull: false },
   type:       { type: DataTypes.ENUM('in','out','adjustment'), allowNull: false },
   qty:        { type: DataTypes.INTEGER, allowNull: false },
@@ -85,17 +105,26 @@ const StockMovement = sequelize.define('ErpStockMovement', {
 
 // ── CUSTOMER ──────────────────────────────────────────────────
 const Customer = sequelize.define('ErpCustomer', {
-  id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  name:         { type: DataTypes.STRING(200), allowNull: false },
-  phone:        { type: DataTypes.STRING(20),  allowNull: true },
-  email:        { type: DataTypes.STRING(100), allowNull: true },
-  address:      { type: DataTypes.TEXT, allowNull: true },
-  city:         { type: DataTypes.STRING(100), allowNull: true },
-  province:     { type: DataTypes.STRING(100), allowNull: true },
-  postal_code:  { type: DataTypes.STRING(10),  allowNull: true },
-  notes:        { type: DataTypes.TEXT, allowNull: true },
-  total_orders: { type: DataTypes.INTEGER, defaultValue: 0 },
-  total_spent:  { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
+  id:            { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name:          { type: DataTypes.STRING(200), allowNull: false },
+  phone:         { type: DataTypes.STRING(20),  allowNull: true },
+  email:         { type: DataTypes.STRING(100), allowNull: true },
+  address:       { type: DataTypes.TEXT, allowNull: true },
+  city:          { type: DataTypes.STRING(100), allowNull: true },
+  city_code:     { type: DataTypes.STRING(10),  allowNull: true },
+  province:      { type: DataTypes.STRING(100), allowNull: true },
+  province_code: { type: DataTypes.STRING(10),  allowNull: true },
+  district:      { type: DataTypes.STRING(100), allowNull: true },
+  district_code: { type: DataTypes.STRING(10),  allowNull: true },
+  village:       { type: DataTypes.STRING(100), allowNull: true },
+  village_code:  { type: DataTypes.STRING(10),  allowNull: true },
+  postal_code:   { type: DataTypes.STRING(10),  allowNull: true },
+  notes:         { type: DataTypes.TEXT, allowNull: true },
+  tags:          { type: DataTypes.TEXT, allowNull: true },
+  source:        { type: DataTypes.STRING(50), allowNull: true },
+  birthday:      { type: DataTypes.DATEONLY, allowNull: true },
+  total_orders:  { type: DataTypes.INTEGER, defaultValue: 0 },
+  total_spent:   { type: DataTypes.DECIMAL(15,2), defaultValue: 0 },
 }, { tableName: 'erp_customers', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
 
 // ── ORDER ─────────────────────────────────────────────────────
@@ -134,6 +163,8 @@ const OrderItem = sequelize.define('ErpOrderItem', {
   id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   order_id:     { type: DataTypes.INTEGER, allowNull: false },
   product_id:   { type: DataTypes.INTEGER, allowNull: false },
+  variant_id:   { type: DataTypes.INTEGER, allowNull: true },
+  variant_name: { type: DataTypes.STRING(150), allowNull: true },
   product_name: { type: DataTypes.STRING(200), allowNull: false },
   product_sku:  { type: DataTypes.STRING(50),  allowNull: true },
   qty:          { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
@@ -241,7 +272,7 @@ Purchase.hasMany(PurchaseItem, { foreignKey: 'purchase_id', as: 'items' });
 
 module.exports = {
   SubChannel,
-  Category, Product, Stock, StockMovement,
+  Category, Product, Stock, StockMovement, ProductVariant,
   Customer, Order, OrderItem, Payment, Shipment,
   Return, ReturnItem,
   ImportLog,
