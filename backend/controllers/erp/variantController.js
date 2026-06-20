@@ -346,6 +346,8 @@ const adjustVariantStock = async (req, res, next) => {
         branch_id,
         qty: qtyAfter,
         qty_reserved: 0,
+        created_at: new Date(),
+        updated_at: new Date(),
       }, { transaction: t });
     } else {
       await stock.update({ qty: qtyAfter }, { transaction: t });

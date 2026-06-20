@@ -337,7 +337,7 @@ const adjustStock = async (req, res, next) => {
   try {
     const { product_id, branch_id, type, qty, notes } = req.body;
     let stock = await Stock.findOne({ where: { product_id, branch_id }, transaction: t });
-    if (!stock) stock = await Stock.create({ product_id, branch_id, qty: 0 }, { transaction: t });
+    if (!stock) stock = await Stock.create({ product_id, branch_id, qty: 0, created_at: new Date(), updated_at: new Date() }, { transaction: t });
     const qtyBefore = stock.qty;
     const qtyAfter  = type === 'in' ? qtyBefore + qty : qtyBefore - qty;
     if (qtyAfter < 0) { await t.rollback(); return res.status(400).json({ success:false, message:'Stok tidak cukup' }); }

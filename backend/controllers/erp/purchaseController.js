@@ -191,7 +191,7 @@ const receivePurchase = async (req, res, next) => {
       if (qtyToReceive <= 0) { if ((item.qty_received||0) < item.qty_ordered) allFullyReceived = false; continue; }
 
       let stock = await Stock.findOne({ where:{ product_id: item.product_id, branch_id: po.branch_id }, transaction: t });
-      if (!stock) stock = await Stock.create({ product_id: item.product_id, branch_id: po.branch_id, qty: 0 }, { transaction: t });
+      if (!stock) stock = await Stock.create({ product_id: item.product_id, branch_id: po.branch_id, qty: 0, created_at: new Date(), updated_at: new Date() }, { transaction: t });
       const qtyBefore = stock.qty;
       await stock.update({ qty: qtyBefore + qtyToReceive }, { transaction: t });
       await StockMovement.create({
@@ -355,7 +355,7 @@ const submitStockOpname = async (req, res, next) => {
         transaction: t,
       });
       if (!stock) {
-        stock = await Stock.create({ product_id: item.product_id, variant_id: variantId, branch_id, qty: 0 }, { transaction: t });
+        stock = await Stock.create({ product_id: item.product_id, variant_id: variantId, branch_id, qty: 0, created_at: new Date(), updated_at: new Date() }, { transaction: t });
       }
       const qtyBefore = stock.qty;
       const qtyAfter  = parseInt(item.actual_qty);

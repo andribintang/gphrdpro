@@ -91,7 +91,7 @@ const confirmReturn = async (req, res, next) => {
     if (ret.restock) {
       for (const item of ret.items) {
         let stock = await Stock.findOne({ where: { product_id: item.product_id, branch_id: ret.branch_id }, transaction: t });
-        if (!stock) stock = await Stock.create({ product_id: item.product_id, branch_id: ret.branch_id, qty: 0 }, { transaction: t });
+        if (!stock) stock = await Stock.create({ product_id: item.product_id, branch_id: ret.branch_id, qty: 0, created_at: new Date(), updated_at: new Date() }, { transaction: t });
         const qtyBefore = stock.qty;
         await stock.update({ qty: qtyBefore + item.qty_return }, { transaction: t });
         await StockMovement.create({

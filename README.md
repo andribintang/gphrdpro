@@ -1,83 +1,67 @@
-# 🎨 Order Module: UI Beda per Cabang + Order Bisa Pilih Varian
+# 🐛 Fix: "Field 'created_at' doesn't have a default value" saat Adjust Stok
 
-## Latar Belakang
+## Akar Masalah
 
-Sebelumnya halaman "Buat Order Baru" terlihat **identik** untuk GP Racing maupun GP Distro — cuma beda warna highlight tipis di kartu pemilihan cabang. Begitu staff scroll ke bawah (pelanggan, produk, ringkasan), tidak ada penanda visual lagi sedang input order untuk cabang yang mana. Ditambah satu masalah fungsional yang lebih serius: **produk dengan varian (Ukuran/Warna) sama sekali tidak bisa dipilih variannya saat dibuatkan order** — order langsung mengambil produk mentah tanpa tahu varian mana, sehingga stok yang terpotong nanti salah/asal.
+Tabel `erp_stock` di database punya kolom `created_at`/`updated_at` yang **NOT NULL tanpa default value**. Model Sequelize-nya (`Stock`) sengaja didefinisikan dengan `timestamps: false` — artinya Sequelize **tidak otomatis mengisi** kolom ini saat `.create()`, beda dengan kebanyakan model lain di project ini yang isi timestamp-nya manual di setiap pemanggilan `.create()` (pola ini sudah konsisten dipakai untuk `StockMovement.create()` di seluruh codebase).
 
-## Yang Dikerjakan
+Masalahnya: ada **5 titik** di backend yang memanggil `Stock.create()` untuk bikin baris stok baru (saat pertama kali sebuah produk/varian/cabang belum punya baris stok sama sekali), dan **semuanya lupa** isi `created_at`/`updated_at`. Begitu MySQL coba INSERT tanpa nilai untuk kolom NOT NULL tanpa default → error persis seperti di screenshot.
 
-### 1. Identitas visual penuh per cabang (bukan cuma kartu pemilihan)
+Skenario di screenshot: Adjust Stok untuk varian "M" di cabang GP Distro yang **belum pernah punya baris stok sebelumnya** (stok 0 → 5) — jadi kode masuk ke jalur `Stock.create()` yang bermasalah.
 
-| | GP Racing | GP Distro |
+## Titik yang Diperbaiki
+
+| File | Fungsi | Konteks |
 |---|---|---|
-| Warna | Merah racing `#dc2626` → `#7f1d1d` | Navy-magenta `#1a1a2e` → `#db2777` |
-| Ikon | 🔧 Wrench | 👕 Shirt |
-| Label divisi | DIVISI SPARE PART | DIVISI FASHION & APPAREL |
-| Pola aksen | Garis diagonal (motif racing) | Titik-titik (motif label baju) |
+| `variantController.js` | `adjustVariantStock` | **Sumber error di screenshot** — Adjust Stok per varian |
+| `masterController.js` | `adjustStock` | Adjust Stok produk biasa (non-varian) |
+| `purchaseController.js` | `receivePurchase` | Penerimaan barang dari PO ke produk yang belum punya stok |
+| `purchaseController.js` | `submitStockOpname` | Submit hasil stok opname (termasuk baris varian) |
+| `returnController.js` | `confirmReturn` | Restock saat retur dikonfirmasi |
 
-Warna ini sekarang konsisten diterapkan ke: **pita identitas cabang** di paling atas (selalu terlihat, ikut menampilkan jumlah produk di keranjang), kartu pemilihan cabang, tombol channel & metode pembayaran terpilih, ikon + placeholder kolom cari produk, badge varian di keranjang, border atas panel Ringkasan, warna teks Total, dan tombol "Konfirmasi Order" — supaya warna cabang terasa di **seluruh halaman**, bukan cuma di satu tempat yang gampang kelewat saat scroll.
+Semua di-patch dengan menambahkan `created_at: new Date(), updated_at: new Date()` ke payload `Stock.create()` — mengikuti pola yang sudah dipakai di seluruh codebase untuk model dengan `timestamps:false`.
 
-### 2. Pengaman ganti cabang dengan keranjang terisi
+## 🛡️ Perbaikan Tambahan di Level Database (Defense-in-Depth)
 
-Kalau staff sudah menambahkan produk lalu klak-klik pindah ke cabang lain, sekarang muncul konfirmasi: *"Anda sudah menambahkan N produk untuk GP Racing. Ganti ke GP Distro akan MENGOSONGKAN keranjang..."*. Mencegah order kecampur produk dua cabang secara tidak sengaja.
-
-### 3. 🎯 Perbaikan fungsional inti: Order sekarang variant-aware
-
-Ini akar masalah paling kritis untuk "user tidak salah input data" di GP Distro:
-
-- Saat staff klik produk hasil pencarian, sistem **otomatis cek** apakah produk itu punya varian aktif (Ukuran/Warna dst).
-- Kalau **punya varian** → muncul modal wajib pilih varian (kartu per varian, ada badge stok merah/kuning/hijau, varian yang stoknya 0 otomatis tidak bisa diklik) — **staff tidak bisa lanjut tanpa memilih varian**.
-- Kalau **tidak punya varian** (mayoritas sparepart GP Racing) → langsung masuk keranjang seperti biasa, tanpa langkah tambahan.
-- Backend (`orderController.js`) sekarang juga **menolak order** kalau ada produk yang punya varian aktif tapi `variant_id` tidak disertakan — jadi pengamanan tetap berlaku walau ada yang coba lewat API langsung, bukan cuma di UI.
-- Pemotongan stok saat order dikonfirmasi sekarang **tepat ke baris stok varian yang benar** (bukan ke produk agregat), demikian juga saat order dibatalkan (restock kembali ke varian yang tepat).
-
-### 🐛 Bonus bug fix yang ditemukan saat investigasi
-
-Order **draft** yang dibatalkan sebelumnya **tidak pernah melepas reservasi stok** (`qty_reserved`) — hanya order berstatus confirmed/processing yang dilepas. Akibatnya stok yang "tertahan" oleh draft yang dibatalkan tidak pernah kembali tersedia sampai ada intervensi manual. Sudah diperbaiki di `cancelOrder`.
-
-## File yang Diubah
-
-```
-backend/controllers/erp/orderController.js   ← createOrder, confirmOrder, cancelOrder: variant-aware
-frontend/src/pages/erp/NewOrderPage.jsx      ← UI beda per cabang + variant picker
-```
-
-**Tidak ada migrasi database baru** — kolom `variant_id` di `erp_order_items`/`erp_stock`/`erp_stock_movements` sudah ada dari Phase 1 variant migration sebelumnya.
-
-## Yang TIDAK Berubah
-
-`AddCustomerModal`, `TagInput`, deteksi pelanggan duplikat, `WilayahPicker`, pencarian pelanggan, sub-channel marketplace/langsung, sinkronisasi insentif — semua persis sama seperti sebelumnya, tidak disentuh sama sekali.
+Selain patch kode, disertakan juga migrasi SQL (`003_fix_erp_stock_timestamp_default.sql`) yang menambahkan `DEFAULT CURRENT_TIMESTAMP` ke kolom `created_at`/`updated_at` di tabel `erp_stock`. Ini **jaring pengaman tingkat database** — kalau suatu saat ada kode baru (ditulis manual atau oleh AI) yang lupa lagi isi timestamp manual saat `Stock.create()`, MySQL akan otomatis isi sendiri, bukannya crash. Bug class ini sudah muncul 5 kali di file berbeda, jadi root-cause fix di level schema lebih aman daripada cuma andalkan disiplin di setiap titik kode.
 
 ---
 
 ## 🚀 Deployment
 
-1. Extract zip, drop ke root repo (2 file ter-replace):
-   - `backend/controllers/erp/orderController.js`
-   - `frontend/src/pages/erp/NewOrderPage.jsx`
-2. **Tidak ada migrasi database** — langsung deploy
-3. `git add . && git commit -m "feat(erp): branch-differentiated order UI + variant-aware order flow" && git push`
-4. Tunggu Railway redeploy backend & frontend
-5. Hard refresh browser
+### Langkah 1 — Jalankan migrasi SQL DULU (lewat Railway DB console)
+```sql
+ALTER TABLE erp_stock
+  MODIFY COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE erp_stock
+  MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+```
+Aman dijalankan walau sudah pernah dijalankan sebelumnya (idempotent — `MODIFY COLUMN` bukan `ADD COLUMN`).
+
+### Langkah 2 — Deploy kode
+Extract zip, drop 4 file ke root repo:
+- `backend/controllers/erp/masterController.js`
+- `backend/controllers/erp/purchaseController.js`
+- `backend/controllers/erp/returnController.js`
+- `backend/controllers/erp/variantController.js`
+
+```
+git add . && git commit -m "fix(erp): Stock.create() missing timestamp causing crash on adjust stock" && git push
+```
+Tunggu Railway redeploy backend.
 
 ## ✅ Testing
 
-1. **Visual**: Buka Buat Order Baru → pilih GP Racing → seluruh halaman (pita atas, tombol channel, total, tombol konfirmasi) berwarna merah dengan ikon kunci pas. Ganti ke GP Distro → semua berubah jadi navy-magenta dengan ikon baju, label "DIVISI FASHION & APPAREL".
-2. **Ganti cabang dengan keranjang terisi**: Tambah 1 produk → coba klik cabang lain → harus muncul dialog konfirmasi peringatan keranjang akan kosong.
-3. **Produk tanpa varian** (mayoritas GP Racing): klik hasil pencarian → langsung masuk keranjang, tidak ada modal tambahan, persis seperti sebelumnya.
-4. **Produk dengan varian** (GP Distro, mis. "Kaos GP Racing"): klik hasil pencarian → modal "Pilih Varian" wajib muncul → pilih salah satu (mis. "Merah / L") → masuk keranjang dengan badge nama varian terlihat di baris produk.
-5. **Stok habis di varian tertentu**: kartu varian yang stoknya 0 harus tampak pudar dan tidak bisa diklik.
-6. **Submit order dengan item varian** → Konfirmasi Order & Kurangi Stok → cek di ProductsPage tab Varian bahwa stok yang terpotong adalah **varian yang dipilih**, bukan total produk.
-7. **Reject tanpa variant_id**: (opsional, test API langsung) kirim order dengan produk yang punya varian aktif tapi `variant_id: null` → harus ditolak dengan pesan "Pilih varian untuk produk...".
-8. **Cancel draft order**: buat order draft dengan beberapa item → batalkan → cek `qty_reserved` produk tersebut di database sudah turun kembali (sebelumnya tidak pernah turun).
+1. Ulangi skenario di screenshot: buka Edit Produk yang punya varian → tab Foto & Varian → klik Adjust Stok pada varian yang **belum pernah disentuh stoknya di cabang tertentu** (kombinasi produk+varian+cabang baru) → isi qty → Adjust Stok → harus **berhasil**, tidak ada lagi error "doesn't have a default value".
+2. Test Adjust Stok produk biasa (non-varian, via InventoryPage atau halaman produk) untuk produk+cabang yang juga belum pernah punya baris stok.
+3. Test terima barang PO (Purchase → Terima) untuk produk yang belum pernah ada stoknya di cabang tujuan.
+4. Test submit Stok Opname untuk baris varian yang stok sistemnya masih 0/belum ada baris Stock sama sekali.
+5. Test konfirmasi Retur dengan opsi restock untuk produk yang belum punya baris stok di cabang tujuan retur.
 
 ## 🔧 Troubleshooting
 
-**Q: Modal varian tidak pernah muncul sama sekali walau produk punya varian?**
-A: Pastikan backend sudah ter-redeploy dengan fix `ProductVariant` model sebelumnya (dari sesi sebelumnya — `fix-models-erp-productvariant.zip`). Endpoint `GET /products/:id/variants` butuh model itu untuk berfungsi.
+**Q: Sudah deploy kode tapi masih error yang sama?**
+A: Cek apakah Step 1 (migrasi SQL) sudah dijalankan — keduanya saling melengkapi tapi kalau lupa jalankan SQL dan ada baris kode lain (di luar 5 titik ini) yang masih punya bug serupa, jaring pengaman database-nya yang akan menyelamatkan.
 
-**Q: Warna tidak berubah saat ganti cabang?**
-A: Hard refresh / clear cache browser — pastikan file `NewOrderPage.jsx` yang ter-deploy adalah versi baru (cek timestamp di Railway build log).
-
-**Q: Order dengan varian gagal terus dengan pesan "Pilih varian untuk produk..."?**
-A: Itu memang perilaku yang disengaja kalau produk punya varian aktif tapi `variant_id` tidak terkirim — cek apakah modal varian sempat ke-skip (mis. karena error jaringan saat cek varian, sistem fail-open dan menambahkan produk tanpa varian). Coba ulangi pencarian produk.
+**Q: Migrasi SQL gagal dengan error syntax?**
+A: Pastikan dijalankan persis seperti di atas (2 statement terpisah), bukan digabung jadi satu. Kalau Railway MySQL versi sangat lama tidak terima `ON UPDATE CURRENT_TIMESTAMP` di kolom kedua, jalankan dulu statement pertama saja — itu sudah menyelesaikan akar masalah utamanya (`created_at`).
