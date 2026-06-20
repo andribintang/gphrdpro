@@ -17,7 +17,11 @@ const getSummary = async (req, res, next) => {
         COALESCE(s.qty, 0) AS qty
       FROM erp_products ep
       LEFT JOIN erp_categories ec ON ec.id = ep.category_id
-      LEFT JOIN erp_stock s ON s.product_id = ep.id ${branch_id ? 'AND s.branch_id = ' + parseInt(branch_id) : ''}
+      LEFT JOIN (
+        SELECT product_id, branch_id, SUM(qty) AS qty
+        FROM erp_stock
+        GROUP BY product_id, branch_id
+      ) s ON s.product_id = ep.id ${branch_id ? 'AND s.branch_id = ' + parseInt(branch_id) : ''}
       WHERE ep.is_active = 1
       ORDER BY qty ASC
     `);
@@ -146,7 +150,11 @@ const createReorderSuggestion = async (req, res, next) => {
       SELECT ep.id, ep.name, ep.sku, ep.stock_min, ep.buy_price,
              COALESCE(s.qty, 0) AS qty
       FROM erp_products ep
-      LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ${parseInt(branch_id)}
+      LEFT JOIN (
+        SELECT product_id, branch_id, SUM(qty) AS qty
+        FROM erp_stock
+        GROUP BY product_id, branch_id
+      ) s ON s.product_id = ep.id AND s.branch_id = ${parseInt(branch_id)}
       WHERE ep.id IN (${product_ids.join(',')})
     `);
 

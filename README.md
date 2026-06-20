@@ -1,92 +1,61 @@
-# 🐛 Fix: "Field 'created_at' doesn't have a default value" saat Adjust Stok
+# 🐛 Fix: Produk Bervarian Muncul Berkali-kali (Duplikat) di Daftar Produk
+
+## Jawaban Singkat
+
+**Bukan, itu bukan perilaku yang seharusnya.** "Batik Honda One Heart Hitam 2022" yang muncul 5 kali dengan stok berbeda-beda (1, 5, 5, 5, 5) itu **bug nyata di query backend**, bukan data ganda di database. Setelah fix ini, produk tersebut akan tampil **1 baris saja**, dengan stok total = jumlah semua variannya.
 
 ## Akar Masalah
 
-Tabel `erp_stock` di database punya kolom `created_at`/`updated_at` yang **NOT NULL tanpa default value**. Model Sequelize-nya (`Stock`) sengaja didefinisikan dengan `timestamps: false` — artinya Sequelize **tidak otomatis mengisi** kolom ini saat `.create()`, beda dengan kebanyakan model lain di project ini yang isi timestamp-nya manual di setiap pemanggilan `.create()` (pola ini sudah konsisten dipakai untuk `StockMovement.create()` di seluruh codebase).
+Query `getProducts` (dipakai di halaman Produk, dan juga oleh pencarian produk di Buat Order Baru) melakukan:
+```sql
+LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
+```
 
-Masalahnya: ada **5 titik** di backend yang memanggil `Stock.create()` untuk bikin baris stok baru (saat pertama kali sebuah produk/varian/cabang belum punya baris stok sama sekali), dan **semuanya lupa** isi `created_at`/`updated_at`. Begitu MySQL coba INSERT tanpa nilai untuk kolom NOT NULL tanpa default → error persis seperti di screenshot.
+Dulu (sebelum fitur varian ada), ini aman — 1 produk + 1 cabang = 1 baris stok, jadi JOIN-nya selalu 1-ke-1. Tapi sekarang produk dengan varian punya **banyak baris stok** (1 per kombinasi varian, mis. M/L/XL = 3 baris). JOIN tanpa agregasi ini jadi **fan-out**: 1 produk dengan 4 varian → query menghasilkan 4-5 baris SQL (1 per baris stok yang cocok), dan setiap baris itu dirender sebagai "produk" terpisah di halaman — persis seperti di screenshot. Angka stok yang beda-beda di tiap baris duplikat itu sebenarnya adalah stok dari **varian yang berbeda-beda** (4 baris dari 4 varian + kemungkinan 1 baris sisa dari sebelum produk ini punya varian).
 
-Skenario di screenshot: Adjust Stok untuk varian "M" di cabang GP Distro yang **belum pernah punya baris stok sebelumnya** (stok 0 → 5) — jadi kode masuk ke jalur `Stock.create()` yang bermasalah.
+Ini adalah gap yang sama persis dengan yang sudah ditemukan sebelumnya di Stok Opname (`getStockOpname`) dan Adjust Stok — bagian dari rangkaian tempat yang perlu disesuaikan setelah fitur varian ditambahkan, yang ternyata masih ada beberapa titik tersisa.
 
-## Titik yang Diperbaiki
+## Yang Diperbaiki
 
-| File | Fungsi | Konteks |
+Semua JOIN yang berpotensi fan-out diganti pakai **subquery teragregasi** (`SUM(qty) GROUP BY product_id, branch_id`), supaya hasilnya tetap maksimal 1 baris per produk+cabang — stok yang ditampilkan jadi **total dari semua varian**, bukan baris terpisah per varian.
+
+| File | Fungsi | Dampak Sebelum Fix |
 |---|---|---|
-| `variantController.js` | `adjustVariantStock` | **Sumber error di screenshot** — Adjust Stok per varian |
-| `masterController.js` | `adjustStock` | Adjust Stok produk biasa (non-varian) |
-| `purchaseController.js` | `receivePurchase` | Penerimaan barang dari PO ke produk yang belum punya stok |
-| `purchaseController.js` | `submitStockOpname` | Submit hasil stok opname (termasuk baris varian) |
-| `returnController.js` | `confirmReturn` | Restock saat retur dikonfirmasi |
+| `masterController.js` | `getProducts` (query utama + fallback) | **Halaman Produk** & **pencarian produk di Buat Order Baru** menampilkan produk bervarian berkali-kali |
+| `masterController.js` | `getProductByBarcode` | Scan barcode produk bervarian mengambil stok dari **varian acak** (bukan total) — diganti pakai agregat manual, bukan `include` Sequelize yang tidak reliable untuk produk multi-baris stok |
+| `inventoryController.js` | `getSummary` | **Dashboard ERP** & tab **Reorder Alert** di Inventory menampilkan produk bervarian berkali-kali, bikin total SKU/nilai stok jadi salah hitung |
+| `inventoryController.js` | `createReorderSuggestion` | Saran pemesanan ulang untuk produk bervarian akan duplikat dengan qty yang salah |
 
-Semua di-patch dengan menambahkan `created_at: new Date(), updated_at: new Date()` ke payload `Stock.create()` — mengikuti pola yang sudah dipakai di seluruh codebase untuk model dengan `timestamps:false`.
+**Tidak perlu diubah** (sudah aman, sempat dicek): `getStockValue` (sudah `GROUP BY` kategori + `COUNT(DISTINCT)`) dan `getMovementTrend` (tidak JOIN ke `erp_stock` sama sekali).
 
-## 🐛 Bug Kedua (Ditemukan dari Laporan Error Baru): Legacy Unique Constraint
+## Yang TIDAK Berubah
 
-Setelah fix timestamp di atas terpasang, INSERT baris stok baru jadi bisa lolos lewat validasi kolom — tapi langsung kena masalah berikutnya: tabel `erp_stock` ternyata masih punya **UNIQUE KEY lama** bernama `erp_stock_product_id_branch_id` (dari sebelum fitur varian ada), yang memaksa **hanya boleh 1 baris stok per kombinasi produk+cabang**.
-
-Dulu itu benar (1 produk = 1 baris stok per cabang). Tapi sekarang dengan varian, **1 produk+cabang butuh banyak baris stok** — 1 baris per varian. Begitu sistem coba simpan baris stok untuk varian KEDUA dari produk yang sama di cabang yang sama, MySQL menolak dengan error *"Duplicate entry ... for key 'erp_stock_product_id_branch_id'"* karena bentrok constraint lama itu — inilah error baru yang dilaporkan.
-
-**Fix**: drop constraint lama ini. Tidak perlu diganti unique key baru yang menyertakan `variant_id`, karena:
-1. Index `idx_stock_lookup (product_id, variant_id, branch_id)` untuk performa query sudah ada dari migrasi Phase 1 sebelumnya.
-2. Uniqueness yang benar (per varian) sudah dijamin di level aplikasi — setiap titik `Stock.create()` di codebase ini selalu didahului `Stock.findOne()` untuk cek apakah baris sudah ada (pola yang konsisten dipakai di 5 titik yang sudah diperbaiki sebelumnya).
-3. Menambah unique key baru yang menyertakan kolom nullable (`variant_id`) punya jebakan tersendiri di MySQL (NULL dianggap selalu "beda" di unique index, jadi tidak benar-benar mencegah duplikat untuk produk tanpa varian) — drop saja lebih aman dan sederhana.
-
-Statement yang ditambahkan ke `alters`:
-```js
-`ALTER TABLE erp_stock DROP INDEX erp_stock_product_id_branch_id`,
-```
-
-Logic SKIP di handler `/run-alter` juga diperluas supaya statement ini **aman dipanggil ulang** — kalau index-nya sudah pernah ke-drop sebelumnya, error "check that column/key exists" sekarang dianggap SKIP (bukan error sungguhan), bukan cuma "Duplicate column"/"already exists"/"Duplicate key name" seperti sebelumnya.
-
-
-
-Selain patch kode, ditambahkan juga 2 statement `ALTER TABLE` baru ke array `alters` di `backend/server.js` (handler `/run-alter`) yang menambahkan `DEFAULT CURRENT_TIMESTAMP` ke kolom `created_at`/`updated_at` di tabel `erp_stock`. Ini **jaring pengaman tingkat database** — kalau suatu saat ada kode baru (ditulis manual atau oleh AI) yang lupa lagi isi timestamp manual saat `Stock.create()`, MySQL akan otomatis isi sendiri, bukannya crash. Bug class ini sudah muncul 5 kali di file berbeda, jadi root-cause fix di level schema lebih aman daripada cuma andalkan disiplin di setiap titik kode.
-
-Statement yang ditambahkan ke `alters` (dieksekusi via `/run-alter`, bukan SQL manual):
-```js
-`ALTER TABLE erp_stock MODIFY COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-`ALTER TABLE erp_stock MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
-```
-Aman dipanggil berkali-kali — `MODIFY COLUMN` bukan `ADD COLUMN`, tidak akan error walau `/run-alter` sudah pernah dipanggil sebelumnya.
+Semua fungsi lain di kedua file ini (create/update/delete produk, semua endpoint inventory lainnya) **tidak disentuh sama sekali** — sudah dicek daftar fungsinya identik sebelum/sesudah patch.
 
 ---
 
 ## 🚀 Deployment
 
-### Langkah 1 — Deploy kode
-Extract zip, drop 5 file ke root repo:
-- `backend/server.js`
-- `backend/controllers/erp/masterController.js`
-- `backend/controllers/erp/purchaseController.js`
-- `backend/controllers/erp/returnController.js`
-- `backend/controllers/erp/variantController.js`
-
-```
-git add . && git commit -m "fix(erp): Stock.create() missing timestamp causing crash on adjust stock" && git push
-```
-Tunggu Railway selesai redeploy backend.
-
-### Langkah 2 — Jalankan `/run-alter` via Postman (SETELAH deploy selesai)
-```
-POST https://backend-gphrdpro.up.railway.app/run-alter
-Header: x-migrate-secret: hrd2024migrateNow!
-```
-Cek response — pastikan ada baris `OK: ALTER TABLE erp_stock MODIFY COLUMN created_at...` (atau `SKIP` kalau sebelumnya sudah pernah jalan, tetap aman).
+1. Extract zip, drop 2 file ke root repo:
+   - `backend/controllers/erp/masterController.js`
+   - `backend/controllers/erp/inventoryController.js`
+2. **Tidak ada migrasi database** — ini murni perbaikan query, langsung deploy.
+3. `git add . && git commit -m "fix(erp): product list duplicates for variant products due to unaggregated stock join" && git push`
+4. Tunggu Railway redeploy backend.
 
 ## ✅ Testing
 
-1. Ulangi skenario di screenshot pertama: buka Edit Produk yang punya varian → tab Foto & Varian → klik Adjust Stok pada varian yang **belum pernah disentuh stoknya di cabang tertentu** → isi qty → Adjust Stok → harus **berhasil**.
-2. **Skenario error baru**: lanjutkan dengan Adjust Stok untuk **varian LAIN dari produk yang sama, di cabang yang sama** (mis. setelah berhasil isi stok varian "M", coba isi stok varian "L" di cabang yang sama) → harus **berhasil juga**, tidak lagi kena error "erp_stock_product_id_branch_id already exists".
-3. Test Adjust Stok produk biasa (non-varian, via InventoryPage atau halaman produk) untuk produk+cabang yang juga belum pernah punya baris stok.
-4. Test terima barang PO (Purchase → Terima) untuk produk yang belum pernah ada stoknya di cabang tujuan.
-5. Test submit Stok Opname untuk baris varian yang stok sistemnya masih 0/belum ada baris Stock sama sekali.
-6. Test konfirmasi Retur dengan opsi restock untuk produk yang belum punya baris stok di cabang tujuan retur.
-7. Panggil `/run-alter` **dua kali berturut-turut** → panggilan kedua harus tetap sukses (semua entri terkait fix ini muncul sebagai `SKIP`, bukan `ERR`).
+1. Buka halaman **Produk** → cari "Batik Honda One Heart Hitam 2022" → harus muncul **1 baris saja**, dengan angka stok = total semua variannya (bukan 1/5/5/5/5 yang terpisah).
+2. Buka **Dashboard ERP** → cek total SKU & nilai stok masuk akal (tidak lagi menghitung produk bervarian berkali-kali).
+3. Buka **Inventory → tab Reorder Alert** → produk bervarian harus muncul 1 baris.
+4. Buat order baru → cari produk yang punya varian di kolom pencarian produk → harus muncul **1 hasil saja** per produk (sebelumnya mungkin juga duplikat di sini, sekarang dengan modal pilih varian dari fix sebelumnya akan jalan normal).
+5. Scan barcode produk bervarian (kalau barcode-nya ada di level produk, bukan per-varian) → stok yang ditampilkan sekarang adalah total, bukan dari varian acak.
+6. Cek produk yang **tidak** punya varian — pastikan masih tampil & berfungsi normal seperti sebelumnya, tidak ada regresi.
 
 ## 🔧 Troubleshooting
 
-**Q: Sudah deploy kode tapi masih error yang sama?**
-A: Cek apakah Step 2 (`/run-alter` via Postman) sudah dipanggil **setelah** Railway selesai redeploy — keduanya saling melengkapi tapi kalau lupa panggil `/run-alter`, jaring pengaman database belum aktif (patch kode di 5 titik tetap jalan duluan kok, jadi tetap aman, tapi lebih solid kalau dua-duanya jalan).
+**Q: Masih ada produk yang muncul dobel setelah deploy?**
+A: Hard refresh / clear cache browser dulu. Kalau masih terjadi, kemungkinan ada titik lain yang belum ketemu saat audit — kirim screenshot produk mana yang masih dobel, saya cek lagi dari endpoint API yang dipakai halaman tersebut.
 
-**Q: Response `/run-alter` menunjukkan `ERR` untuk statement MODIFY COLUMN ini?**
-A: Kemungkinan Railway MySQL versi sangat lama tidak terima `ON UPDATE CURRENT_TIMESTAMP` di statement kedua (`updated_at`). Statement pertama (`created_at`) sudah cukup untuk menyelesaikan akar masalah utama di screenshot — kalau hanya statement kedua yang error, tetap aman dilanjutkan.
+**Q: Total stok di halaman Produk sekarang beda dari sebelumnya untuk produk bervarian?**
+A: Itu memang yang diharapkan — sekarang angkanya benar (total dari semua varian), sebelumnya angka yang tampil di tiap baris duplikat itu cuma stok dari satu varian saja, bukan total.

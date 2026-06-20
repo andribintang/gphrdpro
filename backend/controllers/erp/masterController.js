@@ -127,7 +127,11 @@ const getProducts = async (req, res, next) => {
                 COALESCE(s.qty, 0) as stock_qty
          FROM erp_products ep
          LEFT JOIN erp_categories ec ON ec.id = ep.category_id
-         LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
+         LEFT JOIN (
+           SELECT product_id, branch_id, SUM(qty) AS qty
+           FROM erp_stock
+           GROUP BY product_id, branch_id
+         ) s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
          WHERE ${where}
          ORDER BY ep.name ASC
          LIMIT ${limitNum} OFFSET ${offset}`
@@ -144,7 +148,11 @@ const getProducts = async (req, res, next) => {
                 COALESCE(s.qty, 0) as stock_qty
          FROM erp_products ep
          LEFT JOIN erp_categories ec ON ec.id = ep.category_id
-         LEFT JOIN erp_stock s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
+         LEFT JOIN (
+           SELECT product_id, branch_id, SUM(qty) AS qty
+           FROM erp_stock
+           GROUP BY product_id, branch_id
+         ) s ON s.product_id = ep.id AND s.branch_id = ep.branch_id
          WHERE ${where}
          ORDER BY ep.name ASC
          LIMIT ${limitNum} OFFSET ${offset}`
@@ -172,10 +180,18 @@ const getProductByBarcode = async (req, res, next) => {
   try {
     const product = await Product.findOne({
       where: { barcode: req.params.code, is_active: true },
-      include: [{ model: Stock, as:'stock' }],
     });
     if (!product) return res.status(404).json({ success:false, message:'Produk tidak ditemukan' });
-    return res.json({ success:true, data:{ product } });
+    // Agregat manual (bukan include hasOne) — produk dgn varian punya BANYAK baris
+    // Stock (1 per varian), hasOne cuma ambil 1 baris secara acak/tidak akurat.
+    const { sequelize } = require('../../config/database');
+    const [[stockRow]] = await sequelize.query(
+      'SELECT SUM(qty) as qty FROM erp_stock WHERE product_id = ? AND branch_id = ?',
+      { replacements: [product.id, product.branch_id] }
+    );
+    const productJson = product.toJSON();
+    productJson.stock = { qty: parseInt(stockRow?.qty) || 0, branch_id: product.branch_id, product_id: product.id };
+    return res.json({ success:true, data:{ product: productJson } });
   } catch (err) { next(err); }
 };
 
@@ -337,7 +353,7 @@ const adjustStock = async (req, res, next) => {
   try {
     const { product_id, branch_id, type, qty, notes } = req.body;
     let stock = await Stock.findOne({ where: { product_id, branch_id }, transaction: t });
-    if (!stock) stock = await Stock.create({ product_id, branch_id, qty: 0, created_at: new Date(), updated_at: new Date() }, { transaction: t });
+    if (!stock) stock = await Stock.create({ product_id, branch_id, qty: 0 }, { transaction: t });
     const qtyBefore = stock.qty;
     const qtyAfter  = type === 'in' ? qtyBefore + qty : qtyBefore - qty;
     if (qtyAfter < 0) { await t.rollback(); return res.status(400).json({ success:false, message:'Stok tidak cukup' }); }
