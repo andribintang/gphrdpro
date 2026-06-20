@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Package, Plus, Edit3, X, Loader2, CheckCircle2, AlertTriangle, Trash2,
-  Store, ChevronDown, Upload, Image as ImageIcon,
+  Store, ChevronDown, ChevronUp, ChevronsUpDown, Upload, Image as ImageIcon,
   Search, MoreHorizontal, Copy, ChevronLeft, ChevronRight, Eye,
   Layers, Sparkles, RefreshCw, Power, PowerOff, Check, Wrench, Tag,
 } from 'lucide-react';
@@ -1381,7 +1381,32 @@ export default function ProductsPage() {
   const [showVariants,  setShowVariants]  = useState({}); // expanded rows
   const [actionMenu,    setActionMenu]    = useState(null); // product id with open menu
   const [page,          setPage]          = useState(1);
+  const [sortCol,       setSortCol]       = useState('');
+  const [sortDir,       setSortDir]       = useState('asc');
   const PAGE_SIZE = 20;
+
+  const getSortValue = (p, col) => {
+    if (col === 'name')       return (p.name || '').toLowerCase();
+    if (col === 'sku')        return (p.sku || '').toLowerCase();
+    if (col === 'qty')        return p.stock_qty ?? p.stock?.qty ?? 0;
+    if (col === 'buy_price')  return parseFloat(p.buy_price || 0);
+    if (col === 'sell_price') return parseFloat(p.sell_price || 0);
+    if (col === 'store_price')return parseFloat(p.store_price || p.sell_price_mp || 0);
+    return '';
+  };
+
+  const handleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+    setPage(1);
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortCol !== col) return <ChevronsUpDown size={11} className="opacity-30 group-hover:opacity-60 transition-opacity inline-block ml-1"/>;
+    return sortDir === 'asc'
+      ? <ChevronUp size={11} className="text-[var(--brand-600)] inline-block ml-1"/>
+      : <ChevronDown size={11} className="text-[var(--brand-600)] inline-block ml-1"/>;
+  };
 
   const handleDelete = async (product) => {
     if (!confirm(`Hapus produk "${product.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
@@ -1483,8 +1508,14 @@ export default function ProductsPage() {
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const sorted = sortCol ? [...filtered].sort((a, b) => {
+    const av = getSortValue(a, sortCol), bv = getSortValue(b, sortCol);
+    const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv), 'id', { numeric: true });
+    return sortDir === 'asc' ? cmp : -cmp;
+  }) : filtered;
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const paged = sorted.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const allSelected = paged.length > 0 && paged.every(p => selected.has(p.id));
   const toggleAll = () => {
@@ -1574,14 +1605,26 @@ export default function ProductsPage() {
                     <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-3.5 h-3.5 rounded"/>
                   </th>
                   <th className="px-3 py-3 w-14 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-center">Foto</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">Nama Produk</th>
+                  <th onClick={() => handleSort('name')} className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left cursor-pointer hover:text-[var(--text-secondary)] select-none group">
+                    Nama Produk<SortIcon col="name"/>
+                  </th>
                   <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">Variant</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">SKU</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-center">Qty Stok</th>
+                  <th onClick={() => handleSort('sku')} className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left cursor-pointer hover:text-[var(--text-secondary)] select-none group">
+                    SKU<SortIcon col="sku"/>
+                  </th>
+                  <th onClick={() => handleSort('qty')} className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-center cursor-pointer hover:text-[var(--text-secondary)] select-none group">
+                    Qty Stok<SortIcon col="qty"/>
+                  </th>
                   <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-left">Satuan</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right">Harga Beli</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right">Harga Jual</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right">Harga Toko</th>
+                  <th onClick={() => handleSort('buy_price')} className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right cursor-pointer hover:text-[var(--text-secondary)] select-none group">
+                    Harga Beli<SortIcon col="buy_price"/>
+                  </th>
+                  <th onClick={() => handleSort('sell_price')} className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right cursor-pointer hover:text-[var(--text-secondary)] select-none group">
+                    Harga Jual<SortIcon col="sell_price"/>
+                  </th>
+                  <th onClick={() => handleSort('store_price')} className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide text-right cursor-pointer hover:text-[var(--text-secondary)] select-none group">
+                    Harga Toko<SortIcon col="store_price"/>
+                  </th>
                   <th className="px-3 py-3 w-8"></th>
                 </tr>
               </thead>

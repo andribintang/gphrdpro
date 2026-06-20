@@ -81,7 +81,9 @@ export default function ShipmentsPage() {
         ? <span className="px-2 py-0.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-xs font-bold">{courier}</span>
         : <span className="text-[var(--text-muted)]">—</span>;
     }},
-    { key:'shipment', label:'Nomor Resi', nowrap:true, render:(v,row)=>{
+    { key:'shipment', label:'Nomor Resi', nowrap:true,
+      exportValue:row=>row.shipment?.tracking_no||row.tracking_no||'',
+      render:(v,row)=>{
       const resi = v?.tracking_no || row.tracking_no;
       return resi ? (
         <div className="flex items-center gap-2">
@@ -91,7 +93,12 @@ export default function ShipmentsPage() {
         </div>
       ) : <span className="text-[11px] text-amber-600 font-semibold">Belum ada resi</span>;
     }},
-    { key:'shipment', label:'Status', nowrap:true, render:(v,row)=>{
+    { key:'shipment', label:'Status', nowrap:true,
+      exportValue:row=>{
+        const labels = { delivered:'Terkirim', shipped:'Dalam Pengiriman', pending:'Menunggu' };
+        return labels[row._status] || row._status;
+      },
+      render:(v,row)=>{
       const status = v?.status || row.shipment_status;
       const colors = {
         delivered: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200',
@@ -103,6 +110,12 @@ export default function ShipmentsPage() {
       return <StatusBadge label={labels[s]||s} color={colors[s]||colors.pending}/>;
     }},
   ];
+
+  // Flat _status field untuk filter DataTable (status nested di shipment.status)
+  const shipmentsWithStatus = shipments.map(s => ({
+    ...s,
+    _status: s.shipment?.status || s.shipment_status || 'pending',
+  }));
 
   // Render numbered list for preview
   const reportText = generateReport();
@@ -262,15 +275,25 @@ export default function ShipmentsPage() {
           columns={columns.map((col, idx) => ({
             ...col,
             render: col.render
-              ? (v, row) => col.render(v, row, shipments.indexOf(row))
+              ? (v, row) => col.render(v, row, shipmentsWithStatus.indexOf(row))
               : undefined,
           }))}
-          data={shipments}
+          data={shipmentsWithStatus}
           loading={loading}
-          searchKeys={['order_no']} customFilter={(items, q) => items.filter(s => (s.order?.customer_name||s.customer_name||'').toLowerCase().includes(q.toLowerCase()) || (s.order?.order_no||s.order_no||'').toLowerCase().includes(q.toLowerCase()))}
+          searchFn={(row, q) =>
+            (row.order?.customer_name||row.customer_name||'').toLowerCase().includes(q) ||
+            (row.order?.order_no||row.order_no||'').toLowerCase().includes(q)
+          }
           searchPlaceholder="Cari nama customer, no. order..."
+          filters={[{ key:'_status', label:'Status', options:[
+            { value:'delivered', label:'Terkirim' },
+            { value:'shipped',   label:'Dalam Pengiriman' },
+            { value:'pending',   label:'Menunggu' },
+          ]}]}
           emptyIcon={<Truck size={40}/>}
           emptyText="Tidak ada data pengiriman"
+          exportable exportFilename="pengiriman"
+          pageSizeOptions={[10,25,50,100]}
           pageSize={25}
           zebra
         />

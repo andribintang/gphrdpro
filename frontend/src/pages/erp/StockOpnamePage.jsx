@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ClipboardList, RefreshCw, Save, Loader2, Download, Upload, FileSpreadsheet } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ClipboardList, RefreshCw, Save, Loader2, Download, Upload, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DataTable from '../../components/DataTable';
 import { erpService, toRpShort } from '../../utils/erp/erpService';
 
 export default function StockOpnamePage() {
@@ -10,6 +11,7 @@ export default function StockOpnamePage() {
   const [saving, setSave]       = useState(false);
   const [importing, setImport]  = useState(false);
   const [branch, setBranch]     = useState('1');
+  const [showChangedOnly, setShowChangedOnly] = useState(false);
 
   const fetch = useCallback(async () => {
     setLoad(true);
@@ -42,7 +44,6 @@ export default function StockOpnamePage() {
       ws['!cols'] = [
         { wch: 10 }, { wch: 20 }, { wch: 45 }, { wch: 14 }, { wch: 14 }
       ];
-      // Protect stok_sistem column (visual hint - bold header)
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Stok Opname');
       const branchName = branch === '1' ? 'GPRacing' : 'GPDistro';
@@ -96,7 +97,51 @@ export default function StockOpnamePage() {
     finally { setSave(false); }
   };
 
+  // ── Bulk reset ke stok sistem untuk baris terpilih ─────────────
+  const bulkResetToSystem = (rows, clearSelection) => {
+    const next = { ...opname };
+    rows.forEach(p => { next[p.id] = p.stock?.qty || 0; });
+    setOpname(next);
+    clearSelection();
+    toast.success(`${rows.length} produk direset ke stok sistem`);
+  };
+
   const changesCount = products.filter(p => parseInt(opname[p.id] ?? 0) !== (p.stock?.qty || 0)).length;
+
+  // ── Data untuk DataTable: tambah field _diff & _changed agar bisa dipakai render/filter ──
+  const tableData = useMemo(() => {
+    return products
+      .map(p => {
+        const sistem = p.stock?.qty || 0;
+        const aktual = parseInt(opname[p.id] ?? sistem);
+        return { ...p, _sistem: sistem, _aktual: aktual, _diff: aktual - sistem, _changed: aktual !== sistem };
+      })
+      .filter(p => !showChangedOnly || p._changed);
+  }, [products, opname, showChangedOnly]);
+
+  const columns = [
+    { key: 'name', label: 'Produk', sortable: true, render: (v) => <p className="font-medium truncate max-w-xs">{v}</p> },
+    { key: 'sku', label: 'SKU', sortable: true, nowrap: true, render: v => <span className="font-mono text-xs text-[var(--text-muted)]">{v || '—'}</span> },
+    { key: '_sistem', label: 'Stok Sistem', sortable: true, align: 'center', nowrap: true, render: v => <span className="font-bold">{v}</span> },
+    {
+      key: '_aktual', label: 'Stok Aktual', align: 'center', nowrap: true,
+      exportValue: row => row._aktual,
+      render: (v, row) => (
+        <input type="number" min={0} value={row._aktual}
+          onClick={e => e.stopPropagation()}
+          onChange={e => setOpname(prev => ({ ...prev, [row.id]: parseInt(e.target.value) || 0 }))}
+          className={`input-base h-8 text-center w-24 text-sm mx-auto block ${row._changed ? 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30' : ''}`} />
+      ),
+    },
+    {
+      key: '_diff', label: 'Selisih', sortable: true, align: 'center', nowrap: true,
+      render: (v) => (
+        <span className={`font-bold ${v > 0 ? 'text-emerald-600' : v < 0 ? 'text-red-600' : 'text-[var(--text-muted)]'}`}>
+          {v === 0 ? '—' : (v > 0 ? '+' : '') + v}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="section animate-fade-in">
@@ -144,53 +189,33 @@ export default function StockOpnamePage() {
       </div>
 
       {changesCount > 0 && (
-        <div className="card-sm mb-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+        <div className="card-sm mb-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-amber-700 dark:text-amber-400 font-semibold">⚠ {changesCount} produk memiliki perubahan stok — klik Simpan untuk update</p>
+          <label className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 cursor-pointer select-none">
+            <input type="checkbox" checked={showChangedOnly} onChange={e=>setShowChangedOnly(e.target.checked)} className="w-3.5 h-3.5 rounded"/>
+            Tampilkan yang berubah saja
+          </label>
         </div>
       )}
 
-      <div className="table-wrapper">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border)] sticky top-0 z-10">
-              <tr>
-                {['Produk','SKU','Stok Sistem','Stok Aktual','Selisih'].map(h=>(
-                  <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {loading ? [...Array(5)].map((_,i)=>(
-                <tr key={i}><td colSpan={5} className="px-4 py-3"><div className="skeleton h-8"/></td></tr>
-              )) : products.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-12 text-[var(--text-muted)]">Belum ada produk</td></tr>
-              ) : products.map(p => {
-                const sistem = p.stock?.qty || 0;
-                const aktual = parseInt(opname[p.id] ?? sistem);
-                const diff   = aktual - sistem;
-                const changed = aktual !== sistem;
-                return (
-                  <tr key={p.id} className={`hover:bg-[var(--bg-secondary)] transition-colors ${changed?'bg-amber-50/50 dark:bg-amber-950/20':''}`}>
-                    <td className="px-4 py-3 font-medium max-w-xs">
-                      <p className="truncate">{p.name}</p>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-[var(--text-muted)] whitespace-nowrap">{p.sku||'—'}</td>
-                    <td className="px-4 py-3 text-center font-bold">{sistem}</td>
-                    <td className="px-4 py-3">
-                      <input type="number" min={0} value={aktual}
-                        onChange={e=>setOpname(prev=>({...prev,[p.id]:parseInt(e.target.value)||0}))}
-                        className={`input-base h-8 text-center w-24 text-sm ${changed?'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30':''}`}/>
-                    </td>
-                    <td className={`px-4 py-3 text-center font-bold ${diff>0?'text-emerald-600':diff<0?'text-red-600':'text-[var(--text-muted)]'}`}>
-                      {diff===0?'—':(diff>0?'+':'')+diff}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={tableData}
+        loading={loading}
+        searchKeys={['name','sku']}
+        searchPlaceholder="Cari nama produk, SKU..."
+        emptyIcon={<ClipboardList size={40}/>}
+        emptyText={showChangedOnly ? 'Tidak ada produk yang berubah' : 'Belum ada produk'}
+        selectable
+        bulkActions={(rows, clear) => (
+          <button onClick={() => bulkResetToSystem(rows, clear)} className="btn-secondary h-8 text-xs px-3 gap-1.5">
+            <RotateCcw size={13}/> Reset {rows.length} ke Stok Sistem
+          </button>
+        )}
+        pageSizeOptions={[25,50,100,250]}
+        pageSize={50}
+        zebra
+      />
     </div>
   );
 }

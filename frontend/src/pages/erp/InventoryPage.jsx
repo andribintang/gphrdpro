@@ -6,11 +6,11 @@ import {
   ChevronLeft, ChevronRight, Filter, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid, Legend,
 } from 'recharts';
+import DataTable, { StatusBadge } from '../../components/DataTable';
 
 const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
 const auth = () => ({ Authorization: 'Bearer ' + localStorage.getItem('accessToken') });
@@ -212,7 +212,6 @@ const DashboardTab = ({ branch }) => {
 const AlertsTab = ({ branch, onNavigate }) => {
   const [alerts,   setAlerts]   = useState([]);
   const [loading,  setLoading]  = useState(true);
-  const [selected, setSelected] = useState(new Set());
   const [suggest,  setSuggest]  = useState(null);
 
   const load = useCallback(async () => {
@@ -228,29 +227,16 @@ const AlertsTab = ({ branch, onNavigate }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleSuggest = async () => {
-    if (!selected.size) { toast.error('Pilih produk dulu'); return; }
+  const handleSuggest = async (rows, clearSelection) => {
+    if (!rows.length) { toast.error('Pilih produk dulu'); return; }
     try {
       const r = await fetch(`${API}/erp/inventory/reorder`, {
         method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_ids: [...selected], branch_id: branch || 1 }),
+        body: JSON.stringify({ product_ids: rows.map(a => a.id), branch_id: branch || 1 }),
       });
       const d = await r.json();
       setSuggest(d.data);
     } catch { toast.error('Gagal generate saran'); }
-  };
-
-  const exportAlerts = () => {
-    const rows = alerts.map(a => ({
-      'Nama Produk': a.name, 'SKU': a.sku || '—',
-      'Kategori': a.category || '—', 'Stok Saat Ini': a.qty,
-      'Stok Minimum': a.stock_min, 'Status': a.qty <= 0 ? 'Habis' : 'Menipis',
-      'Urgensi': a.urgency === 'critical' ? 'Kritis' : a.urgency === 'high' ? 'Tinggi' : 'Sedang',
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Reorder Alert');
-    XLSX.writeFile(wb, `reorder_alert_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const critical = alerts.filter(a => a.urgency === 'critical');
@@ -258,11 +244,36 @@ const AlertsTab = ({ branch, onNavigate }) => {
   const medium   = alerts.filter(a => a.urgency === 'medium');
 
   const URGENCY_STYLE = {
-    critical: 'bg-red-100 text-red-700 border-red-200',
-    high:     'bg-orange-100 text-orange-700 border-orange-200',
-    medium:   'bg-amber-100 text-amber-700 border-amber-200',
+    critical: 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+    high:     'bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    medium:   'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
   };
   const URGENCY_LABEL = { critical:'🚨 Kritis', high:'🔴 Tinggi', medium:'⚠️ Sedang' };
+
+  const columns = [
+    { key: 'name', label: 'Produk', sortable: true, render: (v, row) => (
+      <div>
+        <p className="font-semibold text-[var(--text-primary)]">{v}</p>
+        <p className="text-[11px] text-[var(--text-muted)] font-mono">{row.sku || '—'} · {row.category || '—'}</p>
+      </div>
+    )},
+    { key: 'qty', label: 'Stok Saat Ini', sortable: true, align: 'center', nowrap: true, render: (v) => (
+      <span className={`inline-flex items-center justify-center w-10 h-7 rounded-lg font-bold text-sm
+        ${v <= 0 ? 'bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400'}`}>
+        {v}
+      </span>
+    )},
+    { key: 'stock_min', label: 'Minimum', sortable: true, align: 'center', nowrap: true, render: (v) => <span className="text-[var(--text-muted)]">{v}</span> },
+    { key: '_status', label: 'Status', align: 'center', nowrap: true,
+      exportValue: row => row.qty <= 0 ? 'Habis' : 'Menipis',
+      render: (v, row) => (
+        <StatusBadge label={row.qty <= 0 ? '🚨 Habis' : '⚠️ Menipis'}
+          color={row.qty <= 0 ? 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800' : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'} />
+      )},
+    { key: 'urgency', label: 'Urgensi', sortable: true, align: 'center', nowrap: true,
+      exportValue: row => URGENCY_LABEL[row.urgency]?.replace(/[^\w\s]/g,'').trim() || row.urgency,
+      render: (v) => <StatusBadge label={URGENCY_LABEL[v]} color={URGENCY_STYLE[v]} /> },
+  ];
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-[var(--brand-600)] border-t-transparent rounded-full animate-spin"/></div>;
 
@@ -285,79 +296,30 @@ const AlertsTab = ({ branch, onNavigate }) => {
         </div>
       ) : (
         <>
-          {/* Action bar */}
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <p className="text-sm text-[var(--text-muted)]">
-              {selected.size > 0 ? `${selected.size} produk dipilih` : `${alerts.length} produk perlu reorder`}
-            </p>
-            <div className="flex gap-2">
-              <button onClick={exportAlerts} className="btn-secondary gap-2 h-9 text-sm">
-                <Download size={14}/> Export Excel
+          <DataTable
+            columns={columns}
+            data={alerts}
+            loading={loading}
+            searchKeys={['name','sku','category']}
+            searchPlaceholder="Cari produk, SKU, kategori..."
+            filters={[
+              { key:'urgency', label:'Urgensi', options:[
+                { value:'critical', label:'🚨 Kritis' },
+                { value:'high',     label:'🔴 Tinggi' },
+                { value:'medium',   label:'⚠️ Sedang' },
+              ]},
+            ]}
+            selectable
+            bulkActions={(rows, clear) => (
+              <button onClick={() => handleSuggest(rows, clear)} className="btn-primary h-8 text-xs px-3 gap-1.5">
+                <BarChart3 size={13}/> Saran Reorder ({rows.length})
               </button>
-              {selected.size > 0 && (
-                <button onClick={handleSuggest} className="btn-primary gap-2 h-9 text-sm">
-                  <BarChart3 size={14}/> Saran Reorder ({selected.size})
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Alert table */}
-          <div className="table-wrapper overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-                  <th className="px-3 py-3 w-8">
-                    <input type="checkbox"
-                      checked={alerts.length > 0 && alerts.every(a => selected.has(a.id))}
-                      onChange={() => {
-                        const ns = new Set(selected);
-                        if (alerts.every(a => ns.has(a.id))) alerts.forEach(a => ns.delete(a.id));
-                        else alerts.forEach(a => ns.add(a.id));
-                        setSelected(ns);
-                      }} className="w-3.5 h-3.5 rounded"/>
-                  </th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-left">Produk</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-center">Stok Saat Ini</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-center">Minimum</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-center">Status</th>
-                  <th className="px-3 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-center">Urgensi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.map(a => (
-                  <tr key={a.id} className={`border-b border-[var(--border)] transition-colors ${selected.has(a.id) ? 'bg-[var(--brand-600)]/5' : 'hover:bg-[var(--bg-secondary)]'}`}>
-                    <td className="px-3 py-3">
-                      <input type="checkbox" checked={selected.has(a.id)}
-                        onChange={() => { const ns = new Set(selected); ns.has(a.id) ? ns.delete(a.id) : ns.add(a.id); setSelected(ns); }}
-                        className="w-3.5 h-3.5 rounded"/>
-                    </td>
-                    <td className="px-3 py-3">
-                      <p className="font-semibold text-[var(--text-primary)]">{a.name}</p>
-                      <p className="text-[11px] text-[var(--text-muted)] font-mono">{a.sku || '—'} · {a.category || '—'}</p>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={`inline-flex items-center justify-center w-10 h-7 rounded-lg font-bold text-sm
-                        ${a.qty <= 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
-                        {a.qty}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-center text-sm text-[var(--text-muted)]">{a.stock_min}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${a.qty <= 0 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                        {a.qty <= 0 ? '🚨 Habis' : '⚠️ Menipis'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${URGENCY_STYLE[a.urgency]}`}>
-                        {URGENCY_LABEL[a.urgency]}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            )}
+            exportable exportFilename="reorder_alert"
+            pageSizeOptions={[25,50,100]}
+            pageSize={25}
+            zebra
+          />
 
           {/* Reorder suggestion modal */}
           {suggest && (

@@ -322,11 +322,11 @@ export default function ReturnsPage() {
     { key:'return_no', label:'No. Retur', sortable:true, nowrap:true, render:v=><span className="font-mono text-xs font-semibold">{v}</span> },
     { key:'order', label:'No. Order', nowrap:true, render:v=><span className="font-mono text-xs text-[var(--text-secondary)]">{v?.order_no||'—'}</span> },
     { key:'order', label:'Pelanggan', render:v=><span className="font-medium">{v?.customer_name||'—'}</span> },
-    { key:'reason', label:'Alasan', nowrap:true, render:v=><span className="text-[var(--text-secondary)]">{RETURN_REASONS[v]||v}</span> },
-    { key:'resolution', label:'Resolusi', nowrap:true, render:v=>{ const r=RESOLUTIONS[v]||RESOLUTIONS.none; return <StatusBadge label={r.label} color={`${r.color} border-transparent`}/>; } },
-    { key:'restock', label:'Stok', align:'center', nowrap:true, render:v=>v?<span className="text-xs font-semibold text-emerald-600">✓</span>:<span className="text-xs text-[var(--text-muted)]">—</span> },
-    { key:'status', label:'Status', nowrap:true, render:v=>{ const s=RETURN_STATUS[v]||RETURN_STATUS.pending; return <StatusBadge label={s.label} color={s.color}/>; } },
-    { key:'total_return', label:'Total', align:'right', sortable:true, nowrap:true, render:v=><span className="font-semibold text-[var(--brand-600)]">{toRpShort(v)}</span> },
+    { key:'reason', label:'Alasan', nowrap:true, exportValue:row=>RETURN_REASONS[row.reason]||row.reason, render:v=><span className="text-[var(--text-secondary)]">{RETURN_REASONS[v]||v}</span> },
+    { key:'resolution', label:'Resolusi', nowrap:true, exportValue:row=>(RESOLUTIONS[row.resolution]||RESOLUTIONS.none).label, render:v=>{ const r=RESOLUTIONS[v]||RESOLUTIONS.none; return <StatusBadge label={r.label} color={`${r.color} border-transparent`}/>; } },
+    { key:'restock', label:'Stok', align:'center', nowrap:true, exportValue:row=>row.restock?'Ya':'Tidak', render:v=>v?<span className="text-xs font-semibold text-emerald-600">✓</span>:<span className="text-xs text-[var(--text-muted)]">—</span> },
+    { key:'status', label:'Status', nowrap:true, exportValue:row=>(RETURN_STATUS[row.status]||RETURN_STATUS.pending).label, render:v=>{ const s=RETURN_STATUS[v]||RETURN_STATUS.pending; return <StatusBadge label={s.label} color={s.color}/>; } },
+    { key:'total_return', label:'Total', align:'right', sortable:true, nowrap:true, exportValue:row=>parseFloat(row.total_return||0), render:v=><span className="font-semibold text-[var(--brand-600)]">{toRpShort(v)}</span> },
   ];
 
   return (
@@ -349,6 +349,8 @@ export default function ReturnsPage() {
         emptyIcon={<RotateCcw size={40}/>} emptyText="Belum ada retur"
         emptyAction={<button onClick={()=>setCreate(true)} className="btn-primary">Buat Retur Pertama</button>}
         actions={(row)=><button onClick={()=>setDetail(row.id)} className="btn-icon-sm"><Eye size={14}/></button>}
+        exportable exportFilename="retur"
+        pageSizeOptions={[10,25,50,100]}
         pageSize={25} zebra />
       {showCreate && <CreateModal onClose={()=>setCreate(false)} onSuccess={fetch}/>}
       {detailId   && <DetailModal returnId={detailId} onClose={()=>setDetail(null)} onSuccess={fetch}/>}

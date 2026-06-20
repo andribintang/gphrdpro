@@ -10,6 +10,7 @@ import {
   LineChart, Line, Legend, CartesianGrid, Cell,
 } from 'recharts';
 import { CHANNELS } from '../../utils/erp/erpService';
+import DataTable from '../../components/DataTable';
 
 const API = import.meta.env.VITE_API_URL || 'https://backend-gphrdpro.up.railway.app/api';
 const auth = () => ({ Authorization: 'Bearer ' + localStorage.getItem('accessToken') });
@@ -352,9 +353,55 @@ const SetTargetTab = ({ data, year, month, branch, onSaved }) => {
 
   const totalTarget = Object.values(targets).reduce((s,v) => s + (parseFloat(v.target_revenue)||0), 0);
 
+  // Data untuk DataTable — gabungkan channel info dengan target draft state
+  const tableData = (data.channels || []).map(ch => ({
+    ...ch,
+    _target: targets[ch.id] || { target_revenue:'', target_orders:'', notes:'' },
+  }));
+
+  const columns = [
+    { key: 'name', label: 'Sub Channel', sortable: true, render: v => <span className="font-semibold">{v}</span> },
+    { key: 'channel', label: 'Channel', align: 'center', nowrap: true, render: v => {
+      const chInfo = CHANNELS[v] || CHANNELS.direct;
+      return <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${chInfo.bg} ${chInfo.color}`}>{chInfo.label}</span>;
+    }},
+    { key: 'actual_revenue', label: 'Aktual Bulan Ini', sortable: true, align: 'right', nowrap: true,
+      exportValue: row => parseFloat(row.actual_revenue||0),
+      render: (v, row) => (
+        <div>
+          <span className="font-semibold text-emerald-600">{toRp(v)}</span>
+          <p className="text-[10px] text-[var(--text-muted)] font-normal">{row.actual_orders} order</p>
+        </div>
+      )},
+    { key: '_target_revenue', label: 'Target Revenue (Rp)', align: 'right', nowrap: true,
+      exportValue: row => parseFloat(row._target.target_revenue || 0),
+      render: (v, row) => (
+        <input type="number" value={row._target.target_revenue}
+          onClick={e => e.stopPropagation()}
+          onChange={e => setTargets(prev => ({...prev, [row.id]: {...row._target, target_revenue: e.target.value}}))}
+          placeholder="0" className="input-base text-sm text-right h-9 w-full"/>
+      )},
+    { key: '_target_orders', label: 'Target Order', align: 'center', nowrap: true,
+      exportValue: row => parseInt(row._target.target_orders || 0),
+      render: (v, row) => (
+        <input type="number" value={row._target.target_orders}
+          onClick={e => e.stopPropagation()}
+          onChange={e => setTargets(prev => ({...prev, [row.id]: {...row._target, target_orders: e.target.value}}))}
+          placeholder="0" className="input-base text-sm text-center h-9 w-24 mx-auto block"/>
+      )},
+    { key: '_target_notes', label: 'Catatan',
+      exportValue: row => row._target.notes || '',
+      render: (v, row) => (
+        <input type="text" value={row._target.notes}
+          onClick={e => e.stopPropagation()}
+          onChange={e => setTargets(prev => ({...prev, [row.id]: {...row._target, notes: e.target.value}}))}
+          placeholder="Catatan opsional..." className="input-base text-sm h-9 w-full"/>
+      )},
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-[var(--text-muted)]">
           Set target untuk <b>{MONTHS_ID[month]} {year}</b>
         </p>
@@ -367,74 +414,21 @@ const SetTargetTab = ({ data, year, month, branch, onSaved }) => {
         </div>
       </div>
 
-      <div className="table-wrapper overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-              <th className="px-4 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-left">Sub Channel</th>
-              <th className="px-4 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-center">Channel</th>
-              <th className="px-4 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-right">Aktual Bulan Ini</th>
-              <th className="px-4 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-right">Target Revenue (Rp)</th>
-              <th className="px-4 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-center">Target Order</th>
-              <th className="px-4 py-3 text-xs font-bold text-[var(--text-muted)] uppercase text-left">Catatan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data.channels || []).map(ch => {
-              const chInfo = CHANNELS[ch.channel] || CHANNELS.direct;
-              const t = targets[ch.id] || { target_revenue:'', target_orders:'', notes:'' };
-              return (
-                <tr key={ch.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-secondary)]/50">
-                  <td className="px-4 py-3 font-semibold">{ch.name}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${chInfo.bg} ${chInfo.color}`}>
-                      {chInfo.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-emerald-600">
-                    {toRp(ch.actual_revenue)}
-                    <p className="text-[10px] text-[var(--text-muted)] font-normal">{ch.actual_orders} order</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      value={t.target_revenue}
-                      onChange={e => setTargets(prev => ({...prev, [ch.id]: {...t, target_revenue: e.target.value}}))}
-                      placeholder="0"
-                      className="input-base text-sm text-right h-9 w-full"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      value={t.target_orders}
-                      onChange={e => setTargets(prev => ({...prev, [ch.id]: {...t, target_orders: e.target.value}}))}
-                      placeholder="0"
-                      className="input-base text-sm text-center h-9 w-24 mx-auto block"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="text"
-                      value={t.notes}
-                      onChange={e => setTargets(prev => ({...prev, [ch.id]: {...t, notes: e.target.value}}))}
-                      placeholder="Catatan opsional..."
-                      className="input-base text-sm h-9 w-full"
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-[var(--border)] bg-[var(--bg-secondary)]">
-              <td colSpan={3} className="px-4 py-3 font-bold text-sm text-right">Total Target:</td>
-              <td className="px-4 py-3 text-right font-black text-[var(--brand-600)]">{toRp(totalTarget)}</td>
-              <td colSpan={2}/>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={tableData}
+        searchKeys={['name']}
+        searchPlaceholder="Cari sub channel..."
+        filters={[{ key:'channel', label:'Channel', options:[
+          { value:'wa', label:'WhatsApp' },
+          { value:'marketplace', label:'Marketplace' },
+          { value:'direct', label:'Langsung' },
+        ]}]}
+        exportable exportFilename={`target_${year}_${month}`}
+        pageSizeOptions={[10,25,50]}
+        pageSize={25}
+        zebra
+      />
     </div>
   );
 };

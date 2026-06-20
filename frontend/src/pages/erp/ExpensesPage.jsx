@@ -110,17 +110,31 @@ export default function ExpensesPage() {
     catch { toast.error('Gagal'); }
   };
 
+  const bulkDelete = async (rows, clearSelection) => {
+    if (!confirm(`Hapus ${rows.length} pengeluaran terpilih?`)) return;
+    try {
+      await Promise.all(rows.map(r => erpService.deleteExpense(r.id)));
+      toast.success(`${rows.length} pengeluaran dihapus`);
+      clearSelection();
+      fetch();
+    } catch { toast.error('Sebagian gagal dihapus'); fetch(); }
+  };
+
   const totalAmount = expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
 
   const columns = [
     { key:'expense_date', label:'Tanggal', sortable:true, nowrap:true, render:v=><span className="text-[var(--text-secondary)]">{v}</span> },
-    { key:'category', label:'Kategori', nowrap:true, render:v=>{
+    { key:'category', label:'Kategori', nowrap:true,
+      exportValue:row=>EXPENSE_CATEGORIES[row.category]?.label||row.category,
+      render:v=>{
       const cat=EXPENSE_CATEGORIES[v]||EXPENSE_CATEGORIES.lainnya;
       return <StatusBadge label={cat.label} color={`${cat.bg} ${cat.color} border-transparent`}/>;
     }},
     { key:'description', label:'Deskripsi', render:v=><span className="font-medium">{v}</span> },
     { key:'payment_method', label:'Metode', nowrap:true, render:v=><span className="capitalize text-[var(--text-secondary)]">{v}</span> },
-    { key:'amount', label:'Jumlah', sortable:true, align:'right', nowrap:true, render:v=><span className="font-bold text-red-600 dark:text-red-400">{toRpShort(v)}</span> },
+    { key:'amount', label:'Jumlah', sortable:true, align:'right', nowrap:true,
+      exportValue:row=>parseFloat(row.amount||0),
+      render:v=><span className="font-bold text-red-600 dark:text-red-400">{toRpShort(v)}</span> },
   ];
 
   return (
@@ -145,6 +159,7 @@ export default function ExpensesPage() {
 
       <DataTable columns={columns} data={expenses} loading={loading}
         searchKeys={['description','category']} searchPlaceholder="Cari deskripsi, kategori..."
+        filters={[{ key:'category', label:'Kategori', options:Object.entries(EXPENSE_CATEGORIES).map(([k,v])=>({value:k,label:v.label})) }]}
         emptyIcon={<Wallet size={40}/>} emptyText="Belum ada pengeluaran"
         emptyAction={<button onClick={()=>setModal('new')} className="btn-primary">Tambah Pengeluaran</button>}
         actions={(row)=>(
@@ -153,6 +168,14 @@ export default function ExpensesPage() {
             <button onClick={()=>deleteExpense(row.id)} className="btn-icon-sm hover:text-red-500"><Trash2 size={13}/></button>
           </div>
         )}
+        selectable
+        bulkActions={(rows, clear) => (
+          <button onClick={() => bulkDelete(rows, clear)} className="btn-secondary h-8 text-xs px-3 gap-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950">
+            <Trash2 size={13}/> Hapus {rows.length} Terpilih
+          </button>
+        )}
+        exportable exportFilename="pengeluaran"
+        pageSizeOptions={[10,25,50,100]}
         pageSize={25} zebra/>
       {modal && <ExpenseModal expense={modal==='new'?null:modal} onClose={()=>setModal(null)} onSuccess={fetch}/>}
     </div>

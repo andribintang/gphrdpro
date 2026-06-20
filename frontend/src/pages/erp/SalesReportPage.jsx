@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BarChart3, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PeriodFilter from '../../components/PeriodFilter';
+import DataTable from '../../components/DataTable';
 import { erpService, toRp, toRpShort, CHANNELS } from '../../utils/erp/erpService';
 
 export default function SalesReportPage() {
@@ -64,29 +65,37 @@ export default function SalesReportPage() {
               );
             })}
           </div>
-          <div className="table-wrapper">
-            <div className="px-5 py-3 border-b border-[var(--border)] font-bold text-sm">Detail Order ({orders.length})</div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border)]">
-                  <tr>{['Tanggal','Channel','Subtotal','Diskon','Ongkir','Total'].map(h=>(
-                    <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{h}</th>
-                  ))}</tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-subtle)]">
-                  {orders.map((o,i)=>(
-                    <tr key={i} className="hover:bg-[var(--bg-secondary)]">
-                      <td className="px-4 py-3 text-[var(--text-secondary)]">{o.order_date}</td>
-                      <td className="px-4 py-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CHANNELS[o.channel]?.bg} ${CHANNELS[o.channel]?.color}`}>{CHANNELS[o.channel]?.label||o.channel}</span></td>
-                      <td className="px-4 py-3 text-right">{toRpShort(o.subtotal)}</td>
-                      <td className="px-4 py-3 text-right text-red-500">{parseFloat(o.discount_amount)>0?'-'+toRpShort(o.discount_amount):'—'}</td>
-                      <td className="px-4 py-3 text-right">{parseFloat(o.shipping_cost)>0?toRpShort(o.shipping_cost):'—'}</td>
-                      <td className="px-4 py-3 text-right font-bold">{toRpShort(o.total_amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div>
+            <p className="text-sm font-bold mb-2.5">Detail Order ({orders.length})</p>
+            <DataTable
+              columns={[
+                { key:'order_date', label:'Tanggal', sortable:true, nowrap:true, render:v=><span className="text-[var(--text-secondary)]">{v}</span> },
+                { key:'channel', label:'Channel', nowrap:true,
+                  exportValue:row=>CHANNELS[row.channel]?.label||row.channel,
+                  render:v=><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CHANNELS[v]?.bg} ${CHANNELS[v]?.color}`}>{CHANNELS[v]?.label||v}</span> },
+                { key:'subtotal', label:'Subtotal', sortable:true, align:'right', nowrap:true,
+                  exportValue:row=>parseFloat(row.subtotal||0),
+                  render:v=><span>{toRpShort(v)}</span> },
+                { key:'discount_amount', label:'Diskon', align:'right', nowrap:true,
+                  exportValue:row=>parseFloat(row.discount_amount||0),
+                  render:v=>parseFloat(v)>0?<span className="text-red-500">-{toRpShort(v)}</span>:<span className="text-[var(--text-muted)]">—</span> },
+                { key:'shipping_cost', label:'Ongkir', align:'right', nowrap:true,
+                  exportValue:row=>parseFloat(row.shipping_cost||0),
+                  render:v=>parseFloat(v)>0?<span>{toRpShort(v)}</span>:<span className="text-[var(--text-muted)]">—</span> },
+                { key:'total_amount', label:'Total', sortable:true, align:'right', nowrap:true,
+                  exportValue:row=>parseFloat(row.total_amount||0),
+                  render:v=><span className="font-bold">{toRpShort(v)}</span> },
+              ]}
+              data={orders}
+              searchKeys={['order_date']}
+              searchPlaceholder="Cari tanggal..."
+              filters={[{ key:'channel', label:'Channel', options:Object.entries(CHANNELS).map(([k,v])=>({value:k,label:v.label})) }]}
+              emptyText="Tidak ada order pada periode ini"
+              exportable exportFilename="laporan_sales"
+              pageSizeOptions={[10,25,50,100]}
+              pageSize={25}
+              zebra
+            />
           </div>
         </>
       )}
