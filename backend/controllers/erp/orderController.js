@@ -584,10 +584,95 @@ const updateOrder = async (req, res, next) => {
   } catch(err) { await t.rollback(); next(err); }
 };
 
+// ── PATCH /api/orders/bulk-status ────────────────────────────
+const bulkUpdateStatus = async (req, res, next) => {
+  try {
+    const { order_ids, status } = req.body;
+    const VALID = ['confirmed','processing','shipped','completed','cancelled'];
+    if (!order_ids?.length) return res.status(400).json({ success:false, message:'order_ids wajib diisi' });
+    if (!VALID.includes(status)) return res.status(400).json({ success:false, message:`Status tidak valid` });
+
+    let ok = 0, failed = 0;
+    const errors = [];
+
+    for (const orderId of order_ids) {
+      const t = await sequelize.transaction();
+      try {
+        const order = await Order.findByPk(orderId, { transaction: t });
+        if (!order) { await t.rollback(); failed++; errors.push(`Order ID ${orderId} tidak ditemukan`); continue; }
+
+        const TRANSITIONS = {
+          confirmed:  ['draft'],
+          processing: ['confirmed'],
+          shipped:    ['processing','confirmed'],
+          completed:  ['shipped','processing','confirmed'],
+          cancelled:  ['draft','confirmed','processing'],
+        };
+        if (!TRANSITIONS[status]?.includes(order.status)) {
+          await t.rollback(); failed++;
+          errors.push(`Order ${order.order_no}: tidak bisa dari "${order.status}" ke "${status}"`);
+          continue;
+        }
+
+        if (status === 'confirmed' && order.status === 'draft') {
+          const items = await OrderItem.findAll({ where: { order_id: order.id }, transaction: t });
+          for (const item of items) {
+            const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id||null, branch_id: order.branch_id }, transaction: t });
+            if (!stock || stock.qty < item.qty) throw new Error(`Stok ${item.product_name} tidak cukup`);
+            const qtyBefore = stock.qty;
+            await stock.update({ qty: qtyBefore - item.qty, qty_reserved: Math.max(0,(stock.qty_reserved||0)-item.qty) }, { transaction: t });
+            await StockMovement.create({ product_id: item.product_id, variant_id: item.variant_id||null, branch_id: order.branch_id,
+              type:'out', qty:-item.qty, qty_before:qtyBefore, qty_after:qtyBefore-item.qty,
+              ref_type:'order', ref_id:order.id, notes:`Bulk confirm ${order.order_no}`, created_by:req.user?.id,
+              created_at:new Date(), updated_at:new Date() }, { transaction: t });
+          }
+          await order.update({ status, confirmed_at: new Date() }, { transaction: t });
+        } else if (status === 'cancelled') {
+          if (['confirmed','processing'].includes(order.status)) {
+            const items = await OrderItem.findAll({ where: { order_id: order.id }, transaction: t });
+            for (const item of items) {
+              const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id||null, branch_id: order.branch_id }, transaction: t });
+              if (stock) {
+                const qtyBefore = stock.qty;
+                await stock.update({ qty: qtyBefore + item.qty }, { transaction: t });
+                await StockMovement.create({ product_id: item.product_id, variant_id: item.variant_id||null, branch_id: order.branch_id,
+                  type:'in', qty:item.qty, qty_before:qtyBefore, qty_after:qtyBefore+item.qty,
+                  ref_type:'order', ref_id:order.id, notes:`Bulk cancel ${order.order_no}`, created_by:req.user?.id,
+                  created_at:new Date(), updated_at:new Date() }, { transaction: t });
+              }
+            }
+          } else if (order.status === 'draft') {
+            const items = await OrderItem.findAll({ where: { order_id: order.id }, transaction: t });
+            for (const item of items) {
+              const stock = await Stock.findOne({ where: { product_id: item.product_id, variant_id: item.variant_id||null, branch_id: order.branch_id }, transaction: t });
+              if (stock) await stock.update({ qty_reserved: Math.max(0,(stock.qty_reserved||0)-item.qty) }, { transaction: t });
+            }
+          }
+          await order.update({ status }, { transaction: t });
+        } else {
+          const updateData = { status };
+          if (status === 'completed') updateData.completed_at = new Date();
+          await order.update(updateData, { transaction: t });
+        }
+
+        await t.commit();
+        ok++;
+      } catch(e) {
+        await t.rollback(); failed++;
+        errors.push(`Order ${orderId}: ${e.message}`);
+      }
+    }
+
+    return res.json({ success:true, data:{ updated:ok, failed, errors },
+      message:`${ok} order diperbarui ke "${status}"${failed?`, ${failed} gagal`:''}` });
+  } catch(err) { next(err); }
+};
+
 module.exports = {
   getOrders, getOrderDetail, createOrder, buildOrder, updateOrder,
   confirmOrder, completeOrder, cancelOrder,
   addPayment, verifyPayment,
   addShipment, updateShipment,
+  bulkUpdateStatus,
   getSalesReport, getShipmentReport, getDailyReport, getChannelReport,
 };
