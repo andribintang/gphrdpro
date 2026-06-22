@@ -207,6 +207,19 @@ export default function OrdersPage() {
   const [dateFrom,     setDateFrom]     = useState('');
   const [dateTo,       setDateTo]       = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [openDateDrop,  setOpenDateDrop]  = useState(false);
+  const dateDdRef = useRef(null);
+
+  // Tutup dropdown saat klik di luar
+  useEffect(() => {
+    const handler = (e) => {
+      if (dateDdRef.current && !dateDdRef.current.contains(e.target)) {
+        setOpenDateDrop(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // ── Data state ─────────────────────────────────────────────
   const [orders,       setOrders]       = useState([]);
@@ -439,21 +452,25 @@ export default function OrdersPage() {
           })}
         </div>
 
-        {/* Date preset dropdown */}
-        <div className="relative">
-          <button className="flex items-center gap-2 h-9 px-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+        {/* Date preset dropdown — click toggle + klik luar untuk tutup */}
+        <div className="relative" ref={dateDdRef}>
+          <button onClick={()=>setOpenDateDrop(o=>!o)}
+            className={`flex items-center gap-2 h-9 px-3 rounded-xl border text-sm transition-colors ${openDateDrop?'border-[var(--brand-600)] bg-[var(--brand-600)]/5 text-[var(--brand-600)]':'border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             <CalendarRange size={14}/>
             <span className="font-medium">{dateLabel}</span>
-            <ChevronDown size={12}/>
+            <ChevronDown size={12} className={`transition-transform duration-150 ${openDateDrop?'rotate-180':''}`}/>
           </button>
-          <div className="absolute top-full left-0 mt-1 z-30 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl py-1 min-w-[180px]">
-            {DATE_PRESETS.map(dp=>(
-              <button key={dp.key} onClick={()=>handlePreset(dp.key)}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--bg-secondary)] ${datePreset===dp.key?'text-[var(--brand-600)] font-semibold':'text-[var(--text-secondary)]'}`}>
-                {dp.label}
-              </button>
-            ))}
-          </div>
+          {openDateDrop && (
+            <div className="absolute top-full left-0 mt-1 z-30 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl py-1 min-w-[180px]">
+              {DATE_PRESETS.map(dp=>(
+                <button key={dp.key} onClick={()=>{ handlePreset(dp.key); if(dp.key!=='custom') setOpenDateDrop(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--bg-secondary)] flex items-center justify-between ${datePreset===dp.key?'text-[var(--brand-600)] font-semibold':'text-[var(--text-secondary)]'}`}>
+                  {dp.label}
+                  {datePreset===dp.key && <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-600)]"/>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Custom date range */}
