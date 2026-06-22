@@ -114,8 +114,23 @@ const getProducts = async (req, res, next) => {
     if (branch_id)   where += ` AND ep.branch_id = ${parseInt(branch_id)}`;
     if (category_id) where += ` AND ep.category_id = ${parseInt(category_id)}`;
     if (search) {
-      const s = sequelize.escape('%' + search + '%');
-      where += ` AND (ep.name LIKE ${s} OR ep.sku LIKE ${s} OR ep.barcode LIKE ${s})`;
+      // ── Multi-word fuzzy search: setiap kata dievaluasi secara independen
+      // "coil BRT" → kata ["coil","BRT"] → name/sku/barcode mengandung SEMUA kata
+      // Urutan kata tidak penting, partial match diizinkan
+      // Contoh: "coil BRT" mencocokkan "BRT G - Super Coil Injeksi" ✓
+      const words = search.trim().split(/\s+/).filter(Boolean).slice(0, 6); // max 6 kata
+      if (words.length === 1) {
+        // 1 kata: tetap pakai LIKE biasa + OR pada semua field
+        const s = sequelize.escape('%' + words[0] + '%');
+        where += ` AND (ep.name LIKE ${s} OR ep.sku LIKE ${s} OR ep.barcode LIKE ${s})`;
+      } else {
+        // Banyak kata: tiap kata harus muncul di salah satu field (name OR sku OR barcode)
+        const clauses = words.map(w => {
+          const sw = sequelize.escape('%' + w + '%');
+          return `(ep.name LIKE ${sw} OR ep.sku LIKE ${sw} OR ep.barcode LIKE ${sw})`;
+        });
+        where += ' AND ' + clauses.join(' AND ');
+      }
     }
 
     const [[{ total }]] = await sequelize.query(
