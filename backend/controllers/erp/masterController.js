@@ -721,10 +721,405 @@ const importOrders = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ══════════════════════════════════════════════════════════════════
+// IMPORT ORDER MARKETPLACE — Parser khusus per platform
+// Membaca file export asli Shopee/TikTok tanpa perlu template manual.
+// Mengembalikan rows dalam format standar + daftar unresolved_skus
+// (produk yang Seller SKU-nya tidak ada di sistem, khususnya TikTok).
+// ══════════════════════════════════════════════════════════════════
+
+const mpNum = (v) => {
+  if (v == null || String(v).trim() === '' || String(v).trim() === 'nan') return 0;
+  const s = String(v).replace(/\./g, '').replace(/,/g, '.').trim();
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+};
+
+// ── Detect platform dari kolom header ─────────────────────────
+const detectPlatform = (cols) => {
+  if (cols.includes('Order ID') && cols.includes('Seller SKU') && cols.includes('Handling Fee')) return 'tiktok';
+  if (cols.includes('No. Pesanan') && cols.includes('Nomor Referensi SKU') && cols.includes('Voucher Ditanggung Shopee')) return 'shopee';
+  return null;
+};
+
+// ── Parser TikTok Shop ─────────────────────────────────────────
+// Admin fee = Handling Fee + Buyer Service Fee (per order, bukan per item)
+const parseTikTok = (rows) => {
+  const groups = {};
+  for (const row of rows) {
+    const ref = String(row['Order ID'] || '').trim();
+    if (!ref) continue;
+    (groups[ref] = groups[ref] || []).push(row);
+  }
+
+  const parsed = [];
+  for (const [ref, items] of Object.entries(groups)) {
+    const first = items[0];
+    // Admin fee hanya dihitung sekali per order (sum dari semua item baris)
+    const handlingFee  = items.reduce((s, r) => s + mpNum(r['Handling Fee']), 0);
+    const buyerSvcFee  = items.reduce((s, r) => s + mpNum(r['Buyer Service Fee']), 0);
+    const adminFee     = handlingFee + buyerSvcFee;
+
+    // Shipping cost dari baris pertama (nilai sama di semua baris multi-item)
+    const shippingCost = mpNum(first['Shipping Fee After Discount']) || mpNum(first['Original Shipping Fee']);
+
+    // Payment method mapping
+    const pmRaw = String(first['Payment Method'] || '').toLowerCase();
+    const paymentMethod = pmRaw.includes('cod') || pmRaw.includes('tempat') ? 'cod'
+      : pmRaw.includes('qris') ? 'qris'
+      : pmRaw.includes('paylater') ? 'transfer'
+      : 'transfer';
+
+    // Tanggal
+    const createdRaw = String(first['Created Time'] || first['Paid Time'] || '').trim();
+    let orderDate = new Date().toISOString().split('T')[0];
+    if (createdRaw) {
+      // Format: DD/MM/YYYY HH:MM:SS
+      const m = createdRaw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) orderDate = `${m[3]}-${m[2]}-${m[1]}`;
+    }
+
+    const orderItems = items.map(item => {
+      const sellerSku = String(item['Seller SKU'] || '').trim();
+      const variation = String(item['Variation'] || '').trim();
+      const qty       = parseInt(item['Quantity']) || 1;
+      const subtotal  = mpNum(item['SKU Subtotal After Discount']);
+      const sellPrice = qty > 0 ? Math.round(subtotal / qty) : mpNum(item['SKU Unit Original Price']);
+      return {
+        seller_sku:    sellerSku || null,   // null = staff harus pilih manual
+        product_name:  String(item['Product Name'] || '').trim(),
+        variant_name:  variation || null,
+        qty,
+        sell_price:    sellPrice,
+        _raw_product:  `${String(item['Product Name'] || '').trim()}${variation ? ' — ' + variation : ''}`,
+      };
+    });
+
+    parsed.push({
+      order_ref:        ref,
+      platform:         'tiktok',
+      customer_name:    String(first['Recipient'] || first['Buyer Username'] || '').replace(/\*/g, '').trim(),
+      customer_phone:   String(first['Phone #'] || '').replace(/[^0-9+]/g, '').replace('+62', '0'),
+      customer_address: [
+        first['Detail Address'], first['Villages'], first['Districts'],
+        first['Regency and City'], first['Province'],
+      ].filter(v => v && String(v).trim() && !String(v).includes('*')).join(', '),
+      customer_city:    String(first['Regency and City'] || '').replace(/\*/g, '').trim(),
+      order_date:       orderDate,
+      shipping_cost:    shippingCost,
+      admin_fee:        adminFee,
+      admin_fee_detail: { handling_fee: handlingFee, buyer_service_fee: buyerSvcFee },
+      payment_method:   paymentMethod,
+      courier:          String(first['Shipping Provider Name'] || first['Delivery Option'] || '').trim() || null,
+      tracking_no:      String(first['Tracking ID'] || '').trim() || null,
+      notes:            String(first['Buyer Message'] || first['Seller Note'] || '').trim() || null,
+      items:            orderItems,
+    });
+  }
+  return parsed;
+};
+
+// ── Parser Shopee ──────────────────────────────────────────────
+// Admin fee = Voucher Ditanggung Penjual + Voucher Ditanggung Shopee +
+//             Estimasi Potongan Biaya Pengiriman + Cashback Koin +
+//             Diskon Kartu Kredit + Paket Diskon (Diskon dari Shopee) +
+//             Paket Diskon (Diskon dari Penjual)
+// Catatan: Voucher/Cashback/Potongan yang dibayar PLATFORM sebenarnya tidak
+//          jadi biaya penjual, tapi untuk kepentingan rekonsiliasi internal
+//          kita tetap catat semuanya agar Total Pembayaran yang diterima
+//          penjual bisa dihitung: Harga - admin_fee + ongkir_nett.
+// Untuk keperluan ERP ini, admin_fee = biaya yang MENGURANGI pendapatan
+//          penjual = Voucher Ditanggung Penjual + Potongan platform lainnya.
+const parseShopee = (rows) => {
+  // Shopee biasanya 1 No. Pesanan = 1 baris (multi-item dalam 1 sel nama produk)
+  const groups = {};
+  for (const row of rows) {
+    const ref = String(row['No. Pesanan'] || '').trim();
+    if (!ref) continue;
+    (groups[ref] = groups[ref] || []).push(row);
+  }
+
+  const parsed = [];
+  for (const [ref, items] of Object.entries(groups)) {
+    const first = items[0];
+
+    // Admin fee (biaya platform yang jadi tanggungan penjual)
+    const voucherPenjual   = mpNum(first['Voucher Ditanggung Penjual']);
+    const voucherShopee    = mpNum(first['Voucher Ditanggung Shopee']);
+    const potOngkir        = mpNum(first['Estimasi Potongan Biaya Pengiriman']);
+    const cashback         = mpNum(first['Cashback Koin']);
+    const diskonKartuKredit= mpNum(first['Diskon Kartu Kredit']);
+    const paketDiskonShopee= mpNum(first['Paket Diskon (Diskon dari Shopee)']);
+    const paketDiskonPenjual=mpNum(first['Paket Diskon (Diskon dari Penjual)']);
+    const adminFee = voucherPenjual + voucherShopee + potOngkir + cashback
+                   + diskonKartuKredit + paketDiskonShopee + paketDiskonPenjual;
+
+    const shippingCost = mpNum(first['Perkiraan Ongkos Kirim']);
+
+    const pmRaw = String(first['Metode Pembayaran'] || '').toLowerCase();
+    const paymentMethod = pmRaw.includes('cod') || pmRaw.includes('tempat') ? 'cod'
+      : pmRaw.includes('qris') ? 'qris'
+      : pmRaw.includes('paylater') || pmRaw.includes('spaylater') ? 'transfer'
+      : 'transfer';
+
+    const createdRaw = String(first['Waktu Pesanan Dibuat'] || '').trim();
+    let orderDate = new Date().toISOString().split('T')[0];
+    if (createdRaw) {
+      // Format: YYYY-MM-DD HH:MM
+      const m = createdRaw.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (m) orderDate = `${m[1]}-${m[2]}-${m[3]}`;
+    }
+
+    // Ekstrak kurir dari "Opsi Pengiriman" (mis. "Hemat Kargo-SPX Hemat" → "SPX Hemat")
+    const kurirRaw = String(first['Opsi Pengiriman'] || '').trim();
+    const courier  = kurirRaw.includes('-') ? kurirRaw.split('-').slice(1).join('-').trim() : kurirRaw || null;
+
+    const orderItems = items.map(item => {
+      const sku       = String(item['Nomor Referensi SKU'] || '').trim();
+      const variation = String(item['Nama Variasi'] || '').trim();
+      const qty       = parseInt(item['Jumlah']) || 1;
+      const hargaDiskon = mpNum(item['Harga Setelah Diskon']);
+      return {
+        seller_sku:   sku || null,
+        product_name: String(item['Nama Produk'] || '').trim(),
+        variant_name: variation || null,
+        qty,
+        sell_price:   hargaDiskon,
+        _raw_product: `${String(item['Nama Produk'] || '').trim()}${variation ? ' — ' + variation : ''}`,
+      };
+    });
+
+    // Alamat dari Shopee digabung dalam 1 field "Alamat Pengiriman"
+    const alamatFull = String(first['Alamat Pengiriman'] || '').replace(/\*/g, '').trim();
+
+    parsed.push({
+      order_ref:        ref,
+      platform:         'shopee',
+      customer_name:    String(first['Nama Penerima'] || first['Username (Pembeli)'] || '').replace(/\*/g, '').trim(),
+      customer_phone:   String(first['No. Telepon'] || '').replace(/[^0-9+]/g, '').replace('+62', '0'),
+      customer_address: alamatFull,
+      customer_city:    String(first['Kota/Kabupaten'] || '').replace(/KAB\. |KOTA /g, '').trim(),
+      order_date:       orderDate,
+      shipping_cost:    shippingCost,
+      admin_fee:        adminFee,
+      admin_fee_detail: {
+        voucher_penjual: voucherPenjual,
+        voucher_shopee: voucherShopee,
+        potongan_ongkir: potOngkir,
+        cashback_koin: cashback,
+        diskon_kartu: diskonKartuKredit,
+        paket_shopee: paketDiskonShopee,
+        paket_penjual: paketDiskonPenjual,
+      },
+      payment_method:   paymentMethod,
+      courier:          courier,
+      tracking_no:      String(first['No. Resi'] || '').trim() || null,
+      notes:            String(first['Catatan dari Pembeli'] || first['Catatan'] || '').trim() || null,
+      items:            orderItems,
+    });
+  }
+  return parsed;
+};
+
+// ── POST /api/marketplace-import/parse ────────────────────────
+// Step 1: parse file Excel → return structured preview + unresolved_skus
+// Frontend tampilkan preview + minta staff resolve SKU yang tidak ketemu.
+const parseMarketplaceExport = async (req, res, next) => {
+  try {
+    const { platform, branch_id, rows } = req.body;
+    const bid = parseInt(branch_id) || 1;
+    if (!rows?.length) return res.status(400).json({ success: false, message: 'Tidak ada data baris' });
+    if (!['tiktok','shopee'].includes(platform)) return res.status(400).json({ success: false, message: 'Platform tidak didukung' });
+
+    // Parse per platform
+    const parsedOrders = platform === 'tiktok' ? parseTikTok(rows) : parseShopee(rows);
+
+    // Resolve SKU ke product_id di database
+    // Untuk setiap item: cari by seller_sku, kalau tidak ketemu return ke frontend untuk resolusi manual
+    const unresolvedSkus = []; // { item_key, seller_sku, product_name, variant_name, order_ref }
+    const skuCache = {}; // sku → { product_id, product_name, variant_id, variant_name }
+
+    for (const order of parsedOrders) {
+      for (const item of order.items) {
+        if (!item.seller_sku) {
+          // TikTok tanpa SKU — langsung masuk unresolved
+          const itemKey = `${order.order_ref}::${item._raw_product}`;
+          if (!unresolvedSkus.find(u => u.item_key === itemKey)) {
+            unresolvedSkus.push({
+              item_key:     itemKey,
+              order_ref:    order.order_ref,
+              seller_sku:   null,
+              product_name: item.product_name,
+              variant_name: item.variant_name,
+              qty:          item.qty,
+              sell_price:   item.sell_price,
+            });
+          }
+          item._resolved = null;
+          continue;
+        }
+
+        if (skuCache[item.seller_sku] !== undefined) {
+          item._resolved = skuCache[item.seller_sku];
+          continue;
+        }
+
+        const product = await require('../../models/erp').Product.findOne({
+          where: { sku: item.seller_sku, branch_id: bid, is_active: true },
+        });
+        if (!product) {
+          const itemKey = `${order.order_ref}::${item.seller_sku}`;
+          unresolvedSkus.push({
+            item_key:     itemKey,
+            order_ref:    order.order_ref,
+            seller_sku:   item.seller_sku,
+            product_name: item.product_name,
+            variant_name: item.variant_name,
+            qty:          item.qty,
+            sell_price:   item.sell_price,
+          });
+          item._resolved = null;
+          skuCache[item.seller_sku] = null;
+          continue;
+        }
+
+        // Resolve varian jika ada
+        let variantId = null;
+        let variantName = item.variant_name;
+        if (item.variant_name) {
+          const { ProductVariant } = require('../../models/erp');
+          const activeVariants = await ProductVariant.findAll({ where: { product_id: product.id, is_active: true } });
+          const matched = activeVariants.find(v => v.name.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
+          if (matched) { variantId = matched.id; variantName = matched.name; }
+        }
+
+        const resolved = { product_id: product.id, product_name: product.name, variant_id: variantId, variant_name: variantName };
+        item._resolved = resolved;
+        skuCache[item.seller_sku] = resolved;
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        orders: parsedOrders,
+        unresolved_skus: unresolvedSkus,
+        summary: {
+          total_orders:     parsedOrders.length,
+          total_items:      parsedOrders.reduce((s, o) => s + o.items.length, 0),
+          unresolved_count: unresolvedSkus.length,
+        },
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// ── POST /api/marketplace-import/confirm ──────────────────────
+// Step 2: Staff sudah resolve SKU manual → eksekusi buat order
+const confirmMarketplaceImport = async (req, res, next) => {
+  try {
+    const { buildOrder } = require('./orderController');
+    const { orders, branch_id, sub_channel_id, sub_channel_name, resolutions } = req.body;
+    // resolutions: { [item_key]: { product_id, variant_id } } — dari UI konfirmasi staff
+    const bid = parseInt(branch_id) || 1;
+    const resMap = resolutions || {};
+    let success = 0, skipped = 0, failed = 0;
+    const errors = [], notes = [];
+
+    for (const order of (orders || [])) {
+      const t = await sequelize.transaction();
+      try {
+        // Cek duplikat
+        const existing = await Order.findOne({ where: { external_ref: order.order_ref, branch_id: bid }, transaction: t });
+        if (existing) {
+          await t.rollback();
+          skipped++;
+          errors.push(`Order ${order.order_ref}: dilewati, sudah pernah diimport sebagai ${existing.order_no}`);
+          continue;
+        }
+
+        // Build items payload
+        const items = [];
+        for (const item of order.items) {
+          const itemKey = `${order.order_ref}::${item.seller_sku || item._raw_product}`;
+          let productId = item._resolved?.product_id;
+          let variantId = item._resolved?.variant_id ?? null;
+
+          // Staff sudah override via UI resolusi manual
+          if (!productId && resMap[itemKey]) {
+            productId = resMap[itemKey].product_id;
+            variantId = resMap[itemKey].variant_id ?? null;
+          }
+
+          if (!productId) throw new Error(`Produk belum di-mapping: "${item._raw_product || item.seller_sku}" — selesaikan resolusi SKU dulu`);
+
+          items.push({
+            product_id:   productId,
+            variant_id:   variantId,
+            qty:          item.qty,
+            sell_price:   item.sell_price,
+            discount_pct: 0,
+          });
+        }
+
+        const { orderNo } = await buildOrder({
+          branch_id:       bid,
+          channel:         'marketplace',
+          sub_channel_id:  sub_channel_id ? parseInt(sub_channel_id) : null,
+          sub_channel_name: sub_channel_name || order.platform || null,
+          customer_name:   order.customer_name,
+          customer_phone:  order.customer_phone,
+          customer_address: order.customer_address,
+          customer_city:   order.customer_city,
+          items,
+          discount_amount: 0,
+          shipping_cost:   order.shipping_cost || 0,
+          admin_fee:       order.admin_fee || 0,
+          notes:           [order.notes, order.admin_fee ? `Admin fee ${order.platform}: Rp ${order.admin_fee.toLocaleString('id')}` : ''].filter(Boolean).join(' | ') || null,
+          order_date:      order.order_date,
+          payment_method:  order.payment_method,
+          external_ref:    order.order_ref,
+          status:          'draft',
+          created_by:      req.user?.id,
+        }, t);
+
+        // Simpan resi sekalian kalau ada
+        if (order.tracking_no) {
+          await require('../../models/erp').Shipment.create({
+            order_id:    null, // akan di-update setelah order.id diketahui
+            courier:     order.courier || '',
+            tracking_no: order.tracking_no,
+            status:      'shipped',
+          }, { transaction: t }).catch(() => {}); // non-critical, skip kalau gagal
+        }
+
+        await t.commit();
+        success++;
+        notes.push(`${order.order_ref} → ${orderNo}`);
+      } catch (e) {
+        await t.rollback();
+        failed++;
+        errors.push(`Order ${order.order_ref}: ${e.message}`);
+      }
+    }
+
+    try {
+      await ImportLog.create({
+        type: 'marketplace_orders', filename: `marketplace_import`,
+        total: orders?.length || 0, success, failed,
+        errors: JSON.stringify(errors), created_by: req.user?.id,
+      });
+    } catch (logErr) { console.error('[ImportLog]', logErr.message); }
+
+    return res.json({ success: true, data: { success, skipped, failed, errors, notes } });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getSubChannels, getAllSubChannels, createSubChannel, updateSubChannel, deleteSubChannel,
   getCategories, createCategory, updateCategory, deleteCategory,
   getProducts, getProductByBarcode, createProduct, updateProduct, deleteProduct, adjustStock,
   getCustomers, createCustomer, updateCustomer,
   importProducts, importCustomers, importOrders,
+  parseMarketplaceExport, confirmMarketplaceImport,
 };

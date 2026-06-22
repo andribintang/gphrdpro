@@ -41,7 +41,8 @@ import OrderDetailPage from './pages/erp/OrderDetailPage';
 import CustomersPage   from './pages/erp/CustomersPage';
 import SalesReportPage   from './pages/erp/SalesReportPage';
 import SalesTargetPage   from './pages/erp/SalesTargetPage';
-import ImportPage      from './pages/erp/ImportPage';
+import ImportPage           from './pages/erp/ImportPage';
+import MarketplaceImportPage from './pages/erp/MarketplaceImportPage';
 import PurchasesPage   from './pages/erp/PurchasesPage';
 import ExpensesPage    from './pages/erp/ExpensesPage';
 import ProfitLossPage  from './pages/erp/ProfitLossPage';
@@ -176,6 +177,9 @@ export default function App() {
                 } />
                 <Route path="erp/import" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><ImportPage /></ProtectedRoute>
+                } />
+                <Route path="erp/marketplace-import" element={
+                  <ProtectedRoute roles={['admin','hr','supervisor','employee']}><MarketplaceImportPage /></ProtectedRoute>
                 } />
                 <Route path="erp/purchases" element={
                   <ProtectedRoute roles={['admin','hr','supervisor','employee']}><PurchasesPage /></ProtectedRoute>

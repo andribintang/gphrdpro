@@ -112,7 +112,9 @@ export const erpService = {
   getChannelReport: (p)      => api.get(`${BASE}/reports/channel`, { params: p }),
   importProducts:   (d)      => api.post(`${BASE}/import/products`, d),
   importCustomers:  (d)      => api.post(`${BASE}/import/customers`, d),
-  importOrders:     (d)      => api.post(`${BASE}/import/orders`, d),
+  importOrders:            (d) => api.post(`${BASE}/import/orders`, d),
+  parseMarketplaceExport:  (d) => api.post(`${BASE}/marketplace-import/parse`, d),
+  confirmMarketplaceImport:(d) => api.post(`${BASE}/marketplace-import/confirm`, d),
   getProfitLoss:    (p)      => api.get(`${BASE}/reports/profit-loss`, { params: p }),
 };
 

@@ -42,7 +42,8 @@ const NAV = [
           { to:'/erp/purchases',    icon:ShoppingBag,   label:'Pembelian',   roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/stock-opname', icon:ClipboardList, label:'Stok Opname',     roles:['admin','hr','supervisor','employee'] },
           { to:'/erp/inventory',      icon:BarChart3,     label:'Inventory Intel', roles:['admin','hr','supervisor'] },
-          { to:'/erp/import',       icon:Upload,        label:'Import Data', roles:['admin','hr','supervisor','employee'] },
+          { to:'/erp/import',            icon:Upload,        label:'Import Data',             roles:['admin','hr','supervisor','employee'] },
+          { to:'/erp/marketplace-import', icon:ShoppingBag,   label:'Import Order Marketplace', roles:['admin','hr','supervisor','employee'] },
         ],
       },
       {

@@ -131,6 +131,8 @@ router.post  ('/stock-opname',         authenticate, allRoles, purchase.submitSt
 router.post  ('/import/products',      authenticate, allRoles, master.importProducts);
 router.post  ('/import/customers',     authenticate, allRoles, master.importCustomers);
 router.post  ('/import/orders',        authenticate, allRoles, master.importOrders);
+router.post  ('/marketplace-import/parse',   authenticate, allRoles, master.parseMarketplaceExport);
+router.post  ('/marketplace-import/confirm', authenticate, allRoles, master.confirmMarketplaceImport);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);
