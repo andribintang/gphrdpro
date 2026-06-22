@@ -69,6 +69,7 @@ function SkuResolverRow({ item, branchId, onResolve }) {
   };
 
   const isComplete = resolved && (variants.length === 0 || variantId);
+  const fromSaved = item._from_saved_map;
 
   return (
     <div className={`p-3 rounded-xl border-2 transition-all ${isComplete ? 'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-200 bg-amber-50/50 dark:bg-amber-950/20'}`}>
@@ -200,7 +201,7 @@ function OrderPreviewCard({ order, platform, idx }) {
           <div className="space-y-1 mt-1">
             {order.items?.map((item, j) => (
               <div key={j} className="flex items-center gap-2 text-xs py-1 border-b border-[var(--border)] last:border-0">
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item._resolved ? 'bg-emerald-500' : 'bg-amber-400'}`}/>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item._resolved ? (item._resolved.from_saved_map ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-amber-400'}`} title={item._resolved?.from_saved_map ? 'Dari mapping tersimpan' : ''}/>
                 <span className="flex-1 truncate text-[var(--text-primary)]">{item._raw_product || item.product_name}</span>
                 {item.seller_sku && <span className="font-mono text-[10px] text-[var(--text-muted)]">{item.seller_sku}</span>}
                 <span className="font-semibold flex-shrink-0">×{item.qty}</span>
@@ -226,6 +227,27 @@ export default function MarketplaceImportPage() {
   const [resolutions, setResolutions] = useState({});   // { [item_key]: { product_id, variant_id } }
   const [loading, setLoading]     = useState(false);
   const [result, setResult]       = useState(null);
+  const [showMappings, setShowMappings] = useState(false);
+  const [savedMappings, setSavedMappings] = useState([]);
+  const [loadingMappings, setLoadMappings] = useState(false);
+
+  const loadMappings = async () => {
+    setLoadMappings(true);
+    try {
+      const r = await erpService.getMarketplaceMappings({ branch_id: branch });
+      setSavedMappings(r.data.data.mappings || []);
+    } catch {}
+    finally { setLoadMappings(false); }
+  };
+
+  const deleteMapping = async (id) => {
+    if (!confirm('Hapus mapping ini? Import berikutnya akan perlu pilih manual lagi.')) return;
+    try {
+      await erpService.deleteMarketplaceMapping(id);
+      setSavedMappings(prev => prev.filter(m => m.id !== id));
+      toast.success('Mapping dihapus');
+    } catch { toast.error('Gagal menghapus'); }
+  };
 
   // Load sub channels
   useEffect(() => {
@@ -317,12 +339,23 @@ export default function MarketplaceImportPage() {
         }),
       }));
 
+      // Sertakan _mp_key dari unresolved_skus supaya backend tahu kunci yang harus disimpan
+      const resolutionsWithMpKey = {};
+      Object.entries(resolutions).forEach(([itemKey, res]) => {
+        if (!res) return;
+        const unresolvedItem = parsed.unresolved_skus.find(u => u.item_key === itemKey);
+        resolutionsWithMpKey[itemKey] = {
+          ...res,
+          _mp_key: unresolvedItem?._mp_key || null,
+        };
+      });
+
       const r = await erpService.confirmMarketplaceImport({
         orders: ordersWithResolutions,
         branch_id: parseInt(branch),
         sub_channel_id: parseInt(subChannelId),
         sub_channel_name: subChannels.find(s => s.id == subChannelId)?.name || platform,
-        resolutions,
+        resolutions: resolutionsWithMpKey,
       });
       setResult(r.data.data);
       setStep('result');
@@ -345,6 +378,10 @@ export default function MarketplaceImportPage() {
           <h1 className="page-title">Import Order Marketplace</h1>
           <p className="page-subtitle">Upload file export asli dari TikTok Shop atau Shopee — mapping otomatis ke sistem</p>
         </div>
+        <button onClick={() => { setShowMappings(true); loadMappings(); }}
+          className="btn-secondary gap-2 text-sm">
+          <Package size={15}/> Kelola Mapping SKU
+        </button>
       </div>
 
       {/* ── UPLOAD ─────────────────────────────────────────── */}
@@ -567,6 +604,17 @@ export default function MarketplaceImportPage() {
               </div>
             )}
 
+            {(result.saved_mappings?.added > 0 || result.saved_mappings?.updated > 0) && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
+                <Info size={14} className="text-blue-600 flex-shrink-0"/>
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  <strong>{(result.saved_mappings.added||0) + (result.saved_mappings.updated||0)} mapping SKU disimpan</strong> — import berikutnya dengan produk yang sama akan otomatis ter-resolve tanpa input manual.
+                  {' '}<button onClick={() => { setShowMappings(true); loadMappings(); }}
+                    className="underline hover:no-underline">Kelola mapping →</button>
+                </p>
+              </div>
+            )}
+
             {result.errors?.length > 0 && (
               <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto">
                 <p className="text-xs font-bold text-red-700 mb-2">Detail Masalah:</p>
@@ -586,6 +634,70 @@ export default function MarketplaceImportPage() {
           </div>
         </div>
       )}
+
+      {/* ── PANEL KELOLA MAPPING (overlay) ──────────────────── */}
+      {showMappings && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMappings(false)}/>
+          <div className="relative bg-[var(--bg-card)] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <div>
+                <h3 className="font-bold text-sm">Mapping SKU Marketplace</h3>
+                <p className="text-xs text-[var(--text-muted)]">Produk yang pernah dipilih manual — otomatis dipakai di import berikutnya</p>
+              </div>
+              <button onClick={() => setShowMappings(false)} className="btn-icon-sm"><X size={14}/></button>
+            </div>
+
+            {/* Filter bar */}
+            <div className="px-4 pt-3 flex gap-2">
+              <select value={branch} onChange={e => { setBranch(e.target.value); loadMappings(); }}
+                className="input-base h-8 text-xs w-36">
+                <option value="1">GP Racing Store</option>
+                <option value="2">GP Distro</option>
+              </select>
+              <button onClick={loadMappings} disabled={loadingMappings} className="btn-secondary h-8 px-3 text-xs gap-1">
+                {loadingMappings ? <Loader2 size={12} className="animate-spin"/> : <RotateCcw size={12}/>} Refresh
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+              {loadingMappings && <p className="text-xs text-center text-[var(--text-muted)] py-8">Memuat...</p>}
+              {!loadingMappings && savedMappings.length === 0 && (
+                <p className="text-xs text-center text-[var(--text-muted)] py-8">Belum ada mapping tersimpan untuk cabang ini</p>
+              )}
+              {savedMappings.map(m => (
+                <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                  <div className="flex-1 min-w-0">
+                    {/* Marketplace key — tampilkan lebih bersih */}
+                    <p className="text-xs font-mono text-[var(--text-muted)] truncate">
+                      {m.marketplace_key.replace('__name__:', '📦 ').replace('__sku__:', '🏷️ SKU: ')}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${m.platform === 'tiktok' ? 'bg-black text-white' : 'bg-orange-500 text-white'}`}>
+                        {m.platform === 'tiktok' ? '🎵 TikTok' : '🛍️ Shopee'}
+                      </span>
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">→ {m.product_name}</span>
+                      {m.variant_name && <span className="text-[10px] text-[var(--brand-600)] bg-[var(--brand-600)]/10 px-1.5 py-0.5 rounded-full">{m.variant_name}</span>}
+                    </div>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">SKU sistem: {m.product_sku} · Updated: {new Date(m.updated_at).toLocaleDateString('id')}</p>
+                  </div>
+                  <button onClick={() => deleteMapping(m.id)} className="btn-icon-sm text-red-500 hover:text-red-700 flex-shrink-0">
+                    <X size={13}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 border-t border-[var(--border)] bg-blue-50 dark:bg-blue-950/30">
+              <p className="text-[11px] text-blue-700 dark:text-blue-400">
+                💡 Mapping disimpan per platform + cabang. Menghapus mapping tidak membatalkan order yang sudah terbuat — hanya membuat import berikutnya perlu pilih manual lagi.
+              </p>
+            </div>
+          </div>
+        </div>
+      )};
     </div>
   );
 }

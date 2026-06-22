@@ -113,8 +113,10 @@ export const erpService = {
   importProducts:   (d)      => api.post(`${BASE}/import/products`, d),
   importCustomers:  (d)      => api.post(`${BASE}/import/customers`, d),
   importOrders:            (d) => api.post(`${BASE}/import/orders`, d),
-  parseMarketplaceExport:  (d) => api.post(`${BASE}/marketplace-import/parse`, d),
-  confirmMarketplaceImport:(d) => api.post(`${BASE}/marketplace-import/confirm`, d),
+  parseMarketplaceExport:      (d)  => api.post(`${BASE}/marketplace-import/parse`, d),
+  confirmMarketplaceImport:    (d)  => api.post(`${BASE}/marketplace-import/confirm`, d),
+  getMarketplaceMappings:      (p)  => api.get(`${BASE}/marketplace-import/mappings`, { params: p }),
+  deleteMarketplaceMapping:    (id) => api.delete(`${BASE}/marketplace-import/mappings/${id}`),
   getProfitLoss:    (p)      => api.get(`${BASE}/reports/profit-loss`, { params: p }),
 };
 

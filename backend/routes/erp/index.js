@@ -133,6 +133,8 @@ router.post  ('/import/customers',     authenticate, allRoles, master.importCust
 router.post  ('/import/orders',        authenticate, allRoles, master.importOrders);
 router.post  ('/marketplace-import/parse',   authenticate, allRoles, master.parseMarketplaceExport);
 router.post  ('/marketplace-import/confirm', authenticate, allRoles, master.confirmMarketplaceImport);
+router.get   ('/marketplace-import/mappings',        authenticate, allRoles, master.getMarketplaceMappings);
+router.delete('/marketplace-import/mappings/:id',    authenticate, allRoles, master.deleteMarketplaceMapping);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);

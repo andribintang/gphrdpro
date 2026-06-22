@@ -5,6 +5,19 @@ const {
   Customer, Order, OrderItem, Payment, Shipment, ImportLog,
 } = require('../../models/erp');
 
+// Model inline untuk tabel mapping (Sequelize ringan, tidak perlu file model terpisah)
+const { sequelize: _seq } = require('../../config/database');
+const { DataTypes } = require('sequelize');
+const _MarketplaceSkuMap = _seq.define('MarketplaceSkuMap', {
+  id:              { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  platform:        { type: DataTypes.STRING(20),  allowNull: false },
+  branch_id:       { type: DataTypes.INTEGER,     allowNull: false },
+  marketplace_key: { type: DataTypes.STRING(300), allowNull: false },
+  product_id:      { type: DataTypes.INTEGER,     allowNull: false },
+  variant_id:      { type: DataTypes.INTEGER,     allowNull: true  },
+  created_by:      { type: DataTypes.INTEGER,     allowNull: true  },
+}, { tableName: 'erp_marketplace_sku_map', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
+
 const toNum = v => parseFloat(v) || 0;
 
 // ── Sub Channels ──────────────────────────────────────────────
@@ -934,6 +947,15 @@ const parseMarketplaceExport = async (req, res, next) => {
     // Parse per platform
     const parsedOrders = platform === 'tiktok' ? parseTikTok(rows) : parseShopee(rows);
 
+    // ── Load semua mapping tersimpan untuk platform+cabang ini ─────
+    // Mapping yang pernah disimpan manual oleh staff dipakai sebagai
+    // "kamus" — sehingga produk yang sama tidak perlu dicari manual lagi.
+    const savedMappings = await _MarketplaceSkuMap.findAll({
+      where: { platform, branch_id: bid },
+    });
+    const savedMap = {}; // marketplace_key → { product_id, variant_id }
+    savedMappings.forEach(m => { savedMap[m.marketplace_key] = { product_id: m.product_id, variant_id: m.variant_id }; });
+
     // Resolve SKU ke product_id di database
     // Untuk setiap item: cari by seller_sku, kalau tidak ketemu return ke frontend untuk resolusi manual
     const unresolvedSkus = []; // { item_key, seller_sku, product_name, variant_name, order_ref }
@@ -942,8 +964,18 @@ const parseMarketplaceExport = async (req, res, next) => {
     for (const order of parsedOrders) {
       for (const item of order.items) {
         if (!item.seller_sku) {
-          // TikTok tanpa SKU — langsung masuk unresolved
+          // TikTok tanpa SKU — cek dulu di saved mapping (key = nama produk + varian)
           const itemKey = `${order.order_ref}::${item._raw_product}`;
+          const mpKey   = `__name__:${item._raw_product}`;  // key tanpa order_ref supaya reusable lintas order
+          if (savedMap[mpKey]) {
+            const saved = savedMap[mpKey];
+            // Resolve nama produk & varian dari DB supaya tampilan lengkap
+            const pFound = await Product.findByPk(saved.product_id).catch(() => null);
+            const vFound = saved.variant_id ? await ProductVariant.findByPk(saved.variant_id).catch(() => null) : null;
+            item._resolved = { product_id: saved.product_id, product_name: pFound?.name || '?', variant_id: saved.variant_id || null, variant_name: vFound?.name || null, from_saved_map: true };
+            skuCache[mpKey] = item._resolved;
+            continue; // sudah ketemu dari saved mapping — tidak perlu masuk unresolved
+          }
           if (!unresolvedSkus.find(u => u.item_key === itemKey)) {
             unresolvedSkus.push({
               item_key:     itemKey,
@@ -953,14 +985,28 @@ const parseMarketplaceExport = async (req, res, next) => {
               variant_name: item.variant_name,
               qty:          item.qty,
               sell_price:   item.sell_price,
+              _mp_key:      mpKey,
             });
           }
           item._resolved = null;
           continue;
         }
 
+        // Cek session cache terlebih dahulu
         if (skuCache[item.seller_sku] !== undefined) {
           item._resolved = skuCache[item.seller_sku];
+          continue;
+        }
+
+        // Cek saved mapping (dari DB) — SKU yang pernah di-override manual oleh staff
+        const mpKeyBySku = `__sku__:${item.seller_sku}`;
+        if (savedMap[mpKeyBySku]) {
+          const saved = savedMap[mpKeyBySku];
+          const pFound = await Product.findByPk(saved.product_id).catch(() => null);
+          const vFound = saved.variant_id ? await ProductVariant.findByPk(saved.variant_id).catch(() => null) : null;
+          const resolved = { product_id: saved.product_id, product_name: pFound?.name || '?', variant_id: saved.variant_id || null, variant_name: vFound?.name || null, from_saved_map: true };
+          item._resolved = resolved;
+          skuCache[item.seller_sku] = resolved;
           continue;
         }
 
@@ -977,6 +1023,7 @@ const parseMarketplaceExport = async (req, res, next) => {
             variant_name: item.variant_name,
             qty:          item.qty,
             sell_price:   item.sell_price,
+            _mp_key:      mpKeyBySku,
           });
           item._resolved = null;
           skuCache[item.seller_sku] = null;
@@ -1103,6 +1150,40 @@ const confirmMarketplaceImport = async (req, res, next) => {
       }
     }
 
+    // ── Simpan mapping baru dari resolusi manual staff ke DB ─────
+    // Hanya simpan yang dari resolutions (manual override), bukan yang sudah
+    // otomatis ketemu via SKU — karena yang otomatis sudah valid, tidak perlu disimpan lagi.
+    const savedCount = { added: 0, updated: 0 };
+    try {
+      for (const [itemKey, res] of Object.entries(resolutions || {})) {
+        if (!res?.product_id) continue;
+        // item_key format: "order_ref::seller_sku" atau "order_ref::raw_product"
+        // mp_key (yang reusable): dari orders[].items[]._mp_key yang dikirim kembali frontend
+        // Kita derive mp_key dari itemKey — ambil bagian setelah order_ref::
+        const mpKeyRaw = itemKey.split('::').slice(1).join('::');
+        // Tentukan format mp_key: kalau terlihat seperti SKU (dari __sku__: prefix di unresolved), pakai itu
+        // Kalau tidak, pakai __name__:
+        const mpKey = res._mp_key || (mpKeyRaw.includes('__') ? mpKeyRaw : `__name__:${mpKeyRaw}`);
+        const { Op: _Op } = require('sequelize');
+        const [mapRow, created] = await _MarketplaceSkuMap.findOrCreate({
+          where: { platform: orders[0]?.platform || 'unknown', branch_id: bid, marketplace_key: mpKey },
+          defaults: {
+            product_id: res.product_id,
+            variant_id: res.variant_id || null,
+            created_by: req.user?.id,
+          },
+        });
+        if (!created) {
+          await mapRow.update({ product_id: res.product_id, variant_id: res.variant_id || null });
+          savedCount.updated++;
+        } else {
+          savedCount.added++;
+        }
+      }
+    } catch (mapErr) {
+      console.error('[SkuMap] Gagal simpan mapping:', mapErr.message);
+    }
+
     try {
       await ImportLog.create({
         type: 'marketplace_orders', filename: `marketplace_import`,
@@ -1111,7 +1192,48 @@ const confirmMarketplaceImport = async (req, res, next) => {
       });
     } catch (logErr) { console.error('[ImportLog]', logErr.message); }
 
-    return res.json({ success: true, data: { success, skipped, failed, errors, notes } });
+    return res.json({ success: true, data: { success, skipped, failed, errors, notes, saved_mappings: savedCount } });
+  } catch (err) { next(err); }
+};
+
+// ── GET /marketplace-import/mappings — lihat & kelola mapping tersimpan ──
+const getMarketplaceMappings = async (req, res, next) => {
+  try {
+    const { platform, branch_id } = req.query;
+    const where = {};
+    if (platform)  where.platform  = platform;
+    if (branch_id) where.branch_id = parseInt(branch_id);
+    const rows = await _MarketplaceSkuMap.findAll({
+      where,
+      order: [['updated_at', 'DESC']],
+    });
+    // Enrich dengan nama produk/varian
+    const enriched = await Promise.all(rows.map(async (m) => {
+      const p = await Product.findByPk(m.product_id, { attributes: ['id','name','sku'] }).catch(() => null);
+      const v = m.variant_id ? await ProductVariant.findByPk(m.variant_id, { attributes: ['id','name'] }).catch(() => null) : null;
+      return {
+        id:              m.id,
+        platform:        m.platform,
+        branch_id:       m.branch_id,
+        marketplace_key: m.marketplace_key,
+        product_id:      m.product_id,
+        product_name:    p?.name || '—',
+        product_sku:     p?.sku  || '—',
+        variant_id:      m.variant_id,
+        variant_name:    v?.name || null,
+        updated_at:      m.updated_at,
+      };
+    }));
+    return res.json({ success: true, data: { mappings: enriched } });
+  } catch (err) { next(err); }
+};
+
+const deleteMarketplaceMapping = async (req, res, next) => {
+  try {
+    const row = await _MarketplaceSkuMap.findByPk(req.params.id);
+    if (!row) return res.status(404).json({ success: false, message: 'Mapping tidak ditemukan' });
+    await row.destroy();
+    return res.json({ success: true, message: 'Mapping dihapus' });
   } catch (err) { next(err); }
 };
 
@@ -1122,4 +1244,5 @@ module.exports = {
   getCustomers, createCustomer, updateCustomer,
   importProducts, importCustomers, importOrders,
   parseMarketplaceExport, confirmMarketplaceImport,
+  getMarketplaceMappings, deleteMarketplaceMapping,
 };

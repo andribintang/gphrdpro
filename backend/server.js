@@ -720,6 +720,21 @@ app.post('/run-alter', async (req, res) => {
       // (cegah order kedobel kalau file yang sama tidak sengaja diupload ulang).
       `ALTER TABLE erp_orders ADD COLUMN external_ref VARCHAR(100) NULL AFTER marketplace_name`,
       `CREATE INDEX idx_orders_external_ref ON erp_orders (external_ref)`,
+
+      // ════ Marketplace SKU Mapping — simpan hasil mapping manual supaya
+      // import berikutnya bisa resolve SKU yang sama tanpa input ulang ════
+      `CREATE TABLE IF NOT EXISTS erp_marketplace_sku_map (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        platform VARCHAR(20) NOT NULL,
+        branch_id INT NOT NULL,
+        marketplace_key VARCHAR(300) NOT NULL,
+        product_id INT NOT NULL,
+        variant_id INT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_mp_sku_map (platform, branch_id, marketplace_key(200))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ];
 
     for (const sql of alters) {
