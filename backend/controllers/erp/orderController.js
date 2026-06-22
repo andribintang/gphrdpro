@@ -492,8 +492,100 @@ const getChannelReport = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── PUT /api/orders/:id — edit order yang masih draft/confirmed ──
+const updateOrder = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const order = await Order.findByPk(req.params.id, {
+      include: [{ model: OrderItem, as: 'items' }],
+      transaction: t,
+    });
+    if (!order) { await t.rollback(); return res.status(404).json({ success:false, message:'Order tidak ditemukan' }); }
+    if (!['draft','confirmed'].includes(order.status)) {
+      await t.rollback();
+      return res.status(400).json({ success:false, message:`Order status "${order.status}" tidak bisa diedit` });
+    }
+
+    const {
+      customer_name, customer_phone, customer_address, customer_city,
+      items, discount_amount, shipping_cost, admin_fee,
+      notes, order_date, payment_method,
+    } = req.body;
+
+    // ── Kalau items dikirim, recalculate stok ────────────────
+    if (items?.length) {
+      // Kembalikan reserved stok dari item lama
+      for (const oldItem of order.items) {
+        const stock = await Stock.findOne({ where:{ product_id:oldItem.product_id, variant_id:oldItem.variant_id||null, branch_id:order.branch_id }, transaction:t });
+        if (stock) await stock.update({ qty_reserved: Math.max(0,(stock.qty_reserved||0)-oldItem.qty) }, { transaction:t });
+      }
+      // Hapus item lama
+      await OrderItem.destroy({ where:{ order_id:order.id }, transaction:t });
+
+      // Buat item baru
+      let subtotal = 0;
+      const itemsData = [];
+      for (const item of items) {
+        const product = await Product.findByPk(item.product_id, { transaction:t });
+        if (!product) throw new Error(`Produk ID ${item.product_id} tidak ditemukan`);
+        let variant = null;
+        if (item.variant_id) {
+          variant = await ProductVariant.findOne({ where:{ id:item.variant_id, product_id:item.product_id }, transaction:t });
+          if (!variant) throw new Error(`Varian tidak valid untuk produk ${product.name}`);
+        }
+        const stock = await Stock.findOne({ where:{ product_id:item.product_id, variant_id:item.variant_id||null, branch_id:order.branch_id }, transaction:t });
+        const availableQty = stock ? stock.qty - (stock.qty_reserved||0) : 0;
+        if (availableQty < item.qty) throw new Error(`Stok ${variant?`${product.name} (${variant.name})`:product.name} tidak cukup (${availableQty})`);
+        const sellPrice  = toNum(item.sell_price);
+        const buyPrice   = toNum(item.buy_price);
+        const discPct    = toNum(item.discount_pct);
+        const itemSub    = sellPrice * item.qty * (1 - discPct/100);
+        const itemProfit = itemSub - (buyPrice * item.qty);
+        subtotal += itemSub;
+        itemsData.push({
+          order_id: order.id, product_id:item.product_id, variant_id:item.variant_id||null,
+          variant_name: variant?.name||null, product_name:product.name, product_sku:variant?.sku||product.sku,
+          qty:item.qty, buy_price:buyPrice, sell_price:sellPrice,
+          discount_pct:discPct, subtotal:Math.round(itemSub), profit:Math.round(itemProfit),
+        });
+        if (stock) await stock.update({ qty_reserved:(stock.qty_reserved||0)+item.qty }, { transaction:t });
+      }
+      await OrderItem.bulkCreate(itemsData, { transaction:t });
+
+      const adminFeeAmt = toNum(admin_fee);
+      const newTotal = subtotal - toNum(discount_amount||0) + toNum(shipping_cost||0) + adminFeeAmt;
+      await order.update({
+        customer_name, customer_phone, customer_address, customer_city,
+        subtotal:Math.round(subtotal),
+        discount_amount:toNum(discount_amount||0),
+        shipping_cost:toNum(shipping_cost||0),
+        admin_fee:adminFeeAmt,
+        total_amount:Math.round(newTotal),
+        notes, order_date: order_date || order.order_date,
+      }, { transaction:t });
+
+    } else {
+      // Hanya update header (tanpa ubah items)
+      await order.update({
+        customer_name, customer_phone, customer_address, customer_city,
+        discount_amount: discount_amount !== undefined ? toNum(discount_amount) : order.discount_amount,
+        shipping_cost:   shipping_cost   !== undefined ? toNum(shipping_cost)   : order.shipping_cost,
+        admin_fee:       admin_fee       !== undefined ? toNum(admin_fee)       : order.admin_fee,
+        notes, order_date: order_date || order.order_date,
+      }, { transaction:t });
+      // Recalculate total
+      const newTotal = parseFloat(order.subtotal) - toNum(discount_amount||order.discount_amount) + toNum(shipping_cost||order.shipping_cost) + toNum(admin_fee||order.admin_fee);
+      await order.update({ total_amount:Math.round(newTotal) }, { transaction:t });
+    }
+
+    await t.commit();
+    const updated = await Order.findByPk(order.id, { include:[{ model:OrderItem, as:'items' },{ model:Payment, as:'payments' }] });
+    return res.json({ success:true, message:'Order berhasil diperbarui', data:{ order:updated } });
+  } catch(err) { await t.rollback(); next(err); }
+};
+
 module.exports = {
-  getOrders, getOrderDetail, createOrder, buildOrder,
+  getOrders, getOrderDetail, createOrder, buildOrder, updateOrder,
   confirmOrder, completeOrder, cancelOrder,
   addPayment, verifyPayment,
   addShipment, updateShipment,

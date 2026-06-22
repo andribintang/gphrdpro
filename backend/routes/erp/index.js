@@ -84,7 +84,9 @@ router.post  ('/orders/:id/complete', authenticate, allRoles, order.completeOrde
 router.post  ('/orders/:id/cancel',   authenticate, allRoles, order.cancelOrder);
 router.post  ('/orders/:id/payment',  authenticate, allRoles, order.addPayment);
 router.put   ('/orders/:id/payments/:paymentId/verify', authenticate, allRoles, order.verifyPayment);
+router.put   ('/orders/:id',           authenticate, allRoles, order.updateOrder);
 router.post  ('/orders/:id/shipment', authenticate, allRoles, order.addShipment);
+router.patch ('/orders/bulk-status',  authenticate, allRoles, order.bulkUpdateStatus);
 router.put   ('/orders/:id/shipments/:shipmentId', authenticate, allRoles, order.updateShipment);
 
 // ── Returns ──────────────────────────────────────────────────

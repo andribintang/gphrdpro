@@ -137,7 +137,7 @@ const exportToCsv = (columns, rows, filename) => {
 export default function DataTable({
   columns=[], data=[], loading=false, filters=[], searchPlaceholder='Cari...',
   searchKeys=[], searchFn, pageSize=20, pageSizeOptions, emptyIcon, emptyText='Tidak ada data', emptyAction,
-  onRowClick, rowKey='id', actions, zebra=false, stickyHeader=true, className='', toolbar,
+  onRowClick, rowKey='id', actions, zebra=false, stickyHeader=true, className='', toolbar, rowClassName,
   selectable=false, onSelectionChange, bulkActions,
   exportable=false, exportFilename='data',
 }) {
@@ -377,7 +377,7 @@ export default function DataTable({
                 return (
                   <tr key={key} onClick={()=>onRowClick?.(row)}
                     onMouseEnter={()=>setHoveredRow(key)} onMouseLeave={()=>setHoveredRow(null)}
-                    className={`border-b border-[var(--border-subtle)] last:border-0 transition-colors duration-100 group ${onRowClick?'cursor-pointer':''} ${zebra&&idx%2===0?'bg-[var(--bg-secondary)]/25':''} ${isSelected?'bg-[var(--brand-600)]/[0.05] dark:bg-[var(--brand-600)]/[0.09]':isHovered?'bg-[var(--brand-600)]/[0.035] dark:bg-[var(--brand-600)]/[0.07]':''}`}>
+                    className={`border-b border-[var(--border-subtle)] last:border-0 transition-colors duration-100 group ${onRowClick?'cursor-pointer':''} ${!isSelected&&!isHovered&&rowClassName?rowClassName(row,idx):''} ${zebra&&idx%2===0&&!rowClassName?'bg-[var(--bg-secondary)]/25':''} ${isSelected?'bg-[var(--brand-600)]/[0.05] dark:bg-[var(--brand-600)]/[0.09]':isHovered?'bg-[var(--brand-600)]/[0.035] dark:bg-[var(--brand-600)]/[0.07]':''}`}>
                     {selectable && (
                       <td className="px-4 py-[15px]" onClick={e=>e.stopPropagation()}>
                         <button onClick={()=>toggleRow(key)} className="flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--brand-600)] transition-colors">
