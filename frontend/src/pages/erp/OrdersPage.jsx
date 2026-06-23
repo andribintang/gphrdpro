@@ -12,8 +12,8 @@ import { erpService, toRpShort, toRp, ORDER_STATUS, CHANNELS } from '../../utils
 
 // ── Branch identity ─────────────────────────────────────────
 const BRANCH = {
-  1: { name:'GP Racing', icon: Wrench, rowClass:'bg-red-50/40 dark:bg-red-950/10', dotClass:'bg-red-500', color:'#dc2626' },
-  2: { name:'GP Distro', icon: Shirt,  rowClass:'bg-pink-50/40 dark:bg-pink-950/10', dotClass:'bg-pink-500', color:'#db2777' },
+  1: { name:'GP Racing', icon: Wrench, rowClass:'bg-blue-50/50 dark:bg-blue-950/15', dotClass:'bg-blue-500', color:'#2563eb' },
+  2: { name:'GP Distro', icon: Shirt,  rowClass:'bg-rose-50/50 dark:bg-rose-950/15', dotClass:'bg-rose-400', color:'#db2777' },
 };
 
 // ── Status helpers ──────────────────────────────────────────
