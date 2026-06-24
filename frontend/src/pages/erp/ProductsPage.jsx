@@ -725,8 +725,8 @@ function ProductModal({ product, allCategories, onClose, onSuccess }) {
         weight: parseFloat(form.weight) || 0,
         notes: form.notes,
         // Store fields — saved directly to erp_products
-        // category_id: use branch-specific store category
-        category_id: (() => {
+        // store_category_id dari branch (gpdistro=cat_gpd, gpracing=cat_gpr)
+        store_category_id: (() => {
           const branchId = parseInt(form.branch_id) || 1;
           const cat = branchId === 2
             ? form.store_category_gpdistro

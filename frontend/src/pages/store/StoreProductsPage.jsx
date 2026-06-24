@@ -456,10 +456,11 @@ export default function StoreProductsPage() {
           <h1 className="page-title">Produk — {BRAND_LABEL[brand] || brand}</h1>
           <p className="body-sm text-[var(--text-muted)]">{total} produk total</p>
         </div>
-        <a href="/erp/products"
-          className="btn-outline gap-2 text-sm"
-          onClick={e => { e.preventDefault(); window.location.href='/erp/products'; }}>
-            <Plus size={16} /> Tambah via ERP
+        <div className="flex items-center gap-2 flex-wrap">
+          <a href="/erp/products"
+            className="btn-outline gap-2 text-sm"
+            onClick={e => { e.preventDefault(); window.location.href='/erp/products'; }}>
+            <Plus size={16}/> Tambah via ERP
           </a>
           <button onClick={() => handleSyncStock()} disabled={syncing}
             className="btn-secondary gap-2 text-sm h-9 disabled:opacity-50">
