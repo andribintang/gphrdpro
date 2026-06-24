@@ -5,8 +5,8 @@ import toast from 'react-hot-toast';
 import {
   getStoreProducts, createStoreProduct, updateStoreProduct,
   deleteStoreProduct, getStoreCategories,
-  getSyncStatus, syncFromERP, syncStock,
 } from '../../utils/storeService';
+import { erpService } from '../../utils/erp/erpService';
 
 const BRAND_LABEL = { gpdistro: 'GPDISTRO', gpracing: 'GP RACING' };
 const fmt = (n) =>
@@ -407,14 +407,14 @@ export default function StoreProductsPage() {
   }, [brand, search, catFilter, page]);
 
   const loadSyncStatus = async () => {
-    try { const r = await getSyncStatus(brand); setSyncStatus(r.data.data); } catch { setSyncStatus(null); }
+    try { const r = await erpService.storeGetSyncStatus(brand); setSyncStatus(r.data.data); } catch { setSyncStatus(null); }
   };
 
   const handleSync = async (mode = 'full') => {
     if (!confirm(mode === 'stock' ? 'Update stok semua produk dari ERP?' : `Sync semua produk dari ERP ke toko ${(brand||'').toUpperCase()}?`)) return;
     setSyncing(true);
     try {
-      const r = await syncFromERP({ brand, mode });
+      const r = await erpService.storeSyncFromERP({ brand, mode });
       toast.success(r.data.message);
       await load(); await loadSyncStatus();
     } catch (e) { toast.error(e.response?.data?.message || 'Gagal sync'); }
@@ -423,7 +423,7 @@ export default function StoreProductsPage() {
 
   const handleSyncStock = async () => {
     setSyncing(true);
-    try { const r = await syncStock({ brand }); toast.success(r.data.message); await load(); }
+    try { const r = await erpService.storeSyncStock({ brand }); toast.success(r.data.message); await load(); }
     catch { toast.error('Gagal sync stok'); } finally { setSyncing(false); }
   };
 
@@ -505,7 +505,7 @@ export default function StoreProductsPage() {
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                     item.status === 'outdated' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                   }`}>{item.status === 'not_synced' ? 'BELUM SYNC' : 'OUTDATED'}</span>
-                  <button onClick={() => syncFromERP({ brand, mode:'single', erp_product_id: item.erp_product_id }).then(load).then(loadSyncStatus).catch(e=>toast.error(e.message))}
+                  <button onClick={() => erpService.storeSyncFromERP({ brand, mode:'single', erp_product_id: item.erp_product_id }).then(load).then(loadSyncStatus).catch(e=>toast.error(e.message))}
                     className="text-[10px] text-[var(--brand-600)] hover:underline flex-shrink-0">Sync</button>
                 </div>
               ))}

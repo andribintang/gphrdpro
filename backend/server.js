@@ -723,9 +723,8 @@ app.post('/run-alter', async (req, res) => {
 
       // ════ Marketplace SKU Mapping — simpan hasil mapping manual supaya
       // import berikutnya bisa resolve SKU yang sama tanpa input ulang ════
-      // ════ Cleanup: hapus store_products yang brand-nya tidak sesuai
-      // branch_id produk ERP (produk GP Racing branch_id=1 yang terlanjur
-      // masuk ke brand 'gpdistro', dan sebaliknya) ════
+      // ════ Cleanup: hapus store_products yang brand-nya tidak sesuai branch_id ERP
+      // Dijalankan setiap /run-alter (DELETE tidak di-skip karena tidak ada kondisi SKIP) ════
       `DELETE sp FROM store_products sp
        INNER JOIN erp_products ep ON ep.id = sp.erp_product_id
        WHERE (ep.branch_id = 1 AND sp.brand = 'gpdistro')
@@ -1067,6 +1066,27 @@ app.use('/api/employees',  employeeRoutes);
 app.use('/api/store', storeRoutes);               // di bagian app.use
 
 // ── Debug: check store_products table ────────────────────────
+// ── Debug: cek distribusi brand di store_products ─────────────
+app.get('/debug-store-brands', async (req, res) => {
+  try {
+    const secret = req.query.secret || req.headers['x-migrate-secret'];
+    if (!secret || secret !== process.env.MIGRATE_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    const { sequelize } = require('./config/database');
+    const [rows] = await sequelize.query(`
+      SELECT sp.brand, ep.branch_id, COUNT(*) as count
+      FROM store_products sp LEFT JOIN erp_products ep ON ep.id = sp.erp_product_id
+      GROUP BY sp.brand, ep.branch_id ORDER BY sp.brand, ep.branch_id
+    `);
+    const [wrong] = await sequelize.query(`
+      SELECT sp.id, sp.name, sp.brand, ep.branch_id, ep.name as erp_name
+      FROM store_products sp INNER JOIN erp_products ep ON ep.id = sp.erp_product_id
+      WHERE (ep.branch_id = 1 AND sp.brand = 'gpdistro') OR (ep.branch_id = 2 AND sp.brand = 'gpracing')
+      LIMIT 20
+    `);
+    return res.json({ brand_distribution: rows, wrong_count: wrong.length, wrong: wrong });
+  } catch (e) { return res.json({ error: e.message }); }
+});
+
 app.get('/debug-store', async (req, res) => {
   try {
     const secret = req.headers['x-migrate-secret'] || req.query.secret;

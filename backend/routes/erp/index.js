@@ -84,9 +84,7 @@ router.post  ('/orders/:id/complete', authenticate, allRoles, order.completeOrde
 router.post  ('/orders/:id/cancel',   authenticate, allRoles, order.cancelOrder);
 router.post  ('/orders/:id/payment',  authenticate, allRoles, order.addPayment);
 router.put   ('/orders/:id/payments/:paymentId/verify', authenticate, allRoles, order.verifyPayment);
-router.put   ('/orders/:id',           authenticate, allRoles, order.updateOrder);
 router.post  ('/orders/:id/shipment', authenticate, allRoles, order.addShipment);
-router.patch ('/orders/bulk-status',  authenticate, allRoles, order.bulkUpdateStatus);
 router.put   ('/orders/:id/shipments/:shipmentId', authenticate, allRoles, order.updateShipment);
 
 // ── Returns ──────────────────────────────────────────────────
@@ -133,10 +131,11 @@ router.post  ('/stock-opname',         authenticate, allRoles, purchase.submitSt
 router.post  ('/import/products',      authenticate, allRoles, master.importProducts);
 router.post  ('/import/customers',     authenticate, allRoles, master.importCustomers);
 router.post  ('/import/orders',        authenticate, allRoles, master.importOrders);
-router.post  ('/marketplace-import/parse',   authenticate, allRoles, master.parseMarketplaceExport);
-router.post  ('/marketplace-import/confirm', authenticate, allRoles, master.confirmMarketplaceImport);
-router.get   ('/marketplace-import/mappings',        authenticate, allRoles, master.getMarketplaceMappings);
-router.delete('/marketplace-import/mappings/:id',    authenticate, allRoles, master.deleteMarketplaceMapping);
+
+// ── Store Sync (dari ERP routes — lebih reliable) ─────────────
+router.get ('/store-sync/status',      authenticate, allRoles, require('../controllers/store/storeController').getSyncStatus);
+router.post('/store-sync',             authenticate, allRoles, require('../controllers/store/storeController').syncFromERP);
+router.post('/store-sync/stock',       authenticate, allRoles, require('../controllers/store/storeController').syncStock);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);

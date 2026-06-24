@@ -74,8 +74,10 @@ export const erpService = {
   confirmOrder:     (id)     => api.post(`${BASE}/orders/${id}/confirm`),
   completeOrder:    (id)     => api.post(`${BASE}/orders/${id}/complete`),
   cancelOrder:      (id)     => api.post(`${BASE}/orders/${id}/cancel`),
-  updateOrder:      (id,d)   => api.put(`${BASE}/orders/${id}`, d),
-  bulkUpdateStatus: (d)      => api.patch(`${BASE}/orders/bulk-status`, d),
+  // Store sync via ERP routes (lebih reliable)
+  storeSyncFromERP: (d)      => api.post(`${BASE}/store-sync`, d),
+  storeSyncStock:   (d)      => api.post(`${BASE}/store-sync/stock`, d),
+  storeGetSyncStatus:(brand) => api.get(`${BASE}/store-sync/status`, { params: { brand } }),
   addPayment:       (id,d)   => api.post(`${BASE}/orders/${id}/payment`, d),
   verifyPayment:    (id,pid) => api.put(`${BASE}/orders/${id}/payments/${pid}/verify`),
   addShipment:      (id,d)   => api.post(`${BASE}/orders/${id}/shipment`, d),
@@ -115,10 +117,8 @@ export const erpService = {
   importProducts:   (d)      => api.post(`${BASE}/import/products`, d),
   importCustomers:  (d)      => api.post(`${BASE}/import/customers`, d),
   importOrders:            (d) => api.post(`${BASE}/import/orders`, d),
-  parseMarketplaceExport:      (d)  => api.post(`${BASE}/marketplace-import/parse`, d),
-  confirmMarketplaceImport:    (d)  => api.post(`${BASE}/marketplace-import/confirm`, d),
-  getMarketplaceMappings:      (p)  => api.get(`${BASE}/marketplace-import/mappings`, { params: p }),
-  deleteMarketplaceMapping:    (id) => api.delete(`${BASE}/marketplace-import/mappings/${id}`),
+  parseMarketplaceExport:  (d) => api.post(`${BASE}/marketplace-import/parse`, d),
+  confirmMarketplaceImport:(d) => api.post(`${BASE}/marketplace-import/confirm`, d),
   getProfitLoss:    (p)      => api.get(`${BASE}/reports/profit-loss`, { params: p }),
 };
 
