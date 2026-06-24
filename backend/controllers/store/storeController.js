@@ -608,7 +608,7 @@ const createOrder = async (req, res, next) => {
           ...(toNum(discount) > 0 ? [{ id: 'DISCOUNT', price: -Math.round(toNum(discount)), quantity: 1, name: `Diskon ${voucher_code || ''}` }] : []),
         ],
         callbacks: {
-          finish: `${process.env.STORE_FRONTEND_URL || ''}/order/${order.id}/success`,
+          finish: `${brand === 'gpdistro' ? process.env.FRONTEND_GPDISTRO_URL : process.env.FRONTEND_GPRACING_URL}/order/${order.id}/success`,
         },
       });
       midtransToken    = snapData.token;
