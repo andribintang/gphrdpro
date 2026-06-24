@@ -133,9 +133,9 @@ router.post  ('/import/customers',     authenticate, allRoles, master.importCust
 router.post  ('/import/orders',        authenticate, allRoles, master.importOrders);
 
 // ── Store Sync (dari ERP routes — lebih reliable) ─────────────
-router.get ('/store-sync/status',      authenticate, allRoles, require('../controllers/store/storeController').getSyncStatus);
-router.post('/store-sync',             authenticate, allRoles, require('../controllers/store/storeController').syncFromERP);
-router.post('/store-sync/stock',       authenticate, allRoles, require('../controllers/store/storeController').syncStock);
+router.get ('/store-sync/status',      authenticate, allRoles, require('../../controllers/store/storeController').getSyncStatus);
+router.post('/store-sync',             authenticate, allRoles, require('../../controllers/store/storeController').syncFromERP);
+router.post('/store-sync/stock',       authenticate, allRoles, require('../../controllers/store/storeController').syncStock);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);
