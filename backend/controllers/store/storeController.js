@@ -8,6 +8,9 @@ const {
   StoreCustomer, StoreAddress, StoreCart, StoreVoucher,
   StoreOrder, StoreOrderItem, StorePayment,
 } = require('../../models/store');
+const {
+  Product: ErpProduct, Stock: ErpStock, ProductVariant: ErpVariant,
+} = require('../../models/erp');
 
 const toNum = v => parseFloat(v) || 0;
 
@@ -685,6 +688,16 @@ const paymentNotification = async (req, res, next) => {
 
     if (isPaid && order.payment_status !== 'paid') {
       await order.update({ payment_status: 'paid', status: 'paid', paid_at: new Date(), payment_method: payment_type });
+      // Auto-sync stok store setelah terbayar (fire-and-forget, tidak blokir response)
+      const items = await StoreOrderItem.findAll({ where: { order_id: order.id } });
+      Promise.all(items.map(item =>
+        StoreProduct.findByPk(item.product_id).then(sp => {
+          if (!sp?.erp_product_id) return;
+          return getErpStock(sp.erp_product_id, sp.brand).then(newStock =>
+            sp.update({ stock: newStock, sold_count: (sp.sold_count || 0) + item.quantity })
+          );
+        })
+      )).catch(e => console.error('[StockSync]', e.message));
     } else if (isFailed) {
       await order.update({ payment_status: 'unpaid', status: 'cancelled' });
       // Restock
@@ -907,6 +920,234 @@ const updateAdminConfig = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ═══════════════════════════════════════════════════════════════
+// SYNC — ERP → Store
+// ═══════════════════════════════════════════════════════════════
+
+// ── Helper: ambil stok total dari erp_stock per produk + brand ──
+const getErpStock = async (productId, brand) => {
+  const branchId = brand === 'gpdistro' ? 2 : 1;
+  const rows = await ErpStock.findAll({ where: { product_id: productId, branch_id: branchId, variant_id: null } });
+  return rows.reduce((s, r) => s + (parseInt(r.qty) || 0), 0);
+};
+
+// ── Helper: build slug yang aman & unik ───────────────────────
+const buildSlug = (name, brand, erpId) =>
+  name.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    + `-${brand.slice(0,3)}-${erpId}`;
+
+// ── POST /store/admin/sync-from-erp ──────────────────────────
+// Sync produk dari erp_products ke store_products.
+// - Produk dengan store_active_gpd=1 → di-sync ke brand 'gpdistro'
+// - Produk dengan store_active_gpr=1 → di-sync ke brand 'gpracing'
+// Mode:
+//   full   = semua produk yang aktif di store (default)
+//   stock  = hanya update stok, tanpa ubah data lain (lebih cepat)
+//   single = sync 1 produk berdasarkan erp_product_id di body
+const syncFromERP = async (req, res, next) => {
+  try {
+    const { mode = 'full', erp_product_id, brand: forceBrand } = req.body;
+
+    // ── Tentukan daftar produk yang akan di-sync ──────────────
+    const where = {};
+    if (erp_product_id) {
+      where.id = parseInt(erp_product_id);
+    } else {
+      if (forceBrand === 'gpdistro' || !forceBrand) where.store_active_gpd = true;
+      if (forceBrand === 'gpracing'  || !forceBrand) where.store_active_gpr = true;
+      if (!forceBrand) {
+        // Ambil produk yang aktif di SALAH SATU atau KEDUANYA
+        delete where.store_active_gpd;
+        delete where.store_active_gpr;
+        where[Op.or] = [{ store_active_gpd: true }, { store_active_gpr: true }];
+      }
+    }
+
+    const erpProducts = await ErpProduct.findAll({ where });
+    if (!erpProducts.length) return res.json({ success: true, data: { synced: 0, message: 'Tidak ada produk untuk di-sync' } });
+
+    let synced = 0, skipped = 0, errors = [];
+
+    for (const erp of erpProducts) {
+      // Tentukan brand mana yang perlu di-sync untuk produk ini
+      const brands = [];
+      if (erp.store_active_gpd && (!forceBrand || forceBrand === 'gpdistro')) brands.push('gpdistro');
+      if (erp.store_active_gpr && (!forceBrand || forceBrand === 'gpracing'))  brands.push('gpracing');
+      if (erp_product_id && forceBrand) brands.push(forceBrand);
+
+      for (const brand of brands) {
+        try {
+          // Cari store_product yang sudah ada (link via erp_product_id)
+          let storeProduct = await StoreProduct.findOne({ where: { erp_product_id: erp.id, brand } });
+
+          // ── Mode stock-only: hanya update stok ───────────────
+          if (mode === 'stock' && storeProduct) {
+            const newStock = await getErpStock(erp.id, brand);
+            await storeProduct.update({ stock: newStock });
+            synced++;
+            continue;
+          }
+
+          // ── Hitung stok total dari erp_stock ─────────────────
+          const stock = await getErpStock(erp.id, brand);
+
+          // ── Ambil varian (untuk store_variants JSON) ──────────
+          let storeVariants = erp.store_variants || null;
+          if (!storeVariants) {
+            const variants = await ErpVariant.findAll({ where: { product_id: erp.id, is_active: true } });
+            if (variants.length > 0) {
+              storeVariants = variants.reduce((acc, v) => {
+                // Parse attributes: { "Ukuran": "M", "Warna": "Merah" }
+                const attrs = v.attributes || {};
+                Object.entries(attrs).forEach(([axis, val]) => {
+                  if (!acc[axis]) acc[axis] = [];
+                  if (!acc[axis].includes(val)) acc[axis].push(val);
+                });
+                return acc;
+              }, {});
+            }
+          }
+
+          // ── Tentukan kategori store yang sesuai ──────────────
+          let storeCategoryId = null;
+          if (erp.category_id) {
+            // Cari store_category dengan nama yang sama untuk brand ini
+            const erpCat = await ErpProduct.sequelize.query(
+              'SELECT name FROM erp_categories WHERE id = ? LIMIT 1',
+              { replacements: [erp.category_id], type: 'SELECT' }
+            );
+            if (erpCat?.[0]?.name) {
+              const storeCat = await StoreCategory.findOne({
+                where: { brand, name: { [Op.like]: `%${erpCat[0].name}%` }, is_active: true },
+              });
+              storeCategoryId = storeCat?.id || null;
+            }
+          }
+
+          // ── Payload sync ─────────────────────────────────────
+          const payload = {
+            brand,
+            erp_product_id: erp.id,
+            name:           erp.name,
+            slug:           erp.store_slug || buildSlug(erp.name, brand, erp.id),
+            sku:            erp.sku || null,
+            description:    erp.store_description || erp.description || '',
+            short_desc:     erp.store_short_desc || '',
+            price:          parseFloat(erp.store_price) || parseFloat(erp.sell_price) || 0,
+            price_compare:  parseFloat(erp.store_price_compare) || 0,
+            weight:         Math.round((parseFloat(erp.weight) || 0.5) * 1000), // kg → gram
+            stock,
+            images:         Array.isArray(erp.store_images) && erp.store_images.length
+                              ? erp.store_images
+                              : (erp.photo_url ? [erp.photo_url] : []),
+            variants:       storeVariants || {},
+            tags:           Array.isArray(erp.store_tags)
+                              ? erp.store_tags
+                              : (erp.store_tags ? JSON.parse(erp.store_tags) : []),
+            is_featured:    !!erp.store_featured,
+            is_active:      true,
+            category_id:    storeCategoryId,
+            meta_title:     erp.store_meta_title || erp.name,
+            meta_desc:      erp.store_meta_desc  || erp.store_short_desc || '',
+          };
+
+          if (storeProduct) {
+            await storeProduct.update(payload);
+          } else {
+            storeProduct = await StoreProduct.create(payload);
+          }
+          synced++;
+        } catch (e) {
+          errors.push(`Produk "${erp.name}" (${brand}): ${e.message}`);
+          skipped++;
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: { synced, skipped, errors },
+      message: `${synced} produk berhasil disync ke store${skipped ? `, ${skipped} gagal` : ''}`,
+    });
+  } catch (err) { next(err); }
+};
+
+// ── POST /store/admin/sync-stock — hanya update stok, cepat ──
+// Dipanggil otomatis setelah ada order terbayar, juga bisa manual.
+const syncStock = async (req, res, next) => {
+  try {
+    const { brand, erp_product_id } = req.body;
+    const where = { is_active: true };
+    if (brand)          where.brand          = brand;
+    if (erp_product_id) where.erp_product_id = parseInt(erp_product_id);
+
+    const storeProducts = await StoreProduct.findAll({ where });
+    let updated = 0;
+    for (const sp of storeProducts) {
+      if (!sp.erp_product_id) continue;
+      const newStock = await getErpStock(sp.erp_product_id, sp.brand);
+      if (sp.stock !== newStock) {
+        await sp.update({ stock: newStock });
+        updated++;
+      }
+    }
+    return res.json({ success: true, data: { updated }, message: `${updated} stok diperbarui` });
+  } catch (err) { next(err); }
+};
+
+// ── GET /store/admin/sync-status — preview sebelum sync ──────
+// Menampilkan perbandingan: data ERP vs data di store saat ini
+const getSyncStatus = async (req, res, next) => {
+  try {
+    const { brand } = req.query;
+    const erpWhere = brand === 'gpdistro'
+      ? { store_active_gpd: true }
+      : brand === 'gpracing'
+      ? { store_active_gpr: true }
+      : { [Op.or]: [{ store_active_gpd: true }, { store_active_gpr: true }] };
+
+    const erpProducts = await ErpProduct.findAll({ where: erpWhere, attributes: ['id','name','sku','store_price','store_active_gpd','store_active_gpr','updated_at'] });
+
+    const items = await Promise.all(erpProducts.map(async (erp) => {
+      const brands = [];
+      if (erp.store_active_gpd && (!brand || brand === 'gpdistro')) brands.push('gpdistro');
+      if (erp.store_active_gpr && (!brand || brand === 'gpracing')) brands.push('gpracing');
+
+      const storeRows = await StoreProduct.findAll({ where: { erp_product_id: erp.id } });
+      const storeMap  = storeRows.reduce((acc, s) => { acc[s.brand] = s; return acc; }, {});
+
+      return brands.map(b => {
+        const sp = storeMap[b];
+        const stockDiff = sp ? null : null; // stok dihitung terpisah agar cepat
+        return {
+          erp_product_id:  erp.id,
+          name:            erp.name,
+          sku:             erp.sku,
+          brand:           b,
+          status:          sp ? (sp.updated_at < erp.updated_at ? 'outdated' : 'synced') : 'not_synced',
+          store_product_id:sp?.id || null,
+          erp_updated_at:  erp.updated_at,
+          store_updated_at:sp?.updated_at || null,
+        };
+      });
+    }));
+
+    const flat = items.flat();
+    const summary = {
+      total:      flat.length,
+      synced:     flat.filter(i => i.status === 'synced').length,
+      outdated:   flat.filter(i => i.status === 'outdated').length,
+      not_synced: flat.filter(i => i.status === 'not_synced').length,
+    };
+
+    return res.json({ success: true, data: { summary, items: flat } });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   // Public
   getConfig, getBanners, getCategories, getProducts, getFeatured, getProductBySlug,
@@ -930,5 +1171,7 @@ module.exports = {
   getAdminCategories, upsertAdminCategory,
   getAdminVouchers, upsertAdminVoucher,
   getAdminConfig, updateAdminConfig,
+  // Sync
+  syncFromERP, syncStock, getSyncStatus,
   requireCustomer,
 };

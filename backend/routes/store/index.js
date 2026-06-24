@@ -78,4 +78,12 @@ router.put   ('/admin/vouchers/:id',          authenticate, s.upsertAdminVoucher
 router.get   ('/admin/config',                authenticate, s.getAdminConfig);
 router.put   ('/admin/config',                authenticate, s.updateAdminConfig);
 
+// ── Sync ERP → Store ──────────────────────────────────────────
+// GET  /store/admin/sync-status   → preview: lihat produk mana outdated/belum sync
+// POST /store/admin/sync-from-erp → jalankan sync (full / stock / single)
+// POST /store/admin/sync-stock    → update stok saja (cepat, tanpa ubah data lain)
+router.get ('/admin/sync-status',             authenticate, s.getSyncStatus);
+router.post('/admin/sync-from-erp',           authenticate, s.syncFromERP);
+router.post('/admin/sync-stock',              authenticate, s.syncStock);
+
 module.exports = router;

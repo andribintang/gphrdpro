@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Search, Package, X, Save, Upload, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Package, X, Save, Upload, Eye, EyeOff, RefreshCw, Zap, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   getStoreProducts, createStoreProduct, updateStoreProduct,
   deleteStoreProduct, getStoreCategories,
+  getSyncStatus, syncFromERP, syncStock,
 } from '../../utils/storeService';
 
 const BRAND_LABEL = { gpdistro: 'GPDISTRO', gpracing: 'GP RACING' };
@@ -389,27 +390,42 @@ export default function StoreProductsPage() {
   const [page,       setPage]       = useState(1);
   const [total,      setTotal]      = useState(0);
   const [modal,      setModal]      = useState(null); // null | 'add' | product obj
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [syncing,    setSyncing]    = useState(false);
+  const [showSync,   setShowSync]   = useState(false);
   const LIMIT = 20;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch('https://backend-gphrdpro.up.railway.app/store-test');
-      const data = await r.json();
-      let products = (data.rows || []).map(p => {
-        try { p.images = typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []); } catch(e) { p.images = []; }
-        try { p.variants = typeof p.variants === 'string' ? JSON.parse(p.variants) : (p.variants || {}); } catch(e) { p.variants = {}; }
-        return p;
-      });
-      if (brand) products = products.filter(p => p.brand === brand);
-      if (catFilter) products = products.filter(p => String(p.category_id) === String(catFilter));
-      if (search) products = products.filter(p => (p.name||'').toLowerCase().includes(search.toLowerCase()) || (p.sku||'').toLowerCase().includes(search.toLowerCase()));
-      setProducts(products);
-      setTotal(products.length);
+      const r = await getStoreProducts({ brand, search, category_id: catFilter || undefined, page, limit: LIMIT });
+      setProducts(r.data.data.products || []);
+      setTotal(r.data.data.pagination?.total || 0);
     } catch (e) {
-      toast.error('Gagal memuat: ' + e.message);
+      toast.error('Gagal memuat produk: ' + e.message);
     } finally { setLoading(false); }
   }, [brand, search, catFilter, page]);
+
+  const loadSyncStatus = async () => {
+    try { const r = await getSyncStatus(brand); setSyncStatus(r.data.data); } catch { setSyncStatus(null); }
+  };
+
+  const handleSync = async (mode = 'full') => {
+    if (!confirm(mode === 'stock' ? 'Update stok semua produk dari ERP?' : `Sync semua produk dari ERP ke toko ${(brand||'').toUpperCase()}?`)) return;
+    setSyncing(true);
+    try {
+      const r = await syncFromERP({ brand, mode });
+      toast.success(r.data.message);
+      await load(); await loadSyncStatus();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal sync'); }
+    finally { setSyncing(false); }
+  };
+
+  const handleSyncStock = async () => {
+    setSyncing(true);
+    try { const r = await syncStock({ brand }); toast.success(r.data.message); await load(); }
+    catch { toast.error('Gagal sync stok'); } finally { setSyncing(false); }
+  };
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -443,9 +459,61 @@ export default function StoreProductsPage() {
         <a href="/erp/products"
           className="btn-outline gap-2 text-sm"
           onClick={e => { e.preventDefault(); window.location.href='/erp/products'; }}>
-          <Plus size={16} /> Tambah via ERP
-        </a>
+            <Plus size={16} /> Tambah via ERP
+          </a>
+          <button onClick={() => handleSyncStock()} disabled={syncing}
+            className="btn-secondary gap-2 text-sm h-9 disabled:opacity-50">
+            {syncing ? <Loader2 size={14} className="animate-spin"/> : <RefreshCw size={14}/>}
+            Sync Stok
+          </button>
+          <button onClick={() => handleSync('full')} disabled={syncing}
+            className="btn-primary gap-2 text-sm h-9 disabled:opacity-50">
+            {syncing ? <Loader2 size={14} className="animate-spin"/> : <Zap size={14}/>}
+            Sync dari ERP
+          </button>
+          <button onClick={() => { loadSyncStatus(); setShowSync(s => !s); }}
+            className="btn-icon" title="Status Sync">
+            <RefreshCw size={15}/>
+          </button>
+        </div>
       </div>
+
+      {/* Sync status panel */}
+      {showSync && syncStatus && (
+        <div className="table-wrapper p-4 space-y-3 mb-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Status Sinkronisasi ERP → Toko</p>
+            <button onClick={() => setShowSync(false)} className="btn-icon-sm"><X size={13}/></button>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { l:'Total', v:syncStatus.summary.total, c:'bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--text-primary)]' },
+              { l:'Tersync', v:syncStatus.summary.synced, c:'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' },
+              { l:'Outdated', v:syncStatus.summary.outdated, c:'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
+              { l:'Belum Sync', v:syncStatus.summary.not_synced, c:'bg-red-50 border-red-200 text-red-700 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800' },
+            ].map(({l,v,c}) => (
+              <span key={l} className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${c}`}>{v} {l}</span>
+            ))}
+          </div>
+          {syncStatus.items?.filter(i => i.status !== 'synced').length > 0 ? (
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {syncStatus.items.filter(i => i.status !== 'synced').map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg bg-[var(--bg-secondary)]">
+                  <span className="font-medium truncate flex-1">{item.name}</span>
+                  <span className="text-[10px] font-mono text-[var(--text-muted)]">{item.sku}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                    item.status === 'outdated' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  }`}>{item.status === 'not_synced' ? 'BELUM SYNC' : 'OUTDATED'}</span>
+                  <button onClick={() => syncFromERP({ brand, mode:'single', erp_product_id: item.erp_product_id }).then(load).then(loadSyncStatus).catch(e=>toast.error(e.message))}
+                    className="text-[10px] text-[var(--brand-600)] hover:underline flex-shrink-0">Sync</button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-emerald-600 font-semibold">✓ Semua produk sudah tersinkronisasi dengan data ERP terbaru</p>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">

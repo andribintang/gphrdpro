@@ -35,3 +35,8 @@ export const updateStoreVoucher = (id, data)  => api.put(`${BASE}/vouchers/${id}
 // ── Orders ────────────────────────────────────────────────────
 export const getStoreOrders          = (params)    => api.get(`${BASE}/orders`, { params });
 export const updateStoreOrderStatus  = (id, data)  => api.patch(`${BASE}/orders/${id}/status`, data);
+
+// ── Sync ERP → Store ──────────────────────────────────────────
+export const getSyncStatus   = (brand)       => api.get(`${BASE}/sync-status`, { params: { brand } });
+export const syncFromERP     = (data)        => api.post(`${BASE}/sync-from-erp`, data);
+export const syncStock       = (data)        => api.post(`${BASE}/sync-stock`, data);
