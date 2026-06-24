@@ -50,10 +50,6 @@ const allowedOrigins = [
   'https://www.gpdistro.com',
   'https://gpracingstore.com',
   'https://www.gpracingstore.com',
-  'https://gpdistro.com',
-  'https://www.gpdistro.com',
-  'https://gpracing-store-production.up.railway.app',
-  'https://gpdistro-store-production.up.railway.app',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:3001',
@@ -727,6 +723,14 @@ app.post('/run-alter', async (req, res) => {
 
       // ════ Marketplace SKU Mapping — simpan hasil mapping manual supaya
       // import berikutnya bisa resolve SKU yang sama tanpa input ulang ════
+      // ════ Cleanup: hapus store_products yang brand-nya tidak sesuai
+      // branch_id produk ERP (produk GP Racing branch_id=1 yang terlanjur
+      // masuk ke brand 'gpdistro', dan sebaliknya) ════
+      `DELETE sp FROM store_products sp
+       INNER JOIN erp_products ep ON ep.id = sp.erp_product_id
+       WHERE (ep.branch_id = 1 AND sp.brand = 'gpdistro')
+          OR (ep.branch_id = 2 AND sp.brand = 'gpracing')`,
+
       `CREATE TABLE IF NOT EXISTS erp_marketplace_sku_map (
         id INT AUTO_INCREMENT PRIMARY KEY,
         platform VARCHAR(20) NOT NULL,

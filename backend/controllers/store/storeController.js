@@ -742,7 +742,12 @@ const getAdminProducts = async (req, res, next) => {
   try {
     const { brand, page = 1, limit = 20, search, category_id, is_active } = req.query;
     const where = {};
-    if (brand) where.brand = brand;
+    if (brand) {
+      where.brand = brand;
+    } else {
+      // Tanpa filter brand, tetap hanya tampilkan produk yang sesuai brand
+      // (jangan tampilkan produk brand lain secara tidak sengaja)
+    }
     if (category_id) where.category_id = parseInt(category_id);
     if (is_active !== undefined) where.is_active = is_active === '1';
     if (search) {
@@ -973,11 +978,21 @@ const syncFromERP = async (req, res, next) => {
     let synced = 0, skipped = 0, errors = [];
 
     for (const erp of erpProducts) {
-      // Tentukan brand mana yang perlu di-sync untuk produk ini
+      // ── Brand ditentukan dari branch_id produk ERP (bukan dari flag) ──
+      // branch_id=1 (GP Racing) → brand 'gpracing'
+      // branch_id=2 (GP Distro) → brand 'gpdistro'
+      // Ini mencegah produk GP Racing masuk ke toko GPDISTRO dan sebaliknya.
+      const brandFromBranch = erp.branch_id === 2 ? 'gpdistro' : 'gpracing';
       const brands = [];
-      if (erp.store_active_gpd && (!forceBrand || forceBrand === 'gpdistro')) brands.push('gpdistro');
-      if (erp.store_active_gpr && (!forceBrand || forceBrand === 'gpracing'))  brands.push('gpracing');
-      if (erp_product_id && forceBrand) brands.push(forceBrand);
+      if (erp_product_id && forceBrand) {
+        brands.push(forceBrand);
+      } else if (forceBrand) {
+        // Hanya sync produk yang branch-nya sesuai dengan forceBrand
+        if (brandFromBranch === forceBrand) brands.push(forceBrand);
+      } else {
+        // Full sync: tiap produk hanya ke brand yang sesuai branch-nya
+        brands.push(brandFromBranch);
+      }
 
       for (const brand of brands) {
         try {
@@ -1104,18 +1119,19 @@ const syncStock = async (req, res, next) => {
 const getSyncStatus = async (req, res, next) => {
   try {
     const { brand } = req.query;
+    // Filter berdasarkan branch_id (bukan hanya flag store_active)
     const erpWhere = brand === 'gpdistro'
-      ? { store_active_gpd: true }
+      ? { branch_id: 2, [Op.or]: [{ store_active_gpd: true }, { store_active_gpr: true }] }
       : brand === 'gpracing'
-      ? { store_active_gpr: true }
+      ? { branch_id: 1, [Op.or]: [{ store_active_gpd: true }, { store_active_gpr: true }] }
       : { [Op.or]: [{ store_active_gpd: true }, { store_active_gpr: true }] };
 
     const erpProducts = await ErpProduct.findAll({ where: erpWhere, attributes: ['id','name','sku','store_price','store_active_gpd','store_active_gpr','updated_at'] });
 
     const items = await Promise.all(erpProducts.map(async (erp) => {
-      const brands = [];
-      if (erp.store_active_gpd && (!brand || brand === 'gpdistro')) brands.push('gpdistro');
-      if (erp.store_active_gpr && (!brand || brand === 'gpracing')) brands.push('gpracing');
+      // brand dari branch_id — konsisten dengan syncFromERP
+      const brandFromBranch = erp.branch_id === 2 ? 'gpdistro' : 'gpracing';
+      const brands = (!brand || brand === brandFromBranch) ? [brandFromBranch] : [];
 
       const storeRows = await StoreProduct.findAll({ where: { erp_product_id: erp.id } });
       const storeMap  = storeRows.reduce((acc, s) => { acc[s.brand] = s; return acc; }, {});
