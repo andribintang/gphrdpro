@@ -971,6 +971,20 @@ const syncFromERP = async (req, res, next) => {
     const erpProducts = await ErpProduct.findAll({ where });
     if (!erpProducts.length) return res.json({ success: true, data: { synced: 0, message: 'Tidak ada produk untuk di-sync' } });
 
+    // ── AUTO-CLEANUP: hapus store_products yang brand-nya tidak sesuai branch_id ──
+    try {
+      const cleanupBranchId = forceBrand ? (forceBrand === 'gpdistro' ? 2 : 1) : null;
+      const cleanupSQL = cleanupBranchId
+        ? 'DELETE sp FROM store_products sp INNER JOIN erp_products ep ON ep.id = sp.erp_product_id WHERE sp.brand = ? AND ep.branch_id != ?'
+        : 'DELETE sp FROM store_products sp INNER JOIN erp_products ep ON ep.id = sp.erp_product_id WHERE (ep.branch_id = 1 AND sp.brand = ?) OR (ep.branch_id = 2 AND sp.brand = ?)';
+      const cleanupParams = cleanupBranchId
+        ? [forceBrand, cleanupBranchId]
+        : ['gpdistro', 'gpracing'];
+      await sequelize.query(cleanupSQL, { replacements: cleanupParams });
+    } catch (cleanupErr) {
+      console.error('[StoreSync] Cleanup error (non-fatal):', cleanupErr.message);
+    }
+
     let synced = 0, skipped = 0, errors = [];
 
     for (const erp of erpProducts) {
