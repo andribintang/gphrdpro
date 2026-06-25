@@ -12,8 +12,14 @@ import {
   deleteStoreProduct, getStoreCategories,
   bulkUpdateCategory, bulkDeleteProducts,
 } from '../../utils/storeService';
-import { erpService } from '../../utils/erp/erpService';
-import { toRp } from '../../utils/erp/erpService';
+import { erpService, toRp } from '../../utils/erp/erpService';
+
+// Guard: field JSON dari DB bisa kembali sebagai string kalau MySQL version lama
+const safeArr = (v) => {
+  if (Array.isArray(v)) return v;
+  if (!v) return [];
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+};
 
 const BRAND_LABEL = { gpdistro: 'GPDISTRO', gpracing: 'GP RACING' };
 const BRAND_COLOR  = { gpdistro: '#1a1a2e', gpracing: '#dc2626' };
@@ -92,7 +98,7 @@ function ProductModal({ brand, categories, product, onClose, onSaved }) {
                 <div><label className="field-label">Kategori</label>
                   <select value={form.category_id||''} onChange={e => sf('category_id', e.target.value)} className={cs.select}>
                     <option value="">— Pilih Kategori —</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select></div>
                 <div><label className="field-label">Harga Jual *</label>
                   <input type="number" min={0} value={form.price||''} onChange={e => sf('price', e.target.value)} className={cs.input}/></div>
@@ -184,7 +190,7 @@ function BulkCategoryModal({ count, categories, onClose, onApply }) {
             <label className="field-label">Kategori Baru</label>
             <select value={catId} onChange={e => setCatId(e.target.value)} className="input-base">
               <option value="">— Hapus Kategori (set null) —</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
         </div>
@@ -230,7 +236,9 @@ export default function StoreProductsPage() {
   }, [brand, search, catFilter, page]);
 
   useEffect(() => {
-    getStoreCategories(brand).then(r => setCategories(r.data.data || [])).catch(() => {});
+    getStoreCategories(brand)
+      .then(r => { const d = r.data.data; setCategories(Array.isArray(d) ? d : []); })
+      .catch(() => setCategories([]));
   }, [brand]);
 
   useEffect(() => { load(); }, [load]);
@@ -289,10 +297,12 @@ export default function StoreProductsPage() {
   const columns = [
     {
       key: 'name', label: 'Produk', sortable: true,
-      render: (v, row) => (
+      render: (v, row) => {
+        const imgs = safeArr(row.images);
+        return (
         <div className="flex items-center gap-3">
-          {(row.images?.[0] || (Array.isArray(row.images) && row.images[0])) ? (
-            <img src={Array.isArray(row.images) ? row.images[0] : row.images} alt=""
+          {imgs[0] ? (
+            <img src={imgs[0]} alt=""
               className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-[var(--border)]"/>
           ) : (
             <div className="w-10 h-10 rounded-lg flex-shrink-0 bg-[var(--bg-secondary)] flex items-center justify-center">
@@ -304,7 +314,8 @@ export default function StoreProductsPage() {
             <p className="text-[11px] font-mono text-[var(--text-muted)]">{row.sku || '—'}</p>
           </div>
         </div>
-      ),
+        );
+      },
     },
     {
       key: 'category', label: 'Kategori', nowrap: true,
@@ -401,9 +412,9 @@ export default function StoreProductsPage() {
               <span key={l} className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${c}`}>{v} {l}</span>
             ))}
           </div>
-          {syncStatus.items?.filter(i => i.status !== 'synced').length > 0 ? (
+          {(syncStatus.items||[]).filter(i => i.status !== 'synced').length > 0 ? (
             <div className="max-h-40 overflow-y-auto space-y-1">
-              {syncStatus.items.filter(i => i.status !== 'synced').map((item, idx) => (
+              {(syncStatus.items||[]).filter(i => i.status !== 'synced').map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg bg-[var(--bg-secondary)]">
                   <span className="font-medium truncate flex-1">{item.name}</span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
@@ -425,7 +436,7 @@ export default function StoreProductsPage() {
         <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(1); }}
           className="input-base h-9 text-sm w-44">
           <option value="">Semua Kategori</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <select onChange={e => { /* active filter — pass to load */ }}
           className="input-base h-9 text-sm w-36">
