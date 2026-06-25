@@ -974,11 +974,16 @@ const syncFromERP = async (req, res, next) => {
     let synced = 0, skipped = 0, errors = [];
 
     for (const erp of erpProducts) {
-      // Tentukan brand mana yang perlu di-sync untuk produk ini
+      // Brand ditentukan KETAT dari branch_id — satu produk hanya boleh ke satu brand
+      // branch_id=1 → gpracing, branch_id=2 → gpdistro
+      const brandFromBranch = erp.branch_id === 2 ? 'gpdistro' : 'gpracing';
       const brands = [];
-      if (erp.store_active_gpd && (!forceBrand || forceBrand === 'gpdistro')) brands.push('gpdistro');
-      if (erp.store_active_gpr && (!forceBrand || forceBrand === 'gpracing'))  brands.push('gpracing');
-      if (erp_product_id && forceBrand) brands.push(forceBrand);
+      if (erp_product_id && forceBrand) {
+        brands.push(forceBrand); // single product sync — pakai forceBrand
+      } else if (!forceBrand || forceBrand === brandFromBranch) {
+        brands.push(brandFromBranch); // hanya sync ke brand yang sesuai branch_id
+      }
+      // Tidak ada case lain — produk tidak bisa masuk ke brand yang bukan miliknya
 
       for (const brand of brands) {
         try {
