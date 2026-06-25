@@ -1169,6 +1169,27 @@ const getSyncStatus = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── PATCH /store/admin/products/bulk-category ───────────────────
+const bulkUpdateCategory = async (req, res, next) => {
+  try {
+    const { ids, category_id } = req.body;
+    if (!ids?.length) return res.status(400).json({ success: false, message: 'ids wajib diisi' });
+    const catId = category_id ? parseInt(category_id) : null;
+    await StoreProduct.update({ category_id: catId }, { where: { id: { [Op.in]: ids.map(Number) } } });
+    return res.json({ success: true, message: `${ids.length} produk kategori diperbarui` });
+  } catch (err) { next(err); }
+};
+
+// ── DELETE /store/admin/products/bulk — hard delete massal ──────
+const bulkDeleteProducts = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ success: false, message: 'ids wajib diisi' });
+    const deleted = await StoreProduct.destroy({ where: { id: { [Op.in]: ids.map(Number) } } });
+    return res.json({ success: true, message: `${deleted} produk berhasil dihapus permanen`, data: { deleted } });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   // Public
   getConfig, getBanners, getCategories, getProducts, getFeatured, getProductBySlug,
@@ -1186,7 +1207,7 @@ module.exports = {
   createOrder, getOrder, paymentNotification,
   // Admin
   getAdminStats,
-  getAdminProducts, createAdminProduct, updateAdminProduct, deleteAdminProduct,
+  getAdminProducts, createAdminProduct, updateAdminProduct, deleteAdminProduct, bulkUpdateCategory, bulkDeleteProducts,
   getAdminOrders, updateAdminOrderStatus,
   getAdminBanners, upsertAdminBanner, deleteAdminBanner,
   getAdminCategories, upsertAdminCategory,

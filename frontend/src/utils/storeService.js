@@ -19,7 +19,9 @@ export const getErpCategories = (branchId)   => api.get('/erp/categories', { par
 export const getStoreProducts   = (params)    => api.get(`${BASE}/products`, { params });
 export const createStoreProduct = (data)      => api.post(`${BASE}/products`, data);
 export const updateStoreProduct = (id, data)  => api.put(`${BASE}/products/${id}`, data);
-export const deleteStoreProduct = (id)        => api.delete(`${BASE}/products/${id}`);
+export const deleteStoreProduct    = (id)      => api.delete(`${BASE}/products/${id}`);
+export const bulkUpdateCategory    = (data)    => api.patch(`${BASE}/products/bulk-category`, data);
+export const bulkDeleteProducts    = (data)    => api.delete(`${BASE}/products/bulk`, { data });
 
 // ── Banners ───────────────────────────────────────────────────
 export const getStoreBanners    = (brand)     => api.get(`${BASE}/banners`, { params: { brand } });

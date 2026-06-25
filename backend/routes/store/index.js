@@ -53,6 +53,8 @@ router.get   ('/admin/products',              authenticate, s.getAdminProducts);
 router.post  ('/admin/products',              authenticate, s.createAdminProduct);
 router.put   ('/admin/products/:id',          authenticate, s.updateAdminProduct);
 router.delete('/admin/products/:id',          authenticate, s.deleteAdminProduct);
+router.patch ('/admin/products/bulk-category',authenticate, s.bulkUpdateCategory);
+router.delete('/admin/products/bulk',         authenticate, s.bulkDeleteProducts);
 
 // Orders admin
 router.get   ('/admin/orders',                authenticate, s.getAdminOrders);
