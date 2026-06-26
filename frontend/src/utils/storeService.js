@@ -21,7 +21,7 @@ export const createStoreProduct = (data)      => api.post(`${BASE}/products`, da
 export const updateStoreProduct = (id, data)  => api.put(`${BASE}/products/${id}`, data);
 export const deleteStoreProduct    = (id)      => api.delete(`${BASE}/products/${id}`);
 export const bulkUpdateCategory    = (data)    => api.patch(`${BASE}/products/bulk-category`, data);
-export const bulkDeleteProducts    = (data)    => api.delete(`${BASE}/products/bulk`, { data });
+export const bulkDeleteProducts    = (data)    => api.post(`${BASE}/products/bulk-delete`, data);
 
 // ── Banners ───────────────────────────────────────────────────
 export const getStoreBanners    = (brand)     => api.get(`${BASE}/banners`, { params: { brand } });

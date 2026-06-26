@@ -283,9 +283,9 @@ export default function StoreProductsPage() {
 
   // ── Single delete (soft: is_active=false) ──────────────────
   const handleDelete = async (p) => {
-    if (!confirm(`Nonaktifkan "${p.name}"?`)) return;
-    try { await deleteStoreProduct(p.id); toast.success('Produk dinonaktifkan'); load(); }
-    catch { toast.error('Gagal'); }
+    if (!confirm(`Hapus permanen "${p.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await deleteStoreProduct(p.id); toast.success('Produk dihapus permanen'); load(); }
+    catch { toast.error('Gagal menghapus produk'); }
   };
 
   // ── Bulk category ──────────────────────────────────────────
@@ -484,7 +484,7 @@ export default function StoreProductsPage() {
               <Pencil size={13}/>
             </button>
             <button onClick={e => { e.stopPropagation(); handleDelete(row); }}
-              className="btn-icon-sm text-red-500 hover:text-red-700" title="Nonaktifkan">
+              className="btn-icon-sm text-red-500 hover:text-red-700" title="Hapus Permanen">
               <Trash2 size={13}/>
             </button>
           </div>

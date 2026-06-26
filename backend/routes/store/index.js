@@ -54,7 +54,7 @@ router.post  ('/admin/products',              authenticate, s.createAdminProduct
 // ⚠️ PENTING: bulk routes HARUS di atas /:id — Express cocokkan /:id duluan
 // jika bulk di bawah, 'bulk' tertangkap sebagai nilai :id → error 500
 router.patch ('/admin/products/bulk-category',authenticate, s.bulkUpdateCategory);
-router.delete('/admin/products/bulk',         authenticate, s.bulkDeleteProducts);
+router.post  ('/admin/products/bulk-delete',  authenticate, s.bulkDeleteProducts);  // POST lebih reliable dari DELETE+body
 router.put   ('/admin/products/:id',          authenticate, s.updateAdminProduct);
 router.delete('/admin/products/:id',          authenticate, s.deleteAdminProduct);
 

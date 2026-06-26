@@ -785,8 +785,8 @@ const deleteAdminProduct = async (req, res, next) => {
   try {
     const product = await StoreProduct.findByPk(req.params.id);
     if (!product) return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
-    await product.update({ is_active: false });
-    return res.json({ success: true, message: 'Produk dinonaktifkan' });
+    await product.destroy(); // hard delete — hapus permanen dari DB
+    return res.json({ success: true, message: 'Produk berhasil dihapus permanen' });
   } catch (err) { next(err); }
 };
 
