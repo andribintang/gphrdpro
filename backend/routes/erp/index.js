@@ -139,6 +139,8 @@ router.post('/store-sync',                authenticate, allRoles, require('../..
 router.post('/store-sync/stock',          authenticate, allRoles, require('../../controllers/store/storeController').syncStock);
 router.post('/store-sync/categories',     authenticate, allRoles, require('../../controllers/store/storeController').syncCategoriesFromERP);
 router.post('/store-sync/clear-resync',   authenticate, allRoles, require('../../controllers/store/storeController').clearAndResync);
+router.patch('/store-products/bulk-category', authenticate, allRoles, require('../../controllers/store/storeController').bulkUpdateCategory);
+router.post ('/store-products/bulk-delete',   authenticate, allRoles, require('../../controllers/store/storeController').bulkDeleteProducts);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);

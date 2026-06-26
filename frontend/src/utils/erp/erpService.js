@@ -81,6 +81,9 @@ export const erpService = {
   storeSyncCategories:    (d)      => api.post(`${BASE}/store-sync/categories`, d),
   storeClearResync:       (d)      => api.post(`${BASE}/store-sync/clear-resync`, d),
   storeGetDebug:          ()       => api.get(`${BASE}/store-sync/debug`),
+  // Bulk ops via ERP routes (lebih reliable dari /api/store/ POST)
+  storeBulkCategory:      (d)      => api.patch(`${BASE}/store-products/bulk-category`, d),
+  storeBulkDelete:        (d)      => api.post(`${BASE}/store-products/bulk-delete`, d),
   addPayment:       (id,d)   => api.post(`${BASE}/orders/${id}/payment`, d),
   verifyPayment:    (id,pid) => api.put(`${BASE}/orders/${id}/payments/${pid}/verify`),
   addShipment:      (id,d)   => api.post(`${BASE}/orders/${id}/shipment`, d),

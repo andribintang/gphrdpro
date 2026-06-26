@@ -315,7 +315,7 @@ export default function StoreProductsPage() {
   // ── Bulk category ──────────────────────────────────────────
   const handleBulkCategory = async (rows, clearSel, catId) => {
     try {
-      await bulkUpdateCategory({ ids: rows.map(r => r.id), category_id: catId });
+      await erpService.storeBulkCategory({ ids: rows.map(r => r.id), category_id: catId });
       const label = catId ? categories.find(c => c.id == catId)?.name || catId : '(kosong)';
       toast.success(`${rows.length} produk → kategori "${label}"`);
       clearSel(); load();
@@ -327,7 +327,7 @@ export default function StoreProductsPage() {
   const handleBulkDelete = async (rows, clearSel) => {
     if (!confirm(`HAPUS PERMANEN ${rows.length} produk dari database store? Tindakan ini tidak bisa dibatalkan.`)) return;
     try {
-      const r = await bulkDeleteProducts({ ids: rows.map(p => p.id) });
+      const r = await erpService.storeBulkDelete({ ids: rows.map(p => p.id) });
       toast.success(r.data.message);
       clearSel(); load();
     } catch { toast.error('Gagal hapus'); }
