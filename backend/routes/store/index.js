@@ -51,10 +51,12 @@ router.get ('/admin/stats',                   authenticate, s.getAdminStats);
 // Products admin
 router.get   ('/admin/products',              authenticate, s.getAdminProducts);
 router.post  ('/admin/products',              authenticate, s.createAdminProduct);
-router.put   ('/admin/products/:id',          authenticate, s.updateAdminProduct);
-router.delete('/admin/products/:id',          authenticate, s.deleteAdminProduct);
+// ⚠️ PENTING: bulk routes HARUS di atas /:id — Express cocokkan /:id duluan
+// jika bulk di bawah, 'bulk' tertangkap sebagai nilai :id → error 500
 router.patch ('/admin/products/bulk-category',authenticate, s.bulkUpdateCategory);
 router.delete('/admin/products/bulk',         authenticate, s.bulkDeleteProducts);
+router.put   ('/admin/products/:id',          authenticate, s.updateAdminProduct);
+router.delete('/admin/products/:id',          authenticate, s.deleteAdminProduct);
 
 // Orders admin
 router.get   ('/admin/orders',                authenticate, s.getAdminOrders);

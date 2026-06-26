@@ -170,8 +170,9 @@ function ProductModal({ brand, categories, product, onClose, onSaved }) {
 }
 
 // ── Bulk Category Modal ──────────────────────────────────────
-function BulkCategoryModal({ count, categories, onClose, onApply }) {
+function BulkCategoryModal({ count, categories, brand, onClose, onApply }) {
   const [catId, setCatId] = useState('');
+  const isEmpty = !categories || categories.length === 0;
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-backdrop"/>
@@ -186,18 +187,33 @@ function BulkCategoryModal({ count, categories, onClose, onApply }) {
           <p className="text-sm text-[var(--text-secondary)]">
             Ganti kategori untuk <strong>{count}</strong> produk yang dipilih.
           </p>
-          <div>
-            <label className="field-label">Kategori Baru</label>
-            <select value={catId} onChange={e => setCatId(e.target.value)} className="input-base">
-              <option value="">— Hapus Kategori (set null) —</option>
-              {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          {isEmpty ? (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-1.5">
+                <AlertTriangle size={13}/> Belum ada kategori toko
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                Tambah kategori dulu di menu <strong>Kategori & Voucher</strong> sebelum bisa assign ke produk.
+              </p>
+              <button onClick={() => window.location.href = `/store/${brand}/catalog`}
+                className="text-xs text-amber-700 underline mt-1 hover:no-underline">
+                Buka Kategori & Voucher →
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label className="field-label">Kategori Baru</label>
+              <select value={catId} onChange={e => setCatId(e.target.value)} className="input-base">
+                <option value="">— Hapus Kategori (set null) —</option>
+                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <button onClick={onClose} className="btn-secondary flex-1">Batal</button>
-          <button onClick={() => onApply(catId || null)}
-            className="btn-primary flex-1 gap-2">
+          <button onClick={() => onApply(catId || null)} disabled={isEmpty}
+            className="btn-primary flex-1 gap-2 disabled:opacity-50">
             <Tag size={14}/> Terapkan ke {count} Produk
           </button>
         </div>
@@ -512,6 +528,7 @@ export default function StoreProductsPage() {
         <BulkCategoryModal
           count={bulkCatModal.rows.length}
           categories={categories}
+          brand={brand}
           onClose={() => setBulkCatModal(false)}
           onApply={(catId) => handleBulkCategory(bulkCatModal.rows, bulkCatModal.clearSel, catId)}
         />
