@@ -1190,6 +1190,153 @@ const bulkDeleteProducts = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ══════════════════════════════════════════════════════════════
+// SYNC KATEGORI ERP → STORE
+// erp_categories.branch_id=1 → store_categories.brand='gpracing'
+// erp_categories.branch_id=2 → store_categories.brand='gpdistro'
+// ══════════════════════════════════════════════════════════════
+const syncCategoriesFromERP = async (req, res, next) => {
+  try {
+    const { brand } = req.body;
+    const branchId = brand === 'gpdistro' ? 2 : brand === 'gpracing' ? 1 : null;
+
+    const { Category: ErpCategory } = require('../../models/erp');
+
+    const where = { is_active: true };
+    if (branchId) where.branch_id = branchId;
+    else          where.branch_id = { [Op.in]: [1, 2] };
+
+    const erpCats = await ErpCategory.findAll({ where, order: [['sort_order','ASC'],['name','ASC']] });
+
+    let synced = 0, errors = [];
+
+    for (const erp of erpCats) {
+      const catBrand = erp.branch_id === 2 ? 'gpdistro' : 'gpracing';
+      if (brand && catBrand !== brand) continue;
+
+      const slug = erp.name.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g,'')
+        .replace(/\s+/g,'-')
+        .replace(/-+/g,'-')
+        .trim() + `-${erp.id}`;
+
+      try {
+        const [row, created] = await StoreCategory.findOrCreate({
+          where: { brand: catBrand, name: erp.name },
+          defaults: { slug, sort_order: erp.sort_order, is_active: true },
+        });
+        if (!created) {
+          await row.update({ slug: row.slug || slug, sort_order: erp.sort_order, is_active: true });
+        }
+        synced++;
+      } catch (e) {
+        errors.push(`Kategori "${erp.name}": ${e.message}`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `${synced} kategori disinkronisasi dari ERP`,
+      data: { synced, errors },
+    });
+  } catch (err) { next(err); }
+};
+
+// ── POST /store-sync/clear-resync — hapus bersih + sync ulang ──
+// Dipakai untuk fix data yang salah brand
+const clearAndResync = async (req, res, next) => {
+  try {
+    const { brand } = req.body;
+    if (!brand || !['gpdistro','gpracing'].includes(brand)) {
+      return res.status(400).json({ success: false, message: 'brand wajib: gpdistro atau gpracing' });
+    }
+
+    // 1. Hapus SEMUA produk store untuk brand ini (bersih total)
+    const deleted = await StoreProduct.destroy({ where: { brand } });
+
+    // 2. Sync ulang dari ERP dengan brand yang benar
+    const branchId = brand === 'gpdistro' ? 2 : 1;
+    const erpProducts = await ErpProduct.findAll({
+      where: {
+        branch_id: branchId,
+        [Op.or]: [{ store_active_gpd: true }, { store_active_gpr: true }],
+      },
+    });
+
+    let synced = 0, errors = [];
+    for (const erp of erpProducts) {
+      try {
+        const stock = await getErpStock(erp.id, brand);
+        const slug  = erp.store_slug || buildSlug(erp.name, brand, erp.id);
+
+        // Kategori store
+        let storeCategoryId = null;
+        if (erp.category_id) {
+          const { Category: ErpCat } = require('../../models/erp');
+          const erpCat = await ErpCat.findByPk(erp.category_id, { attributes: ['name'] });
+          if (erpCat) {
+            const storeCat = await StoreCategory.findOne({
+              where: { brand, name: { [Op.like]: `%${erpCat.name}%` }, is_active: true },
+            });
+            storeCategoryId = storeCat?.id || null;
+          }
+        }
+
+        await StoreProduct.create({
+          brand, erp_product_id: erp.id,
+          name:        erp.name,
+          slug,
+          sku:         erp.sku || null,
+          description: erp.store_description || '',
+          short_desc:  erp.store_short_desc  || '',
+          price:       parseFloat(erp.store_price)         || parseFloat(erp.sell_price) || 0,
+          price_compare: parseFloat(erp.store_price_compare) || 0,
+          weight:      Math.round((parseFloat(erp.weight) || 0.5) * 1000),
+          stock,
+          images:      Array.isArray(erp.store_images) && erp.store_images.length ? erp.store_images : (erp.photo_url ? [erp.photo_url] : []),
+          variants:    erp.store_variants || {},
+          tags:        Array.isArray(erp.store_tags) ? erp.store_tags : [],
+          is_featured: !!erp.store_featured,
+          is_active:   true,
+          category_id: storeCategoryId,
+          meta_title:  erp.store_meta_title || erp.name,
+          meta_desc:   erp.store_meta_desc  || '',
+        });
+        synced++;
+      } catch (e) {
+        errors.push(`"${erp.name}": ${e.message}`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Selesai: hapus ${deleted} produk lama, sync ${synced} produk baru untuk ${brand}`,
+      data: { deleted, synced, errors },
+    });
+  } catch (err) { next(err); }
+};
+
+// ── GET /store-sync/debug — lihat distribusi brand di store_products ──
+const getStoreDebug = async (req, res, next) => {
+  try {
+    const [dist] = await sequelize.query(`
+      SELECT sp.brand, ep.branch_id, COUNT(*) as count
+      FROM store_products sp
+      LEFT JOIN erp_products ep ON ep.id = sp.erp_product_id
+      GROUP BY sp.brand, ep.branch_id ORDER BY sp.brand, ep.branch_id
+    `);
+    const [wrong] = await sequelize.query(`
+      SELECT sp.brand, ep.branch_id, COUNT(*) as count
+      FROM store_products sp
+      INNER JOIN erp_products ep ON ep.id = sp.erp_product_id
+      WHERE (ep.branch_id = 1 AND sp.brand = 'gpdistro')
+         OR (ep.branch_id = 2 AND sp.brand = 'gpracing')
+      GROUP BY sp.brand, ep.branch_id
+    `);
+    return res.json({ success: true, data: { distribution: dist, wrong_brand: wrong, ok: wrong.length === 0 } });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   // Public
   getConfig, getBanners, getCategories, getProducts, getFeatured, getProductBySlug,
@@ -1215,5 +1362,6 @@ module.exports = {
   getAdminConfig, updateAdminConfig,
   // Sync
   syncFromERP, syncStock, getSyncStatus,
+  syncCategoriesFromERP, clearAndResync, getStoreDebug,
   requireCustomer,
 };

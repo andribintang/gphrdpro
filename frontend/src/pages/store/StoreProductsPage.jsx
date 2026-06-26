@@ -281,6 +281,30 @@ export default function StoreProductsPage() {
     catch { toast.error('Gagal sync stok'); } finally { setSyncing(false); }
   };
 
+  const handleSyncCategories = async () => {
+    setSyncing(true);
+    try {
+      const r = await erpService.storeSyncCategories({ brand });
+      toast.success(r.data.message);
+      // Reload categories
+      const rc = await (await import('../../utils/storeService')).getStoreCategories(brand);
+      const d = rc.data.data;
+      setCategories(Array.isArray(d) ? d : []);
+    } catch { toast.error('Gagal sync kategori'); }
+    finally { setSyncing(false); }
+  };
+
+  const handleClearResync = async () => {
+    if (!confirm(`HAPUS SEMUA produk ${(brand||'').toUpperCase()} di toko lalu sync ulang dari ERP?\nProses ini tidak bisa dibatalkan.`)) return;
+    setSyncing(true);
+    try {
+      const r = await erpService.storeClearResync({ brand });
+      toast.success(r.data.message);
+      await load(); await loadSyncStatus();
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal clear & resync'); }
+    finally { setSyncing(false); }
+  };
+
   // ── Single delete (soft: is_active=false) ──────────────────
   const handleDelete = async (p) => {
     if (!confirm(`Hapus permanen "${p.name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
@@ -402,8 +426,17 @@ export default function StoreProductsPage() {
           <button onClick={() => handleSyncStock()} disabled={syncing} className="btn-secondary gap-1.5 text-sm h-9 disabled:opacity-50">
             {syncing ? <Loader2 size={13} className="animate-spin"/> : <RefreshCw size={13}/>} Sync Stok
           </button>
+          <button onClick={handleSyncCategories} disabled={syncing}
+            className="btn-secondary gap-1.5 text-sm h-9 disabled:opacity-50" title="Sync kategori dari ERP">
+            {syncing ? <Loader2 size={13} className="animate-spin"/> : <Tag size={13}/>} Sync Kategori
+          </button>
           <button onClick={() => handleSync('full')} disabled={syncing} className="btn-primary gap-1.5 text-sm h-9 disabled:opacity-50">
             {syncing ? <Loader2 size={13} className="animate-spin"/> : <Zap size={13}/>} Sync dari ERP
+          </button>
+          <button onClick={handleClearResync} disabled={syncing}
+            className="h-9 px-3 rounded-xl border border-red-300 text-red-600 dark:border-red-700 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 flex items-center gap-1.5"
+            title="Hapus semua & sync ulang (reset bersih)">
+            {syncing ? <Loader2 size={13} className="animate-spin"/> : <Trash2 size={13}/>} Clear & Resync
           </button>
           <button onClick={() => setModal('add')} className="btn-primary gap-1.5 text-sm h-9" style={{ background: brandColor, borderColor: brandColor }}>
             <Plus size={14}/> Tambah

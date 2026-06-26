@@ -133,9 +133,12 @@ router.post  ('/import/customers',     authenticate, allRoles, master.importCust
 router.post  ('/import/orders',        authenticate, allRoles, master.importOrders);
 
 // ── Store Sync (dari ERP routes — lebih reliable) ─────────────
-router.get ('/store-sync/status',      authenticate, allRoles, require('../../controllers/store/storeController').getSyncStatus);
-router.post('/store-sync',             authenticate, allRoles, require('../../controllers/store/storeController').syncFromERP);
-router.post('/store-sync/stock',       authenticate, allRoles, require('../../controllers/store/storeController').syncStock);
+router.get ('/store-sync/status',         authenticate, allRoles, require('../../controllers/store/storeController').getSyncStatus);
+router.get ('/store-sync/debug',          authenticate, allRoles, require('../../controllers/store/storeController').getStoreDebug);
+router.post('/store-sync',                authenticate, allRoles, require('../../controllers/store/storeController').syncFromERP);
+router.post('/store-sync/stock',          authenticate, allRoles, require('../../controllers/store/storeController').syncStock);
+router.post('/store-sync/categories',     authenticate, allRoles, require('../../controllers/store/storeController').syncCategoriesFromERP);
+router.post('/store-sync/clear-resync',   authenticate, allRoles, require('../../controllers/store/storeController').clearAndResync);
 
 // ── Reports ──────────────────────────────────────────────────
 router.get   ('/reports/sales',        authenticate, allRoles, order.getSalesReport);
