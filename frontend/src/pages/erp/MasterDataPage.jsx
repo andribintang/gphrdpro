@@ -102,9 +102,10 @@ function CategoryModal({ category, defaultBranchId, onClose, onSuccess }) {
 // ══════════════════════════════════════════════════════════════
 // Modal SubChannel
 // ══════════════════════════════════════════════════════════════
-function SubChannelModal({ subChannel, onClose, onSuccess }) {
+function SubChannelModal({ subChannel, defaultBranchId, onClose, onSuccess }) {
   const isEdit = !!subChannel;
   const [form, setForm] = useState({
+    branch_id:   subChannel?.branch_id   ?? defaultBranchId ?? '',
     channel:     subChannel?.channel     ?? 'marketplace',
     name:        subChannel?.name        ?? '',
     description: subChannel?.description ?? '',
@@ -116,8 +117,9 @@ function SubChannelModal({ subChannel, onClose, onSuccess }) {
     if (!form.name.trim()) { toast.error('Nama wajib'); return; }
     setSaving(true);
     try {
-      if (isEdit) await erpService.updateSubChannel(subChannel.id, form);
-      else        await erpService.createSubChannel(form);
+      const payload = { ...form, branch_id: form.branch_id ? parseInt(form.branch_id) : null };
+      if (isEdit) await erpService.updateSubChannel(subChannel.id, payload);
+      else        await erpService.createSubChannel(payload);
       toast.success(isEdit ? 'Sub channel diperbarui' : 'Sub channel ditambahkan');
       onSuccess(); onClose();
     } catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
@@ -135,6 +137,23 @@ function SubChannelModal({ subChannel, onClose, onSuccess }) {
           <button onClick={onClose} className="btn-icon-sm"><X size={14}/></button>
         </div>
         <div className="modal-body space-y-3">
+          <div>
+            <label className="field-label">Cabang</label>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(BRANCH).map(([key, b]) => {
+                const Icon = b.icon;
+                const sel = String(form.branch_id) === String(b.id);
+                return (
+                  <button key={key} onClick={() => setForm(f => ({ ...f, branch_id: b.id }))}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                      sel ? `${b.bg} ${b.border} ${b.text}` : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+                    }`}>
+                    <Icon size={13}/> {b.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div>
             <label className="field-label">Channel</label>
             <div className="grid grid-cols-3 gap-2">
@@ -192,8 +211,8 @@ function BranchPanel({ branchKey, categories, subChannels, loading, onRefresh })
   };
 
   const deleteSC = async (id, name) => {
-    if (!confirm(`Nonaktifkan sub channel "${name}"?`)) return;
-    try { await erpService.deleteSubChannel(id); toast.success('Dinonaktifkan'); onRefresh(); }
+    if (!confirm(`Hapus permanen sub channel "${name}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await erpService.deleteSubChannel(id); toast.success(`${name} berhasil dihapus permanen`); onRefresh(); }
     catch (e) { toast.error(e.response?.data?.message || 'Gagal'); }
   };
 
@@ -357,6 +376,7 @@ function BranchPanel({ branchKey, categories, subChannels, loading, onRefresh })
       {scModal && (
         <SubChannelModal
           subChannel={scModal === 'new' ? null : scModal}
+          defaultBranchId={b.id}
           onClose={() => setScModal(null)}
           onSuccess={onRefresh}
         />
@@ -389,19 +409,11 @@ export default function MasterDataPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Sub channel tidak punya branch_id — kita filter berdasarkan nama (konvensi penamaan)
-  // Contoh: "TOKOPEDIA GPRACING" → GP Racing, "SHOPEE GPDISTRO" → GP Distro
-  // Kalau tidak ada konvensi, tampilkan semua di kedua cabang
+  // Filter sub channel by branch_id (sekarang sudah ada kolom branch_id)
+  // Sub channel tanpa branch_id (null) tampil di kedua cabang
   const scForBranch = (bKey) => {
     const b = BRANCH[bKey];
-    const keyword = bKey === 'gpdistro' ? ['distro','gpd','gpdistro'] : ['racing','gpr','gpracing'];
-    const hasMatch = subChannels.some(sc =>
-      keyword.some(k => sc.name.toLowerCase().includes(k))
-    );
-    if (!hasMatch) return subChannels; // fallback: tampilkan semua
-    return subChannels.filter(sc =>
-      keyword.some(k => sc.name.toLowerCase().includes(k))
-    );
+    return subChannels.filter(sc => sc.branch_id === b.id || sc.branch_id === null);
   };
 
   return (

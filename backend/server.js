@@ -773,6 +773,14 @@ app.post('/run-alter', async (req, res) => {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
       results.push('OK: erp_sub_channels table ready');
+      // Tambah branch_id ke erp_sub_channels (untuk filter per cabang di Master Data)
+      await sequelize.query(`ALTER TABLE erp_sub_channels ADD COLUMN branch_id INT NULL AFTER sort_order`).catch(()=>{});
+      results.push('OK: erp_sub_channels.branch_id added');
+      // Update data lama: deteksi dari nama (GPRACING→1, GPDISTRO→2, sisanya null)
+      await sequelize.query(`UPDATE erp_sub_channels SET branch_id = CASE
+        WHEN LOWER(name) LIKE '%racing%' OR LOWER(name) LIKE '%gpr%' THEN 1
+        WHEN LOWER(name) LIKE '%distro%' OR LOWER(name) LIKE '%gpd%' THEN 2
+        ELSE NULL END WHERE branch_id IS NULL`).catch(()=>{});
 
       // Seed default sub channels
       const existing = await sequelize.query('SELECT COUNT(*) as cnt FROM erp_sub_channels', { type: 'SELECT' });

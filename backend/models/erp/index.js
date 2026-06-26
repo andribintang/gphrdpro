@@ -5,6 +5,7 @@ const { Purchase, PurchaseItem, Expense } = require('./Purchase');
 // ── SUB CHANNEL ───────────────────────────────────────────────
 const SubChannel = sequelize.define('ErpSubChannel', {
   id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  branch_id:   { type: DataTypes.INTEGER, allowNull: true },
   channel:     { type: DataTypes.ENUM('wa','marketplace','direct'), allowNull: false },
   name:        { type: DataTypes.STRING(100), allowNull: false },
   description: { type: DataTypes.STRING(200), allowNull: true },

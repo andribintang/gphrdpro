@@ -33,16 +33,19 @@ const getSubChannels = async (req, res, next) => {
 
 const getAllSubChannels = async (req, res, next) => {
   try {
-    const rows = await SubChannel.findAll({ order: [['channel','ASC'],['sort_order','ASC']] });
+    const { branch_id } = req.query;
+    const where = {};
+    if (branch_id) where.branch_id = parseInt(branch_id);
+    const rows = await SubChannel.findAll({ where, order: [['channel','ASC'],['sort_order','ASC']] });
     return res.json({ success: true, data: { sub_channels: rows } });
   } catch (err) { next(err); }
 };
 
 const createSubChannel = async (req, res, next) => {
   try {
-    const { channel, name, description, sort_order } = req.body;
+    const { channel, name, description, sort_order, branch_id } = req.body;
     if (!channel || !name) return res.status(400).json({ success:false, message:'channel dan name wajib' });
-    const sc = await SubChannel.create({ channel, name, description, sort_order: sort_order||0 });
+    const sc = await SubChannel.create({ channel, name, description, sort_order: sort_order||0, branch_id: branch_id||null });
     return res.status(201).json({ success:true, data:{ sub_channel: sc } });
   } catch (err) { next(err); }
 };
@@ -60,8 +63,8 @@ const deleteSubChannel = async (req, res, next) => {
   try {
     const sc = await SubChannel.findByPk(req.params.id);
     if (!sc) return res.status(404).json({ success:false, message:'Tidak ditemukan' });
-    await sc.update({ is_active: false });
-    return res.json({ success:true, message:`${sc.name} dinonaktifkan` });
+    await sc.destroy(); // hard delete — hapus permanen
+    return res.json({ success:true, message:`${sc.name} berhasil dihapus permanen` });
   } catch (err) { next(err); }
 };
 
