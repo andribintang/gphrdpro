@@ -54,6 +54,7 @@ import ErpMasterPage   from './pages/erp/MasterDataPage';
 import DailyReportPage  from './pages/erp/DailyReportPage';
 import ChannelReportPage from './pages/erp/ChannelReportPage';
 import StoreDashboard     from './pages/store/StoreDashboard';
+import StoreSyncPage      from './pages/store/StoreSyncPage';
 import StoreProductsPage  from './pages/store/StoreProductsPage';
 import StoreOrdersPage    from './pages/store/StoreOrdersPage';
 import StoreCatalogPage   from './pages/store/StoreCatalogPage';
@@ -215,6 +216,9 @@ export default function App() {
                 {/* ── Store Management ──────────────────── */}
                 <Route path="store" element={
                   <ProtectedRoute roles={['admin','hr']}><StoreDashboard /></ProtectedRoute>
+                } />
+                <Route path="store/sync" element={
+                  <ProtectedRoute roles={['admin','hr']}><StoreSyncPage /></ProtectedRoute>
                 } />
                 <Route path="store/:brand/products" element={
                   <ProtectedRoute roles={['admin','hr']}><StoreProductsPage /></ProtectedRoute>

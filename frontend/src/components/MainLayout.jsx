@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   Home, Users, Clock, CalendarOff, DollarSign,
   TrendingUp, Building2, SlidersHorizontal, Settings,
-  ShoppingCart, Package, Upload, ShoppingBag, Wallet,
+  ShoppingCart, Package, Upload, ShoppingBag, Wallet, RefreshCw,
   ClipboardList, BarChart3, LogOut, Bell, Sun, Moon,
   ChevronDown, Menu, Truck, Database, CalendarDays,
   RotateCcw, LayoutList, Layers, Target, Zap, Plus, Store, Sparkles, User, Trash2, HardDrive,
@@ -105,6 +105,9 @@ const NAV = [
           { to:'/store/gpracing/catalog',  icon:LayoutList,   label:'Kategori & Voucher', roles:['admin','hr'] },
         ],
       },
+    ],
+    items: [
+      { to:'/store/sync', icon:RefreshCw, label:'Sinkronisasi ERP → Toko', roles:['admin','hr'] },
     ],
   },
   // ── 6. Pengaturan ─────────────────────────────────────────────
