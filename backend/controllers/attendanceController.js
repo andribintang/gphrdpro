@@ -92,6 +92,18 @@ const uploadToCloudinary = async (base64Image) => {
   } catch(e) { console.error('[Cloudinary] Exception:', e.message); return null; }
 };
 
+// Tentukan jam check-out berdasarkan tanggal (weekend/libur/biasa)
+const getEffectiveCheckout = (office, dateStr) => {
+  if (!dateStr) dateStr = getTodayWIB();
+  const d    = new Date(dateStr + 'T00:00:00');
+  const dow  = d.getDay(); // 0=Minggu, 6=Sabtu
+  const holidays = Array.isArray(office.public_holidays) ? office.public_holidays : [];
+
+  if (holidays.includes(dateStr) && office.check_out_holiday) return office.check_out_holiday;
+  if (dow === 6 && office.check_out_weekend) return office.check_out_weekend; // Sabtu
+  return office.check_out_start || '16:00';
+};
+
 const getOfficeCfg = async () => {
   const office = await OfficeSetting.findOne({ where: { is_active: true } });
   return office || { lat: null, lng: null, radius: DEFAULT_RADIUS, check_in_deadline: '08:05', name: 'Kantor' };
@@ -271,10 +283,45 @@ const getOfficeSettingsApi = async (req, res, next) => {
 
 const updateOfficeSettings = async (req, res, next) => {
   try {
-    const { name, address, lat, lng, radius, check_in_deadline, check_out_start, work_hours_required } = req.body;
+    const {
+      name, address, radius,
+      check_in_start, check_in_deadline, check_out_start, work_hours_required,
+      check_out_weekend, check_out_holiday, public_holidays,
+    } = req.body;
+
+    // lat/lng — convert ke float, abaikan jika kosong (allowNull false di model)
+    const lat = req.body.lat !== '' && req.body.lat !== undefined && req.body.lat !== null
+      ? parseFloat(req.body.lat) : undefined;
+    const lng = req.body.lng !== '' && req.body.lng !== undefined && req.body.lng !== null
+      ? parseFloat(req.body.lng) : undefined;
+
+    const updates = {
+      name, address, radius: radius ? parseInt(radius) : undefined,
+      check_in_start: check_in_start || '06:00',
+      check_in_deadline: check_in_deadline || '08:05',
+      check_out_start: check_out_start || '16:00',
+      work_hours_required: work_hours_required ? parseFloat(work_hours_required) : 8,
+      check_out_weekend:  check_out_weekend  || null,
+      check_out_holiday:  check_out_holiday  || null,
+      public_holidays:    Array.isArray(public_holidays)
+        ? public_holidays
+        : (typeof public_holidays === 'string' ? JSON.parse(public_holidays || '[]') : []),
+    };
+    // Hanya update lat/lng jika ada nilai
+    if (lat !== undefined && !isNaN(lat)) updates.lat = lat;
+    if (lng !== undefined && !isNaN(lng)) updates.lng = lng;
+
+    // Hapus key undefined agar tidak override data lama
+    Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
     let office = await OfficeSetting.findOne({ where: { is_active: true } });
-    if (office) { await office.update({ name, address, lat, lng, radius, check_in_deadline, check_out_start, work_hours_required }); }
-    else { office = await OfficeSetting.create({ name, address, lat, lng, radius, check_in_deadline, check_out_start, work_hours_required }); }
+    if (office) {
+      await office.update(updates);
+    } else {
+      // Create baru — lat/lng wajib
+      if (!lat || !lng) return res.status(400).json({ success: false, message: 'Koordinat kantor wajib diisi untuk data baru' });
+      office = await OfficeSetting.create({ ...updates, lat, lng });
+    }
     return res.json({ success: true, message: 'Pengaturan kantor tersimpan', data: { office } });
   } catch (err) { next(err); }
 };
@@ -360,9 +407,7 @@ const updateAttendance = async (req, res, next) => {
 
     const { date, check_in, check_out, status, notes } = req.body;
     const validStatuses = ['present','absent','late','half_day','leave','holiday'];
-    // Semua status valid bisa di-set manual oleh admin
-    // Auto-hitung HANYA jika admin tidak memberikan status sama sekali
-    const manualStatuses = ['present','absent','late','half_day','leave','holiday'];
+    const manualStatuses = ['absent','half_day','leave','holiday']; // status yang tidak di-auto-hitung
 
     // Calculate work hours
     let work_hours = null;
@@ -375,19 +420,19 @@ const updateAttendance = async (req, res, next) => {
       if (work_hours < 0) work_hours = null;
     }
 
-    // Logika status:
-    // 1. Admin set status eksplisit → gunakan langsung (tidak di-override)
-    // 2. Admin ubah jam check_in tanpa set status → auto-hitung dari deadline
-    // 3. Tidak ada keduanya → pertahankan status lama
+    // Auto-determine status dari check_in vs deadline
+    // Kecuali jika admin set manual ke absent/leave/holiday/half_day
     let finalStatus = att.status;
-    if (status && validStatuses.includes(status)) {
-      // Admin override manual — selalu dihormati
+    if (status && manualStatuses.includes(status)) {
+      // Admin set manual — pakai apa adanya
       finalStatus = status;
-    } else if (!status && ci) {
-      // Jam diubah tapi status tidak di-set → auto-hitung ulang
+    } else if (ci) {
+      // Ada check_in — hitung otomatis dari deadline
       const office = await OfficeSetting.findOne({ where: { is_active: true } });
       const deadline = office?.check_in_deadline || '08:05';
-      finalStatus = determineStatus(ci.slice(0, 5), deadline);
+      finalStatus = determineStatus(ci.slice(0,5), deadline);
+    } else if (status && validStatuses.includes(status)) {
+      finalStatus = status;
     }
 
     await att.update({
