@@ -730,6 +730,11 @@ app.post('/run-alter', async (req, res) => {
        WHERE (ep.branch_id = 1 AND sp.brand = 'gpdistro')
           OR (ep.branch_id = 2 AND sp.brand = 'gpracing')`,
 
+      `ALTER TABLE office_settings ADD COLUMN check_out_weekend VARCHAR(5) NULL DEFAULT NULL COMMENT 'Jam check-out Sabtu'`,
+      `ALTER TABLE office_settings ADD COLUMN check_out_holiday VARCHAR(5) NULL DEFAULT NULL COMMENT 'Jam check-out hari libur'`,
+      `ALTER TABLE office_settings ADD COLUMN public_holidays JSON NULL COMMENT 'Daftar tanggal libur YYYY-MM-DD'`,
+      `ALTER TABLE office_settings ADD COLUMN check_in_start VARCHAR(5) NOT NULL DEFAULT '06:00' COMMENT 'Jam mulai bisa check-in'`,
+
       `CREATE TABLE IF NOT EXISTS erp_marketplace_sku_map (
         id INT AUTO_INCREMENT PRIMARY KEY,
         platform VARCHAR(20) NOT NULL,
