@@ -177,7 +177,7 @@ export default function CompanySettingsPage() {
                   <div key={k}>
                     <label className="field-label">{l}</label>
                     <input type={t} value={officeForm[k]||''} placeholder={h}
-                      onChange={e => sf(k, t==='number' ? parseFloat(e.target.value)||0 : e.target.value)}
+                      onChange={e => sof(k, t==='number' ? parseFloat(e.target.value)||0 : e.target.value)}
                       className="input-base"
                       style={k==='check_in_deadline' ? { borderColor:'var(--brand-600)', boxShadow:'0 0 0 2px var(--brand-600)20' } : {}}
                     />
