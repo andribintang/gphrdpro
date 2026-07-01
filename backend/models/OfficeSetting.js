@@ -52,6 +52,27 @@ const OfficeSetting = sequelize.define('OfficeSetting', {
     defaultValue: 8.0,
     comment: 'Jam kerja wajib per hari',
   },
+  // Jam khusus weekend (Sabtu)
+  check_out_weekend: {
+    type: DataTypes.STRING(5),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Jam minimal check-out di hari Sabtu (null = sama dengan hari biasa)',
+  },
+  // Daftar tanggal libur nasional (JSON array: ["2026-01-01","2026-08-17"])
+  public_holidays: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    comment: 'Array tanggal libur nasional format YYYY-MM-DD',
+  },
+  // Jam check-out khusus di hari libur nasional
+  check_out_holiday: {
+    type: DataTypes.STRING(5),
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Jam minimal check-out di hari libur (null = sama dgn hari biasa)',
+  },
   is_active: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
