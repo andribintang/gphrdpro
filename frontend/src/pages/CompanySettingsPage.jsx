@@ -2,8 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Building2, Upload, Save, Loader2, Image,
   Phone, Mail, Globe, MapPin, Palette,
-  CheckCircle2, RefreshCw, X
-, Clock, MapPin, Timer } from 'lucide-react';
+  CheckCircle2, RefreshCw, X, Clock, Timer,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { useCompany } from '../context/CompanyContext';
@@ -101,7 +101,7 @@ export default function CompanySettingsPage() {
     finally { setSavingOffice(false); }
   };
 
-  const sf = (k, v) => setOfficeForm(p => ({ ...p, [k]: v }));
+  const sof = (k, v) => setOfficeForm(p => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
     if (!form.company_name.trim()) { toast.error('Nama perusahaan wajib diisi'); return; }
@@ -194,23 +194,23 @@ export default function CompanySettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="field-label">Nama Kantor</label>
-                  <input value={officeForm.name||''} onChange={e => sf('name',e.target.value)} className="input-base"/>
+                  <input value={officeForm.name||''} onChange={e => sof('name',e.target.value)} className="input-base"/>
                 </div>
                 <div className="md:col-span-2">
                   <label className="field-label">Alamat</label>
-                  <textarea value={officeForm.address||''} onChange={e => sf('address',e.target.value)} rows={2} className="input-base resize-none"/>
+                  <textarea value={officeForm.address||''} onChange={e => sof('address',e.target.value)} rows={2} className="input-base resize-none"/>
                 </div>
                 <div>
                   <label className="field-label">Latitude</label>
-                  <input type="number" step="any" value={officeForm.lat||''} onChange={e => sf('lat',e.target.value)} className="input-base" placeholder="-7.123456"/>
+                  <input type="number" step="any" value={officeForm.lat||''} onChange={e => sof('lat',e.target.value)} className="input-base" placeholder="-7.123456"/>
                 </div>
                 <div>
                   <label className="field-label">Longitude</label>
-                  <input type="number" step="any" value={officeForm.lng||''} onChange={e => sf('lng',e.target.value)} className="input-base" placeholder="110.123456"/>
+                  <input type="number" step="any" value={officeForm.lng||''} onChange={e => sof('lng',e.target.value)} className="input-base" placeholder="110.123456"/>
                 </div>
                 <div>
                   <label className="field-label">Radius Geofence (meter)</label>
-                  <input type="number" min={10} value={officeForm.radius||100} onChange={e => sf('radius',parseInt(e.target.value)||100)} className="input-base"/>
+                  <input type="number" min={10} value={officeForm.radius||100} onChange={e => sof('radius',parseInt(e.target.value)||100)} className="input-base"/>
                 </div>
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function CompanySettingsPage() {
         </div>
       )}
 
-      {activeTab === 'company' && (
+      {activeTab === 'company' && (<>
       <div className="page-header">
         <div>
           <h1 className="page-title">Pengaturan Perusahaan</h1>
@@ -407,6 +407,6 @@ export default function CompanySettingsPage() {
         </div>
       </div>
     </div>
-      )}
+      </>)}
   );
 }
