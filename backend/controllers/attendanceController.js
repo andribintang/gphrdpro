@@ -360,7 +360,9 @@ const updateAttendance = async (req, res, next) => {
 
     const { date, check_in, check_out, status, notes } = req.body;
     const validStatuses = ['present','absent','late','half_day','leave','holiday'];
-    const manualStatuses = ['absent','half_day','leave','holiday']; // status yang tidak di-auto-hitung
+    // Semua status valid bisa di-set manual oleh admin
+    // Auto-hitung HANYA jika admin tidak memberikan status sama sekali
+    const manualStatuses = ['present','absent','late','half_day','leave','holiday'];
 
     // Calculate work hours
     let work_hours = null;
@@ -373,19 +375,19 @@ const updateAttendance = async (req, res, next) => {
       if (work_hours < 0) work_hours = null;
     }
 
-    // Auto-determine status dari check_in vs deadline
-    // Kecuali jika admin set manual ke absent/leave/holiday/half_day
+    // Logika status:
+    // 1. Admin set status eksplisit → gunakan langsung (tidak di-override)
+    // 2. Admin ubah jam check_in tanpa set status → auto-hitung dari deadline
+    // 3. Tidak ada keduanya → pertahankan status lama
     let finalStatus = att.status;
-    if (status && manualStatuses.includes(status)) {
-      // Admin set manual — pakai apa adanya
+    if (status && validStatuses.includes(status)) {
+      // Admin override manual — selalu dihormati
       finalStatus = status;
-    } else if (ci) {
-      // Ada check_in — hitung otomatis dari deadline
+    } else if (!status && ci) {
+      // Jam diubah tapi status tidak di-set → auto-hitung ulang
       const office = await OfficeSetting.findOne({ where: { is_active: true } });
       const deadline = office?.check_in_deadline || '08:05';
-      finalStatus = determineStatus(ci.slice(0,5), deadline);
-    } else if (status && validStatuses.includes(status)) {
-      finalStatus = status;
+      finalStatus = determineStatus(ci.slice(0, 5), deadline);
     }
 
     await att.update({
