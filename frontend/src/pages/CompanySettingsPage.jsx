@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Building2, Upload, Save, Loader2, Image,
   Phone, Mail, Globe, MapPin, Palette,
   CheckCircle2, RefreshCw, X
-} from 'lucide-react';
+, Clock, MapPin, Timer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { useCompany } from '../context/CompanyContext';
@@ -36,6 +36,20 @@ const TOPBAR_THEMES = [
 
 export default function CompanySettingsPage() {
   const { settings, refresh } = useCompany();
+
+  const [activeTab, setActiveTab]     = useState('company');
+  const [officeForm, setOfficeForm]   = useState({
+    name:                'Kantor Pusat',
+    address:             '',
+    lat:                 '',
+    lng:                 '',
+    radius:              100,
+    check_in_start:      '06:00',
+    check_in_deadline:   '08:05',
+    check_out_start:     '16:00',
+    work_hours_required: 8,
+  });
+  const [savingOffice, setSavingOffice] = useState(false);
 
   const [form, setForm] = useState({
     company_name:    settings.company_name    || 'GPDISTRO HR Pro',
@@ -70,6 +84,25 @@ export default function CompanySettingsPage() {
 
   const handleDrop = (e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); };
 
+  // Load office settings
+  useEffect(() => {
+    api.get('/attendance/office/settings').then(r => {
+      const s = r.data.data || r.data;
+      if (s) setOfficeForm(prev => ({ ...prev, ...s }));
+    }).catch(() => {});
+  }, []);
+
+  const handleSaveOffice = async () => {
+    setSavingOffice(true);
+    try {
+      await api.put('/attendance/office/settings', officeForm);
+      toast.success('Pengaturan absensi disimpan');
+    } catch (e) { toast.error(e.response?.data?.message || 'Gagal menyimpan'); }
+    finally { setSavingOffice(false); }
+  };
+
+  const sf = (k, v) => setOfficeForm(p => ({ ...p, [k]: v }));
+
   const handleSave = async () => {
     if (!form.company_name.trim()) { toast.error('Nama perusahaan wajib diisi'); return; }
     setSaving(true);
@@ -82,8 +115,117 @@ export default function CompanySettingsPage() {
     finally { setSaving(false); }
   };
 
+  const TABS = [
+    { k:'company',    l:'Profil Perusahaan' },
+    { k:'attendance', l:'⏰ Pengaturan Absensi' },
+  ];
+
   return (
     <div className="w-full animate-fade-in">
+      {/* Tab selector */}
+      <div className="flex gap-2 mb-5">
+        {TABS.map(t => (
+          <button key={t.k} onClick={() => setActiveTab(t.k)}
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+              activeTab === t.k ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)] shadow-sm' : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'attendance' && (
+        <div className="space-y-5">
+          <div className="page-header">
+            <div>
+              <h2 className="text-lg font-bold">Pengaturan Absensi</h2>
+              <p className="text-sm text-[var(--text-muted)]">Jam kerja, batas toleransi, dan radius lokasi kantor</p>
+            </div>
+            <button onClick={handleSaveOffice} disabled={savingOffice} className="btn-primary gap-2 disabled:opacity-60">
+              {savingOffice ? <Loader2 size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>}
+              Simpan Pengaturan
+            </button>
+          </div>
+
+          {/* Info batas terlambat */}
+          <div className="table-wrapper p-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3">
+              <Clock size={16} className="text-amber-600 flex-shrink-0 mt-0.5"/>
+              <div>
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Batas Jam Masuk (check_in_deadline)</p>
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                  Karyawan yang check-in <strong>setelah</strong> jam ini otomatis berstatus <strong>Terlambat</strong>.
+                  Saat ini: <strong>{officeForm.check_in_deadline}</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="table-wrapper p-5 space-y-5">
+            {/* Jam kerja */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+                <Clock size={13}/> Jam Kerja
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { l:'Mulai Bisa Check-in',   k:'check_in_start',      t:'time', h:'HH:MM' },
+                  { l:'Batas Jam Masuk ⚠️',     k:'check_in_deadline',   t:'time', h:'08:05' },
+                  { l:'Mulai Bisa Check-out',   k:'check_out_start',     t:'time', h:'16:00' },
+                  { l:'Jam Kerja Wajib (jam)',  k:'work_hours_required', t:'number', h:'8' },
+                ].map(({l,k,t,h}) => (
+                  <div key={k}>
+                    <label className="field-label">{l}</label>
+                    <input type={t} value={officeForm[k]||''} placeholder={h}
+                      onChange={e => sf(k, t==='number' ? parseFloat(e.target.value)||0 : e.target.value)}
+                      className="input-base"
+                      style={k==='check_in_deadline' ? { borderColor:'var(--brand-600)', boxShadow:'0 0 0 2px var(--brand-600)20' } : {}}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Lokasi kantor */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+                <MapPin size={13}/> Lokasi Kantor
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="field-label">Nama Kantor</label>
+                  <input value={officeForm.name||''} onChange={e => sf('name',e.target.value)} className="input-base"/>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="field-label">Alamat</label>
+                  <textarea value={officeForm.address||''} onChange={e => sf('address',e.target.value)} rows={2} className="input-base resize-none"/>
+                </div>
+                <div>
+                  <label className="field-label">Latitude</label>
+                  <input type="number" step="any" value={officeForm.lat||''} onChange={e => sf('lat',e.target.value)} className="input-base" placeholder="-7.123456"/>
+                </div>
+                <div>
+                  <label className="field-label">Longitude</label>
+                  <input type="number" step="any" value={officeForm.lng||''} onChange={e => sf('lng',e.target.value)} className="input-base" placeholder="110.123456"/>
+                </div>
+                <div>
+                  <label className="field-label">Radius Geofence (meter)</label>
+                  <input type="number" min={10} value={officeForm.radius||100} onChange={e => sf('radius',parseInt(e.target.value)||100)} className="input-base"/>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[var(--bg-secondary)] rounded-xl p-3">
+              <p className="text-xs text-[var(--text-muted)]">
+                💡 <strong>Tips:</strong> Koordinat lat/lng bisa dicopy dari Google Maps — klik kanan di lokasi kantor → "Copy coordinates".
+                Radius 100m biasanya cukup untuk 1 gedung. Karyawan yang check-in di luar radius akan mendapat peringatan.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'company' && (
       <div className="page-header">
         <div>
           <h1 className="page-title">Pengaturan Perusahaan</h1>
@@ -265,5 +407,6 @@ export default function CompanySettingsPage() {
         </div>
       </div>
     </div>
+      )}
   );
 }
