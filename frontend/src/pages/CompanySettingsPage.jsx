@@ -406,7 +406,7 @@ export default function CompanySettingsPage() {
           </button>
         </div>
       </div>
-    </div>
       </>)}
+  </div>
   );
 }
