@@ -48,7 +48,11 @@ export default function CompanySettingsPage() {
     check_in_deadline:   '08:05',
     check_out_start:     '16:00',
     work_hours_required: 8,
+    check_out_weekend:   '',
+    check_out_holiday:   '',
+    public_holidays:     [],
   });
+  const [newHoliday, setNewHoliday]   = useState('');
   const [savingOffice, setSavingOffice] = useState(false);
 
   const [form, setForm] = useState({
@@ -87,8 +91,10 @@ export default function CompanySettingsPage() {
   // Load office settings
   useEffect(() => {
     api.get('/attendance/office/settings').then(r => {
-      const s = r.data.data || r.data;
-      if (s) setOfficeForm(prev => ({ ...prev, ...s }));
+      const s = r.data?.data?.office || r.data?.data || r.data;
+      if (s && typeof s === 'object' && s.id) setOfficeForm(prev => ({ ...prev, ...s,
+        public_holidays: Array.isArray(s.public_holidays) ? s.public_holidays : [],
+      }));
     }).catch(() => {});
   }, []);
 
@@ -147,43 +153,86 @@ export default function CompanySettingsPage() {
             </button>
           </div>
 
-          {/* Info batas terlambat */}
-          <div className="table-wrapper p-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
-            <div className="flex items-start gap-3">
-              <Clock size={16} className="text-amber-600 flex-shrink-0 mt-0.5"/>
-              <div>
-                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Batas Jam Masuk (check_in_deadline)</p>
-                <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                  Karyawan yang check-in <strong>setelah</strong> jam ini otomatis berstatus <strong>Terlambat</strong>.
-                  Saat ini: <strong>{officeForm.check_in_deadline}</strong>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="table-wrapper p-5 space-y-5">
-            {/* Jam kerja */}
+          <div className="table-wrapper p-5 space-y-6">
+            {/* Jam kerja normal */}
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-3 flex items-center gap-2">
-                <Clock size={13}/> Jam Kerja
+                <Clock size={13}/> Jam Kerja Hari Biasa
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { l:'Mulai Bisa Check-in',   k:'check_in_start',      t:'time', h:'HH:MM' },
-                  { l:'Batas Jam Masuk ⚠️',     k:'check_in_deadline',   t:'time', h:'08:05' },
-                  { l:'Mulai Bisa Check-out',   k:'check_out_start',     t:'time', h:'16:00' },
-                  { l:'Jam Kerja Wajib (jam)',  k:'work_hours_required', t:'number', h:'8' },
-                ].map(({l,k,t,h}) => (
+                  { l:'Mulai Bisa Check-in',   k:'check_in_start',      t:'time',   note:'' },
+                  { l:'Batas Jam Masuk ⚠️',     k:'check_in_deadline',   t:'time',   note:'Lewat jam ini = Terlambat' },
+                  { l:'Mulai Bisa Check-out',   k:'check_out_start',     t:'time',   note:'' },
+                  { l:'Jam Kerja Wajib (jam)',  k:'work_hours_required', t:'number', note:'' },
+                ].map(({l,k,t,note}) => (
                   <div key={k}>
                     <label className="field-label">{l}</label>
-                    <input type={t} value={officeForm[k]||''} placeholder={h}
+                    <input type={t} value={officeForm[k]||''} min={t==='number'?0:undefined}
                       onChange={e => sof(k, t==='number' ? parseFloat(e.target.value)||0 : e.target.value)}
-                      className="input-base"
-                      style={k==='check_in_deadline' ? { borderColor:'var(--brand-600)', boxShadow:'0 0 0 2px var(--brand-600)20' } : {}}
+                      className={`input-base ${k==='check_in_deadline'?'border-amber-400 dark:border-amber-600':''}`}
                     />
+                    {note && <p className="text-[10px] text-amber-600 mt-1">{note}</p>}
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Jam kerja weekend & libur */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+                <Timer size={13}/> Jam Khusus Weekend &amp; Libur Nasional
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mb-3">Kosongkan jika sama dengan hari biasa.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label">Check-out Hari Sabtu</label>
+                  <input type="time" value={officeForm.check_out_weekend||''} placeholder="—"
+                    onChange={e => sof('check_out_weekend', e.target.value)}
+                    className="input-base"/>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Contoh: 14:00 untuk pulang jam 2 siang di Sabtu</p>
+                </div>
+                <div>
+                  <label className="field-label">Check-out Hari Libur Nasional</label>
+                  <input type="time" value={officeForm.check_out_holiday||''} placeholder="—"
+                    onChange={e => sof('check_out_holiday', e.target.value)}
+                    className="input-base"/>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Berlaku untuk tanggal yang ada di daftar libur nasional di bawah</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Daftar libur nasional */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-3">
+                📅 Libur Nasional ({(officeForm.public_holidays||[]).length} tanggal)
+              </p>
+              <div className="flex gap-2 mb-3">
+                <input type="date" value={newHoliday} onChange={e => setNewHoliday(e.target.value)} className="input-base h-9 text-sm"/>
+                <button onClick={() => {
+                  if (!newHoliday) return;
+                  const list = officeForm.public_holidays||[];
+                  if (!list.includes(newHoliday)) {
+                    sof('public_holidays', [...list, newHoliday].sort());
+                  }
+                  setNewHoliday('');
+                }} className="btn-primary h-9 px-4 text-sm gap-1.5 flex-shrink-0">
+                  + Tambah
+                </button>
+              </div>
+              {(officeForm.public_holidays||[]).length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                  {(officeForm.public_holidays||[]).map(d => (
+                    <div key={d} className="flex items-center justify-between gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-xs">
+                      <span className="font-mono">{d}</span>
+                      <button onClick={() => sof('public_holidays', (officeForm.public_holidays||[]).filter(x => x !== d))}
+                        className="text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">Belum ada tanggal libur ditambahkan</p>
+              )}
             </div>
 
             {/* Lokasi kantor */}
@@ -213,12 +262,8 @@ export default function CompanySettingsPage() {
                   <input type="number" min={10} value={officeForm.radius||100} onChange={e => sof('radius',parseInt(e.target.value)||100)} className="input-base"/>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-[var(--bg-secondary)] rounded-xl p-3">
-              <p className="text-xs text-[var(--text-muted)]">
-                💡 <strong>Tips:</strong> Koordinat lat/lng bisa dicopy dari Google Maps — klik kanan di lokasi kantor → "Copy coordinates".
-                Radius 100m biasanya cukup untuk 1 gedung. Karyawan yang check-in di luar radius akan mendapat peringatan.
+              <p className="text-xs text-[var(--text-muted)] mt-2">
+                💡 Koordinat bisa dicopy dari Google Maps — klik kanan lokasi kantor → "Copy coordinates". Radius 100m = 1 gedung.
               </p>
             </div>
           </div>
