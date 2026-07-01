@@ -270,7 +270,7 @@ const update = async (req, res, next) => {
     }
 
     const {
-      name, role,
+      name, email, role,
       nip, position, department, salary_base, join_date, status,
       phone, address, emergency_contact, emergency_phone,
       photo_url,
@@ -291,6 +291,21 @@ const update = async (req, res, next) => {
     if (name) userUpdates.name = name.trim();
     // Only admin can change role
     if (role && req.user.role === 'admin') userUpdates.role = role;
+    // Email — hanya admin/hr yang boleh ubah, dengan cek duplikat
+    if (email && isHRAdmin) {
+      const emailTrimmed = email.toLowerCase().trim();
+      if (emailTrimmed !== user.email) {
+        const emailExists = await User.findOne({
+          where: { email: emailTrimmed, id: { [Op.ne]: userId } },
+          transaction: t,
+        });
+        if (emailExists) {
+          await t.rollback();
+          return res.status(409).json({ success: false, message: 'Email sudah digunakan akun lain' });
+        }
+        userUpdates.email = emailTrimmed;
+      }
+    }
     if (Object.keys(userUpdates).length) await user.update(userUpdates, { transaction: t });
 
     // Update employee — employees can only update own contact info, HR/admin can update all
